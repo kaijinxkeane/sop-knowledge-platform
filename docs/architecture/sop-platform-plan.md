@@ -214,9 +214,31 @@ are never exposed.
 | **Headscale** (scale-up path) | Only the two devices | **None.** It is an open-source, self-hosted replacement for Tailscale's coordination server, and staff keep the same Tailscale apps | Best long-term fit for "local only". Must itself be reachable from the internet: router port-forward with a public or dynamic-DNS address |
 | Plain WireGuard on the office router | Only the two devices | None | Fine for a handful of people; manual key management gets painful as staff grow |
 
-**Decision:** start on **Tailscale**, then move to **self-hosted Headscale**
-when the team grows or when no third-party service is acceptable. The move is
-only a matter of pointing the same apps at the company's own server.
+**Decision: self-hosted Headscale from day one**, so there is no later switch.
+
+- **Where it runs:** Headscale runs on the office machine, next to the app.
+  Staff install the official Tailscale app once and point it at the company's
+  Headscale address. The macOS, Windows, iOS and Android apps all support a
+  custom server.
+- **Relays are self-hosted too:** Headscale's **embedded relay (DERP)** is
+  turned on and Tailscale's public relays are turned off. So even connections
+  that can't go direct never touch Tailscale's infrastructure.
+- **Access rules (ACLs):** staff devices can only reach the app's HTTPS port,
+  nothing else on the office machine.
+- **Requirements, checked before Phase 6:**
+  - The office internet connection must accept incoming connections. Some
+    ISPs use carrier-grade NAT (CGNAT), which blocks this. The fix is to ask
+    the ISP for a public IP, usually a cheap add-on.
+  - A router port-forward: TCP 443 for the control server and UDP 3478 for the
+    relay.
+  - A stable address: a domain name, or dynamic DNS if the IP changes.
+  - A TLS certificate (e.g. Let's Encrypt, which only issues the certificate
+    and sees no traffic).
+- **Responsibility:** Headscale is an internet-facing service the company runs
+  itself. It must be kept updated, and that is part of the runbook.
+- **Fallback:** if the connection is stuck behind CGNAT and no public IP is
+  available, use Tailscale's hosted service. The apps are the same, and moving
+  to Headscale later is just changing the server address.
 
 **Either way:**
 - HTTPS inside the private network.
@@ -225,8 +247,8 @@ only a matter of pointing the same apps at the company's own server.
 - Remote sign-ins are recorded in the audit log.
 
 > Remote access can never be completely free of outside parties: at minimum,
-> traffic crosses the office internet provider. With Headscale, encrypted
-> traffic is all that ever leaves the building. The other external dependency
+> traffic crosses the office internet provider. With Headscale and its own
+> relay, encrypted traffic is all that ever leaves the building. The other external dependency
 > is the Claude API, until the answering tiers move to local models (§5.2).
 
 ### 3.4 Host machine: Mac mini or Windows
@@ -751,7 +773,7 @@ Docker can't use the Mac GPU. Only `demo-vault/` is used.
 | **3. Agents** (2 wk) | Core agent first, then IT and HR; Concierge routing and synthesis, SSE streaming, citations, "no answer" handling, gap logging | Eval set (about 50 Q&A per demo space) ≥ 90% correct with valid citations; zero leaks in the adversarial suite; same evals run against one local model as a baseline |
 | **4. SOP governance** (1–2 wk) | In-platform review with changes shown against the last approved version, version-bound approvals, "last approved version stays live", self-approval flag, frontmatter write-back, `_proposals/` writes, governance report (unattributed edits, unreviewed changes), review-due reminders, Obsidian SOP template, webhooks | Demo: staff A edits an SOP → staff B (lead) approves in the platform → the bot cites it with "written by A, approved by B"; an edit after approval is not cited until re-approved |
 | **5. Retention features** (1–2 wk) | Capture sessions, gap clustering, staleness and bus-factor reports, conflict detection, retract | Reports exposed via API; retract verified across index, caches and history |
-| **6. Company deployment** (1 wk) | Install guide for company admins (Mac mini and Windows/WSL2 variants, Obsidian + Obsidian Git on the device for the admin, Tailscale or Cloudflare Tunnel for remote access, TOTP enrolment, backups); deploy on the company machine with the real vault mounted by them; backups; rate limits; metrics; frozen OpenAPI v1 plus TypeScript client | Admin-run install succeeds; logs confirmed free of note text; API contract frozen |
+| **6. Company deployment** (1 wk) | Install guide for company admins (Mac mini and Windows/WSL2 variants, Obsidian + Obsidian Git on the device for the admin, Headscale with embedded relay and ACLs (CGNAT/public-IP check, port-forward, domain + TLS), TOTP enrolment, backups); deploy on the company machine with the real vault mounted by them; backups; rate limits; metrics; frozen OpenAPI v1 plus TypeScript client | Admin-run install succeeds; logs confirmed free of note text; API contract frozen |
 | **7. Local-model migration** (when hardware is ready) | Choose a GPU host or a high-memory Mac Studio, run the evals for each tier, switch tiers in `models.yaml` (`classifier` tier first, then `core`, optionally `local_only`) | Each switched tier meets the eval threshold; no cloud calls for `local_only` spaces (verified from gateway logs) |
 
 **Later:** SSO (Entra/Google/OIDC: groups map onto roles, so the grants model
