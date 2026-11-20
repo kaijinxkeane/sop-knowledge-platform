@@ -576,6 +576,65 @@ only kept if answer accuracy and citation validity stay at the bar.
 Until then, staying on the API is cheaper and gives better answers. The cost
 dashboard shows when the crossover arrives.
 
+### 5.3 Making the models better over time (especially local ones)
+
+Model weights don't improve just from being used. Answers improve through
+four mechanisms, in order of payoff:
+
+1. **Better retrieval and prompts per model** (cheapest, biggest gains):
+   chunking, filters (programme and stage), passage count and the prompt
+   wording are tuned against the eval set **for each model**, because local
+   models usually need tighter context and more explicit instructions.
+2. **Reviewed playbooks** (learning at the agent layer). When a type of
+   question keeps getting good answers by a certain route (which notes,
+   which filters, what answer shape), the Librarian **proposes a playbook**
+   for that space, e.g. "*for pricing questions in the delivery stage, check
+   the Rate Card SOP first, then the programme's commercial notes*".
+   - A lead approves or rejects each playbook. It is versioned and scoped to
+     one space, and tested with the evals before it goes live.
+   - Agents never write their own instructions unsupervised. That keeps
+     behaviour auditable, and stops something learned in one user's or
+     space's conversations from leaking into another's.
+3. **A data flywheel from human decisions** (on the company machine only):
+   - **Classifier:** every reviewer *approve / edit / reject* of an AI label
+     is a correctly labelled example.
+   - **Answers:** 👍/👎 feedback, plus answers that a lead marked as correct
+     or corrected.
+   - **Search:** which result a user actually opened for a query.
+
+   These are stored as a versioned dataset alongside the evals. They never
+   leave the company machine and are covered by the retention rules (§11).
+4. **Fine-tuning small local models** (Phase 7+):
+   - **The Classifier goes first.** It has the cleanest training data (reviewer
+     decisions) and is a small model.
+   - LoRA fine-tuning runs **on the Mac itself with Apple's MLX**. On 16 GB
+     this is realistic for the 3–4B Classifier, scheduled after hours. Larger
+     answering models need 32 GB+ or a rented GPU for the training run.
+   - **Training data comes from the company's own material:** approved SOPs,
+     human-approved or human-corrected answers, and reviewer labels.
+     **Fine-tuning on raw Claude outputs is not planned** until the company
+     has checked Anthropic's commercial terms on using outputs to train
+     models.
+   - **Every fine-tuned model must pass the full eval set** (for the
+     Classifier: **zero over-exposures**) before it replaces the current one.
+     Models are versioned, with one-click rollback in `models.yaml`.
+
+**Candidate local models** are chosen by eval results, not by name. Examples
+to include in the Phase 7 comparison:
+
+- general open-weight models (e.g. the Qwen family)
+- **Nous Research's Hermes 4 / 4.3** (14B and 36B open weights, strong at
+  tool calling and structured output)
+
+On 16 GB only the small Classifier fits. 14B-class answering models need
+roughly 24–32 GB; 36B-class models need 48 GB+.
+
+**Hermes Agent** (Nous Research's open-source self-improving agent framework)
+was considered and **not adopted as the runtime**. Its self-written skills and
+cross-session memory don't fit per-user permission enforcement, fail-closed
+access or an auditable trail. Its useful idea, reusable learned procedures, is
+adopted in the controlled, human-approved form above (reviewed playbooks).
+
 ### Department agent configuration
 
 Each department agent is defined by `config/spaces/<space>.yaml`: persona,
@@ -719,6 +778,38 @@ Author writes in the app ─▶ clicks "Submit for review" (status: in_review)
     planned → addressed. It is marked addressed when an SOP is published or
     the training is delivered, and HR and leads can see whether questions on
     that topic actually drop afterwards.
+- **"Gaps from your searches" (personal recommendations):**
+  - **Signals:**
+    - Library searches with no or weak results.
+    - Rephrasing the same search several times.
+    - Chat questions with no or low-confidence answers.
+    - 👎 feedback.
+    - Opening several results and leaving without using any.
+  - **What the user sees:** a "Gaps from your searches" panel on their Home
+    page, e.g. "*You've looked for 'handling camera-shy clients in the
+    delivery stage' 4 times this month; no SOP covers it.*" Each suggestion
+    comes with one-click actions:
+    - **Request an SOP:** notifies the space lead, with the anonymised search
+      context.
+    - **Start a draft:** the Curator builds an outline from related notes the
+      user can access, which goes to `_proposals/`.
+    - **Suggest an expert:** the authors of the most closely related SOPs, as
+      likely people to interview in a capture session.
+  - **Privacy:** personal suggestions are visible **only to that user**. They
+    also feed the anonymised aggregate gap topics (minimum 3 people for HR,
+    §7 above).
+  - **No leaks through suggestions:** if a topic *is* covered, but only by an
+    SOP the user can't access, the user sees an ordinary gap ("no SOP you can
+    access covers this; ask the delivery team"), which never confirms that the
+    restricted SOP exists. Separately, the lead sees an **access gap**: "*people
+    without access keep asking about something covered by a restricted SOP;
+    consider publishing a public or internal version*".
+  - **Cost:** grouping runs nightly as a batch job. Embeddings are local, and
+    topic labels are written by the low-cost `router` tier.
+- **Coverage map (gaps nobody has searched for yet):** a programme × stage
+  grid showing which cells have no published SOPs, or only stale ones (e.g.
+  *Executive Presence → follow-up: 0 SOPs*). It is shown to leads and the
+  CEO, and HR sees the same grid without document titles.
 - **Staleness:** a `review_due` dashboard, plus llm-wiki `volatility` and
   `verified` checks.
 - **Bus-factor report:** SOPs whose only owner or contributor is one person,
@@ -818,7 +909,7 @@ app, email, Slack or Teams subscribe without changes to the core.
 | **Library** | Browse by programme, stage or department; search; reading view with links and backlinks; slide and PDF viewers; version history with side-by-side changes | Everyone (filtered by permissions) |
 | **Write** | New SOP form; visual editor; attachment upload (with the original tool and a link back to the Google Slides or Canva design); submit for review; my drafts; merge screen | Staff with `contribute` |
 | **Review** | SOP changes shown against the last approved version; AI label suggestions (grouped, bulk approve, reasoning shown); unplaced notes; governance report | Leads; authors for their own notes |
-| **Retain** | Capture interview sessions; gap dashboards (leads: own space with example questions; **HR: anonymised cross-company view with follow-up status**); review-due list; bus-factor report | Leads, HR, CEO |
+| **Retain** | "Gaps from your searches" panel with request / draft / suggest-expert actions; coverage map (programme × stage); capture interview sessions; gap dashboards (leads: own space with example questions; **HR: anonymised cross-company view with follow-up status**); review-due list; bus-factor report | Leads, HR, CEO |
 | **Admin** | Users, roles and grants; invites with TOTP enrolment; staff notice editor; audit log search and export; retention settings; cost and usage dashboard; Classifier accuracy; system health; API key status | CEO / platform admin |
 | **Account** | Two-factor setup; staff notice acknowledgement; profile | Everyone |
 
@@ -985,9 +1076,9 @@ Docker can't use the Mac GPU. Only `demo-vault/` is used.
 | **2b. AI Classifier** (1–2 wk) | Classifier agent, deterministic safeguards incl. the local name detector (staff names excluded), one-way rule, review queue with grouping and bulk approve, re-classification on edit, optional frontmatter write-back. **UI:** Review → AI label suggestions and unplaced notes | On the demo vault: **0 over-exposures**; ≥ 85% of notes correctly placed without edits; a looser re-classification never takes effect without approval |
 | **3. Agents** (2 wk) | Core agent first, then IT and HR; Concierge routing and synthesis, SSE streaming, citations, "no answer" handling, gap logging. **UI:** Ask (streaming chat, citation badges that open the slide or section, feedback, history), role-based Home | Eval set (about 50 Q&A per demo space) ≥ 90% correct with valid citations; zero leaks in the adversarial suite; same evals run against one local model as a baseline |
 | **4. SOP governance** (1–2 wk) | In-platform review with changes shown against the last approved version, version-bound approvals, "last approved version stays live", self-approval flag, frontmatter write-back, `_proposals/` writes, governance report (unattributed edits, unreviewed changes), review-due reminders, Obsidian SOP template, webhooks. **UI:** Review → SOP changes with side-by-side diff, approve/request changes; in-app notifications | Demo: staff A edits an SOP → staff B (lead) approves in the platform → the bot cites it with "written by A, approved by B"; an edit after approval is not cited until re-approved |
-| **5. Retention features** (1–2 wk) | Capture sessions, gap topics with HR's anonymised view (minimum 3 people) and follow-up tracking, staleness and bus-factor reports, conflict detection, retract, 24-month retention job, staff notice and acknowledgement. **UI:** Retain (capture interviews, gap dashboards incl. HR's anonymised view, review-due, bus factor), cost and usage dashboard, audit log viewer | Reports exposed via API; retract verified across index, caches and history |
+| **5. Retention features** (1–2 wk) | Capture sessions, gap topics with HR's anonymised view (minimum 3 people) and follow-up tracking, staleness and bus-factor reports, conflict detection, retract, 24-month retention job, staff notice and acknowledgement, **personal gap recommendations from searches, access gaps, coverage map**. **UI:** Retain (capture interviews, gap dashboards incl. HR's anonymised view, review-due, bus factor), cost and usage dashboard, audit log viewer | Reports exposed via API; retract verified across index, caches and history |
 | **6. Company deployment** (1 wk) | Install guide for company admins (Mac mini and Windows/WSL2 variants, Obsidian + Obsidian Git on the device for the admin, Headscale with embedded relay and ACLs (CGNAT/public-IP check, port-forward, domain + TLS), TOTP enrolment, backups); deploy on the company machine with the real vault mounted by them; backups; rate limits; metrics; frozen OpenAPI v1; Playwright end-to-end suite green on the deployed machine | Admin-run install succeeds; logs confirmed free of note text; API contract frozen |
-| **7. Local-model migration** (when hardware is ready) | Choose a GPU host or a high-memory Mac Studio, run the evals for each tier, switch tiers in `models.yaml` (`classifier` tier first, then `core`, optionally `local_only`) | Each switched tier meets the eval threshold; no cloud calls for `local_only` spaces (verified from gateway logs) |
+| **7. Local models and the improvement loop** (when hardware is ready) | Model comparison including Qwen-family and Hermes 4/4.3 candidates; the data flywheel (reviewer labels, approved/corrected answers, search clicks); **MLX LoRA fine-tune of the Classifier** on its reviewer decisions; reviewed playbooks; switch tiers in `models.yaml` (`classifier` first, then answering tiers when memory allows), with versioned models and rollback | Each switched or fine-tuned model meets the eval threshold (Classifier: zero over-exposures) before it goes live; no cloud calls for `local_only` spaces (verified from gateway logs) |
 
 **Later:** SSO (Entra/Google/OIDC: groups map onto roles, so the grants model
 is unchanged), Slack/Teams adapters, the dashboard app, ticketing integrations
