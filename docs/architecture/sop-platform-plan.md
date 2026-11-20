@@ -32,6 +32,8 @@ polished UI.
 | Access to `core` | A small **public tier** that everyone can read (e.g. "how to book a training room"). Everything else is core-staff only, and the most sensitive material is restricted to named roles. Notes with missing or invalid access metadata **fail closed** (treated as restricted). |
 | Source of truth | **One Obsidian vault for the whole company**, on a private company computer or server. Staff keep **writing in Obsidian**. The platform watches and indexes the vault **read-only** (§3.1). |
 | Who can see what | An **AI Classifier** reads each note and **proposes** which department owns it and how sensitive it is. It can make access tighter on its own, but **only a human can make access wider** (§4.1). |
+| Team | Core is **2–3 staff plus the CEO**. The CEO is `core-lead` and platform admin; the staff are `core-staff`. The vault is small but growing as SOPs are written. |
+| Classifier model | **Local from day one** at the company deployment (it reads every note, including the most restricted). Answering agents stay on Claude for now (§4.1 data note). |
 | AI models | **Claude API now**, behind a **model gateway**, so the system can move to **local models** later without code changes (§5.1). Embeddings run locally from day one. |
 | Dev environment | Built and tested on the developer's **MacBook** (Apple Silicon) with Docker Compose and a **synthetic demo vault**. |
 | Data handling | The developer **never handles real company data**. Real vaults are only mounted on the company's own machine, by company admins (§11). |
@@ -148,7 +150,7 @@ Example grants, with `core` as the strictest space:
 |---|---|---|---|
 | employee | core, it, hr | public | ask |
 | core-staff | core | internal | ask, contribute |
-| core-lead | core | restricted | ask, review, approve |
+| core-lead (the CEO) | core | restricted | ask, review, approve |
 | it-staff | it | internal | ask, contribute |
 | hr-staff | hr | internal | ask, contribute, review |
 | space-admin:core | core | restricted | all |
@@ -213,8 +215,19 @@ never `public`.
 - **Grouping:** similar notes are grouped (by folder, tags and topic), so a
   reviewer can approve, say, "these 40 workshop worksheets → `core`/`internal`"
   in one action.
-- **Who reviews:** each space's admins and leads review proposals for their
-  own space. Notes the AI couldn't place go to platform admins.
+- **Who reviews:**
+  - **Notes the AI couldn't place** go to the note's **author** (the person
+    who created it), or else the department lead. The author is taken from the
+    note's `author:` frontmatter (pre-filled by the Obsidian template), or from
+    the git commit author if the vault uses git. If neither exists, the note
+    goes to the lead.
+  - **Authors can approve** placing their own note in their **own department**
+    at `internal` or `restricted`.
+  - **Only the department lead** (the CEO, for `core`) can approve the two
+    decisions that widen access the most: making a note **`public`**, or
+    **sharing it with another department**. In a small team this keeps the
+    lead's workload light and still puts IP-exposing decisions with one
+    accountable person.
 - **First run:** the initial pass over the whole vault produces one review
   queue, grouped this way, to work through once.
 - **Optional write-back:** an approved label can be written into the note's
@@ -234,12 +247,17 @@ Auto-applying a looser label could be allowed later, only for a space whose
 admins opt in, and only after the over-exposure rate has stayed at zero on real
 review history.
 
-**Data note:** to classify a note, the Classifier has to read it. While the
+**Data note (decision: local Classifier from day one):** to classify a note, the Classifier has to read it. While the
 Classifier uses the Claude API, that means every note's text goes to Claude
 once, at first index and after edits. Classification is a simple task that
 small models handle well, so the `classifier` tier is the **first candidate to
-move to a local model** (§5.1, Phase 7). If that matters before then, it can be
-pinned to local from the start.
+move to a local model** (§5.1, Phase 7).
+
+Decision: the `classifier` tier runs **locally from day one** at the company
+deployment. During development on the MacBook, both providers are tested
+against the synthetic demo vault, so local accuracy is known before any real
+note is classified. If the local model's mistakes are a problem, they fall on
+the safe side (more review work, not leaks), because of the one-way rule.
 
 ### Enforcement: in code, never by prompt
 
@@ -285,7 +303,7 @@ injected by the server, and they call models only through the model gateway
 | **Concierge** | `router` tier (Haiku) for routing, `answer` tier (Sonnet) for synthesis | `ask_<space>_agent` (only allowed spaces), `get_user_profile`, `create_ticket_handoff` (optional) | No |
 | **Department agent** (one config per space) | `answer` tier (Sonnet) | `search(query)`, `read_article(id)`, `read_index(path)`, `list_sops(filter)`, all scope-filtered | No |
 | **Curator** | `drafting` tier (Opus) | `parse_upload`, `propose_note`, `propose_sop_update`, `link_sources` | Only writes draft notes into the vault's `_proposals/` folder |
-| **Classifier** | `classifier` tier (Haiku now; first to go local) + deterministic safeguards | `read_note`, `list_spaces`, `propose_classification` | Writes proposals and auto-tightened labels only (§4.1) |
+| **Classifier** | `classifier` tier (local model via Ollama; Haiku as eval baseline) + deterministic safeguards | `read_note`, `list_spaces`, `propose_classification` | Writes proposals and auto-tightened labels only (§4.1) |
 | **Librarian** | `answer` tier + deterministic `wiki_core lint` | lint, staleness scan, conflict detection, gap report | Reports and tasks only |
 
 ### 5.1 Model gateway (Claude now, local later)
@@ -303,7 +321,7 @@ class ModelGateway(Protocol):
 
   ```yaml
   router:     {provider: anthropic, model: claude-haiku-5-5}
-  classifier: {provider: anthropic, model: claude-haiku-5-5}
+  classifier: {provider: openai_compat, base_url: http://host.docker.internal:11434/v1, model: qwen3:8b}  # local (Ollama); Claude Haiku as eval baseline
   answer:   {provider: anthropic, model: claude-sonnet-5-5}
   drafting: {provider: anthropic, model: claude-opus-5-5}
   # later, e.g.:
@@ -548,6 +566,10 @@ is unchanged), Slack/Teams adapters, the dashboard app, ticketing integrations
 
 Resolved on 2026-11-20 (see §1):
 
+- Core team of 2–3 staff plus the CEO (CEO = core lead). Unplaced notes are
+  reviewed by their author or the department lead. The vault is small and
+  growing. The Classifier is local from day one.
+
 - `core` covers methodology, training programmes, client delivery and training
   content, with strict access and a public tier.
 - One Obsidian vault, edited directly, with AI-proposed and human-approved
@@ -557,12 +579,11 @@ Resolved on 2026-11-20 (see §1):
 
 Still open:
 
-1. **Roles inside core:** who should be `core-lead` (restricted access) versus
-   `core-staff`? Rough headcounts are enough. Core leads will also review the
-   Classifier's proposals for `core`.
-2. **Vault size and format:** roughly how many notes and attachments? Is the
-   training content mostly slides, PDFs or videos? Is the vault already in git
-   (Obsidian Git plugin)?
+1. **Vault git:** is the vault in git yet, with each person committing under
+   their own name? This is the most reliable way to know a note's author for
+   review routing. Otherwise the `author:` field in the template is used.
+2. **Training content format:** mostly slides, PDFs or videos? This decides
+   which file types are supported first.
 3. **Client register:** is there a list of client names the safeguards can
    check against?
 4. **Target machine** for the company deployment and the later local models
