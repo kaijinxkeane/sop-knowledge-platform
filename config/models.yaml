@@ -34,14 +34,6 @@ tiers:
     max_tokens: 16000
     fallbacks: default
 
-  # Curator drafts (SOPs from interviews/uploads).
-  drafting:
-    provider: anthropic
-    model: claude-opus-5-5
-    effort: high
-    max_tokens: 16000
-    fallbacks: default
-
   # Reads every note to propose access labels -> local from day one.
   classifier:
     provider: openai_compat
@@ -50,6 +42,16 @@ tiers:
     # qwen3:4b vs qwen3:8b decided by the Phase 2b Classifier eval.
     model: qwen3:4b
     max_tokens: 1024
+
+  # Background writing nobody waits for: Librarian reports, review summaries,
+  # handover completeness checks. Local, so this data never leaves the server.
+  # Runs one job at a time; live questions take priority (plan §5).
+  background:
+    provider: openai_compat
+    location: local
+    base_url: ${OLLAMA_BASE_URL}/v1
+    model: qwen3:8b
+    max_tokens: 2048
 
   # Search index embeddings (multilingual, long context, 1024-dim) -> always local.
   # Queries need an instruction prefix; documents are embedded as-is.

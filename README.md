@@ -35,7 +35,7 @@ API docs: http://localhost:8000/api/v1/docs
 | `demo-vault/` | Synthetic Obsidian vault of a fictional training company, with ground-truth labels |
 | `deploy/` | Docker Compose stack and dev vault setup |
 | `scripts/llm-wiki` | Deterministic wiki helpers (lint, retract, index, schema), loaded by `backend/wiki_core` |
-| `scripts/llm-wiki-session` | Session-capture helper (basis for knowledge-capture sessions) |
+| `scripts/llm-wiki-session` | Inherited session-capture helper |
 | `claude-plugin/` | Inherited llm-wiki workflow specs (ingest, compile, query, lint, librarian, refresh, retract), reused as agent prompt material |
 | `tests/` | Structural tests, golden and defect wiki fixtures, promptfoo evals |
 

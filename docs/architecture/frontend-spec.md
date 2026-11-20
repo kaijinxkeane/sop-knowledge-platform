@@ -117,6 +117,9 @@ Status: proposal · 2026-11-20 · Companion to `sop-platform-plan.md` (§8.1)
 - **Answer formatting:** steps, lists and tables are rendered properly.
   "Copy" copies the answer with its citations. "Export PDF" produces a
   one-page answer sheet with its sources.
+- **Several departments:** when more than one department answers, each answer
+  appears in its own section headed by the department, with its own
+  citations. Nothing is merged by a model.
 - **Follow-up chips:** 2–3 suggested next questions. The programme and stage
   filters carry over to the next question.
 - **No-answer state:** "*No SOP you can access covers this.*" This is never
@@ -211,14 +214,17 @@ Status: proposal · 2026-11-20 · Companion to `sop-platform-plan.md` (§8.1)
   link" field (Google Slides or Canva) and the tool name.
 - **Edit clash:** saving over a newer version opens a merge screen (theirs
   vs yours, choose per block).
-- **"Draft with AI"** from a capture interview or an uploaded file. The
-  output lands in `_proposals/` and is clearly marked AI-drafted.
+- **Start from the template:** a new SOP opens with the SOP template's
+  sections. Started from a gap, it is also pre-filled with the programme,
+  stage and links to related SOPs. People write SOPs; there is no AI
+  drafting.
 
 ## 7. Review
 
 - **Tabs:** SOP changes · AI label suggestions · Unplaced notes · Governance.
 - **SOP changes:**
   - a **side-by-side diff against the last approved version**
+  - a short summary of what changed, generated locally on save
   - Approve · Request changes (with comment)
   - an approver option: **"Material change: require re-reading"**, which
     triggers re-acknowledgement for required-reading assignees
@@ -240,8 +246,13 @@ Status: proposal · 2026-11-20 · Companion to `sop-platform-plan.md` (§8.1)
     questions drop after training.
 - **Coverage map:** a programme × stage grid. Click a cell for its SOPs, or
   for "create one".
-- **Capture interviews:** a guided, chat-like interview with a progress
-  outline. Outputs go to `_proposals/`.
+- **Handover notes:** a form following the handover template (client and
+  programme, stage, done, open actions with dates, upcoming sessions, client
+  preferences, files, contacts, risks). Pick the receivers, run the
+  completeness check (flags missing dates or owners), then send. Receivers
+  see it under "Awaiting my acknowledgement" and confirm "read and
+  understood"; questions go in comments. Lists: my handovers, sent, awaiting
+  acknowledgement.
 - **Review due** and **bus-factor** lists.
 
 ## 9. v1 extras
@@ -335,5 +346,5 @@ Status: proposal · 2026-11-20 · Companion to `sop-platform-plan.md` (§8.1)
 | 2b | Review → AI label suggestions, unplaced notes |
 | 3 | **Ask (polish priority)**: streaming, live steps, side-panel citations, follow-ups, no-answer actions, history; ask-first Home |
 | 4 | Review → SOP diffs and approval with material-change flag; **required reading and sign-off**; **PDF/print export**; notifications |
-| 5 | Retain (gaps incl. HR view, coverage map, capture interviews, review due, bus factor); **onboarding paths**; cost dashboard; audit log viewer |
+| 5 | Retain (gaps incl. HR view, coverage map, handover notes, review due, bus factor); **onboarding paths**; cost dashboard; audit log viewer |
 | 6 | Playwright end-to-end suite on the deployed Mac mini; accessibility pass |

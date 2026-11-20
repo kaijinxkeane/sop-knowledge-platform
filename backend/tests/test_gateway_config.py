@@ -10,7 +10,7 @@ ENV = {"OLLAMA_BASE_URL": "http://localhost:11434"}
 
 def test_repo_config_loads_with_expected_tiers():
     cfg = load_gateway_config(CONFIG_DIR, ENV)
-    assert {"router", "answer", "reasoning", "drafting", "classifier", "embedding"} <= set(
+    assert {"router", "answer", "reasoning", "background", "classifier", "embedding"} <= set(
         cfg.tiers
     )
     assert {"core", "it", "hr"} <= set(cfg.spaces)
@@ -21,6 +21,8 @@ def test_reads_every_note_tiers_are_local():
     # The Classifier reads every note and embeddings index everything: local from day one.
     assert cfg.tier("classifier").location == "local"
     assert cfg.tier("embedding").location == "local"
+    # Background writing (Librarian, review summaries, handover checks) stays local.
+    assert cfg.tier("background").location == "local"
     assert cfg.tier("classifier").base_url == "http://localhost:11434/v1"
 
 
@@ -28,7 +30,8 @@ def test_cloud_tiers_use_current_models():
     cfg = load_gateway_config(CONFIG_DIR, ENV)
     assert cfg.tier("answer").model == "claude-haiku-5-5"
     assert cfg.tier("reasoning").model == "claude-sonnet-5-5"
-    assert cfg.tier("drafting").model == "claude-opus-5-5"
+    # Claude answers questions and nothing else; people write SOPs (no AI drafting).
+    assert {n for n, t in cfg.tiers.items() if t.location == "cloud"} == {"answer", "reasoning"}
     # Routing is local: questions never go to Claude just to be routed.
     assert cfg.tier("router").location == "local"
 
