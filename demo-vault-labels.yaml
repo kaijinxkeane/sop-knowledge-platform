@@ -1,0 +1,82 @@
+# Ground-truth labels for every note and attachment in demo-vault/ (fictional data).
+# Used to test the AI Classifier (plan §4.1, Phase 2b): over-exposure (a label
+# looser than this) must be zero.
+#
+# label_source: frontmatter = the note itself declares space/sensitivity
+#               inferred    = no explicit label; the Classifier must work it out
+# safeguard:    a deterministic safeguard must force `restricted` (plan §4.1)
+
+version: 1
+stages: [discovery, strategy, content, delivery, follow-up]
+
+notes:
+  "Programmes/Signature Personal Brand Programme/01 Discovery/Discovery Workshop SOP.md":
+    {space: core, sensitivity: internal, programme: Signature Personal Brand Programme, stage: discovery, doc_type: sop, label_source: inferred}
+  "Programmes/Signature Personal Brand Programme/01 Discovery/Intake Questionnaire Guide.md":
+    {space: core, sensitivity: internal, programme: Signature Personal Brand Programme, stage: discovery, doc_type: guide, label_source: inferred}
+  "Programmes/Signature Personal Brand Programme/02 Strategy/Brand Pillars Workshop SOP.md":
+    {space: core, sensitivity: internal, programme: Signature Personal Brand Programme, stage: strategy, doc_type: sop, label_source: inferred}
+  "Programmes/Signature Personal Brand Programme/03 Content/Content Calendar Setup SOP.md":
+    {space: core, sensitivity: internal, programme: Signature Personal Brand Programme, stage: content, doc_type: sop, label_source: inferred}
+  "Programmes/Signature Personal Brand Programme/04 Delivery/Coaching Session Run-Sheet.md":
+    {space: core, sensitivity: internal, programme: Signature Personal Brand Programme, stage: delivery, doc_type: checklist, label_source: inferred}
+  "Programmes/Signature Personal Brand Programme/05 Follow-up/90-Day Review SOP.md":
+    {space: core, sensitivity: internal, programme: Signature Personal Brand Programme, stage: follow-up, doc_type: sop, label_source: inferred}
+  "Programmes/Executive Presence Workshop/01 Discovery/Executive Pre-Workshop Interview SOP.md":
+    {space: core, sensitivity: internal, programme: Executive Presence Workshop, stage: discovery, doc_type: sop, label_source: inferred}
+  "Programmes/Executive Presence Workshop/04 Delivery/Executive Presence Workshop Run-Sheet.md":
+    {space: core, sensitivity: internal, programme: Executive Presence Workshop, stage: delivery, doc_type: checklist, label_source: inferred}
+  "Methodology/Brand Pillars Framework.md":
+    {space: core, sensitivity: restricted, doc_type: guide, label_source: frontmatter}
+  "Methodology/Voice and Story Method.md":
+    {space: core, sensitivity: internal, doc_type: guide, label_source: inferred}
+  "Commercial/Rate Card 2026.md":
+    {space: core, sensitivity: restricted, doc_type: reference, label_source: frontmatter, safeguard: pricing-terms}
+  "Commercial/Client Contract Checklist.md":
+    {space: core, sensitivity: restricted, doc_type: checklist, label_source: inferred, safeguard: contract-terms}
+  "Shared Templates/SOP Template.md":
+    {space: core, sensitivity: internal, doc_type: template, label_source: inferred}
+  "Training Content/Brand Foundations Deck Notes.md":
+    {space: core, sensitivity: internal, programme: Signature Personal Brand Programme, stage: discovery, doc_type: guide, label_source: inferred}
+  "Public/How to Book a Training Room.md":
+    {space: core, sensitivity: public, doc_type: sop, label_source: frontmatter}
+  "Public/Training Day Dress Code.md":
+    {space: core, sensitivity: public, doc_type: guide, label_source: frontmatter}
+  "IT/Laptop Setup for New Staff.md":
+    {space: it, sensitivity: internal, doc_type: sop, label_source: inferred}
+  "IT/Password Manager Policy.md":
+    {space: it, sensitivity: internal, doc_type: policy, label_source: inferred}
+  "IT/Booking AV Equipment.md":
+    {space: it, sensitivity: public, doc_type: sop, label_source: frontmatter}
+  "IT/Reporting an IT Issue.md":
+    {space: it, sensitivity: public, doc_type: sop, label_source: frontmatter}
+  "HR/Leave Policy.md":
+    {space: hr, sensitivity: public, doc_type: policy, label_source: frontmatter}
+  "HR/New Hire Onboarding Checklist.md":
+    {space: hr, sensitivity: internal, doc_type: checklist, label_source: inferred}
+  "HR/Disciplinary Process.md":
+    {space: hr, sensitivity: restricted, doc_type: policy, label_source: frontmatter}
+  "HR/Expense Claims.md":
+    {space: hr, sensitivity: public, doc_type: sop, label_source: frontmatter}
+  "Inbox/meeting notes 2026-10-14.md":
+    {space: core, sensitivity: restricted, doc_type: note, label_source: inferred, safeguard: personal-data}
+  "Inbox/workshop ideas.md":
+    {space: core, sensitivity: internal, doc_type: note, label_source: inferred}
+  "Inbox/printer jam fix.md":
+    {space: it, sensitivity: public, doc_type: note, label_source: inferred}
+  "Inbox/untitled.md":
+    {space: core, sensitivity: internal, doc_type: note, label_source: inferred}
+
+attachments:
+  "Training Content/Attachments/Brand Foundations.pptx":
+    {space: core, sensitivity: internal, programme: Signature Personal Brand Programme, stage: discovery, doc_type: deck}
+  "Training Content/Attachments/Executive Presence.pptx":
+    {space: core, sensitivity: internal, programme: Executive Presence Workshop, stage: delivery, doc_type: deck}
+  "Training Content/Attachments/Values Card Sort Worksheet.pdf":
+    {space: core, sensitivity: internal, programme: Signature Personal Brand Programme, stage: discovery, doc_type: worksheet}
+  "Training Content/Attachments/Brand Audit Worksheet.pdf":
+    {space: core, sensitivity: internal, doc_type: worksheet, note: "not embedded in any note (orphan attachment)"}
+
+ignored:   # never indexed
+  - "_templates/SOP.md"
+  - ".obsidian/app.json"

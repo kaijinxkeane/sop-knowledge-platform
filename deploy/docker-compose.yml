@@ -1,0 +1,83 @@
+# Local development / single-machine deployment (Mac mini or Windows+WSL2).
+# Ollama runs natively on the host (Docker can't use the Mac GPU), reached via
+# host.docker.internal. Caddy (TLS + frontend) and Headscale arrive in later phases.
+#
+#   cp .env.example .env            # then edit
+#   ./deploy/init-demo-vault.sh     # development only: create the demo vault repo
+#   docker compose -f deploy/docker-compose.yml up -d --build
+
+name: sop-platform
+
+x-backend: &backend
+  build:
+    context: ..
+    dockerfile: backend/Dockerfile
+  env_file:
+    - path: ../.env
+      required: false
+  environment:
+    DATABASE_URL: postgresql+asyncpg://sop:${POSTGRES_PASSWORD:-sop-dev-only}@postgres:5432/sop
+    REDIS_URL: redis://redis:6379/0
+    VAULT_PATH: /vault
+    SOP_CONFIG_DIR: /config
+    OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+  volumes:
+    - ${VAULT_HOST_PATH:-./data/vault}:/vault
+    - ../config:/config:ro
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: sop
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sop-dev-only}
+      POSTGRES_DB: sop
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sop -d sop"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    # Bound to localhost only: never reachable from the network.
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "60", "1", "--maxmemory", "128mb", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    <<: *backend
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/live')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  worker:
+    <<: *backend
+    command: ["arq", "app.workers.main.WorkerSettings"]
+
+volumes:
+  pgdata:
+  redisdata:

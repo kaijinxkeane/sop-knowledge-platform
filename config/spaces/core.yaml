@@ -1,0 +1,4 @@
+name: core
+title: "Core delivery (methodology, programmes, client delivery, training content)"
+# true = this space's text may never be sent to a cloud model (plan §5.1)
+local_only: false

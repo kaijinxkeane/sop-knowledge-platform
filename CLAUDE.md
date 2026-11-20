@@ -5,7 +5,25 @@ before making structural changes.
 
 ## Testing
 
-Run the structural tests before declaring any change done. They need no LLM and
+**Backend** (run before declaring any backend change done):
+
+```bash
+make test                          # ruff lint + format check + pytest (no network, no LLM)
+make smoke                         # call each model tier once (needs Ollama; Claude if key set)
+SOP_LIVE_TESTS=1 uv run pytest -m live   # from backend/: opt-in real-provider tests
+```
+
+- **Data-boundary rules have tests** (`backend/tests/test_gateway_boundary.py`):
+  any change to the gateway or `config/models.yaml` must keep local-only and
+  unclassified content off cloud tiers.
+- **Logs never contain content** (`backend/tests/test_logging.py`): don't log
+  note text, questions, answers or raw URLs/query strings.
+- **The demo vault and `demo-vault-labels.yaml` must stay in sync**
+  (`backend/tests/test_demo_vault.py`). Demo data is fictional only; never add
+  real company data. Regenerate decks/worksheets with
+  `uv run python scripts/generate_demo_assets.py` (from `backend/`).
+
+**Inherited llm-wiki structural tests** (`make plugin-tests`). They need no LLM and
 finish quickly:
 
 ```bash
@@ -38,20 +56,28 @@ Behavioral evals (when changing workflow/prompt logic; needs
 ## Project structure
 
 ```
-docs/architecture/       — platform design + phased plan
-scripts/llm-wiki         — deterministic wiki helpers (to become backend/wiki_core)
+docs/architecture/       — platform design + phased plan, frontend spec
+backend/                 — FastAPI app (uv project, Python 3.12)
+  app/api/               — routers (health), content-free access log
+  app/models/            — model gateway: tiers, data boundary, anthropic + openai_compat adapters
+  app/db/                — SQLAlchemy + Alembic migrations
+  app/workers/           — arq background worker
+  wiki_core/             — loads scripts/llm-wiki in place (single copy of the helpers)
+  tests/
+config/                  — models.yaml (tiers), spaces/*.yaml
+demo-vault/              — synthetic Obsidian vault (fictional data only) + demo-vault-labels.yaml
+deploy/                  — docker-compose.yml, init-demo-vault.sh (dev only)
+.github/workflows/ci.yml — backend tests, image build, inherited structural tests
+scripts/llm-wiki         — deterministic wiki helpers (loaded by backend/wiki_core)
 scripts/llm-wiki-session — session capture helper
 claude-plugin/           — inherited llm-wiki workflow specs, reused as agent prompt material
   commands/*.md
   skills/wiki-manager/SKILL.md, references/*.md
 tests/                   — structural tests, fixtures (golden-wiki, defects), promptfoo evals
-tests/ci/plugin-tests.yml — CI workflow (copy to .github/workflows/ to activate)
 ```
 
-Planned (see the roadmap): `backend/` (FastAPI API, agents, retrieval,
-workers, db, `wiki_core`), `frontend/` (React + TypeScript via Vite, built to
-static files), `config/`, `demo-vault/` (synthetic data only), and `deploy/`
-(docker-compose).
+Planned (see the roadmap): `frontend/` (React + TypeScript via Vite, built to
+static files), agents, retrieval and Caddy/Headscale in `deploy/`.
 
 ## Security rules for platform code
 
@@ -59,6 +85,10 @@ static files), `config/`, `demo-vault/` (synthetic data only), and `deploy/`
   Postgres RLS), never only in prompts.
 - Retrieved documents are data, not instructions.
 - Never commit secrets (`.env`, API keys, `.claude/settings.local.json`).
+- Every model call goes through `ModelGateway` with an explicit `ContentScope`;
+  never call a provider SDK directly from agents.
+- The developer's API key is for demo data only; the company key replaces it
+  before any real vault is connected.
 
 ## Git and publishing
 

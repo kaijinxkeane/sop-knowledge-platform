@@ -1068,6 +1068,11 @@ repo on the company device, mounted at deploy time via `VAULT_PATH`.
 
 ## 12. Phased plan
 
+**Progress:** Phase 0 *backend* done (2026-11-20): the gateway with its data
+boundary, the Docker stack, migrations, the demo vault, CI and a content-free
+logging policy. The Phase 0 *frontend* skeleton follows when frontend work
+starts (backend first, by decision).
+
 Phases 0–5 (backend and frontend together) are built and tested on a MacBook (Apple Silicon) using Docker
 Compose. Ollama runs natively on the Mac for the local embeddings, because
 Docker can't use the Mac GPU. Only `demo-vault/` is used.
