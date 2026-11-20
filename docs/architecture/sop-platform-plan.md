@@ -207,18 +207,27 @@ silently overwritten.
 Remote staff reach **only the app**. The database, the vault files and Ollama
 are never exposed.
 
-- **Recommended: Tailscale.** A private network between staff devices and the
-  office machine. There are no open ports on the office internet connection,
-  it is free for small teams, and it works on macOS, Windows, iOS and Android.
-  Staff install it once and sign in.
-- **Alternative: Cloudflare Tunnel** with Cloudflare Access login in front, if
-  staff shouldn't have to install anything. The app is then reachable at a
-  company web address.
-- **Either way:**
-  - HTTPS only.
-  - **Two-factor sign-in (TOTP) required for all users.**
-  - Short sessions, with lockout after repeated failed logins.
-  - Remote sign-ins are recorded in the audit log.
+| Option | Who can see the traffic | Third-party dependency | Fit |
+|---|---|---|---|
+| **Cloudflare Tunnel** | **Cloudflare decrypts it.** Every SOP and answer passes through their servers in readable form | Cloudflare for everything | **Rejected:** conflicts with keeping data local |
+| **Tailscale** (start here) | Only the two devices. Traffic is end-to-end encrypted (WireGuard) and usually goes directly device-to-device. Relays, when needed, carry only encrypted packets | Tailscale's coordination service handles logins and key exchange, not your data | Easiest start; per-user pricing beyond the free tier |
+| **Headscale** (scale-up path) | Only the two devices | **None.** It is an open-source, self-hosted replacement for Tailscale's coordination server, and staff keep the same Tailscale apps | Best long-term fit for "local only". Must itself be reachable from the internet: router port-forward with a public or dynamic-DNS address |
+| Plain WireGuard on the office router | Only the two devices | None | Fine for a handful of people; manual key management gets painful as staff grow |
+
+**Decision:** start on **Tailscale**, then move to **self-hosted Headscale**
+when the team grows or when no third-party service is acceptable. The move is
+only a matter of pointing the same apps at the company's own server.
+
+**Either way:**
+- HTTPS inside the private network.
+- **Two-factor sign-in (TOTP) required for all users.**
+- Short sessions, with lockout after repeated failed logins.
+- Remote sign-ins are recorded in the audit log.
+
+> Remote access can never be completely free of outside parties: at minimum,
+> traffic crosses the office internet provider. With Headscale, encrypted
+> traffic is all that ever leaves the building. The other external dependency
+> is the Claude API, until the answering tiers move to local models (§5.2).
 
 ### 3.4 Host machine: Mac mini or Windows
 
@@ -409,7 +418,7 @@ injected by the server, and they call models only through the model gateway
 | Agent | Model (default) | Tools | Writes? |
 |---|---|---|---|
 | **Concierge** | `router` tier (Haiku) for routing, `answer` tier (Sonnet) for synthesis | `ask_<space>_agent` (only allowed spaces), `get_user_profile`, `create_ticket_handoff` (optional) | No |
-| **Department agent** (one config per space) | `answer` tier (Sonnet) | `search(query)`, `read_article(id)`, `read_index(path)`, `list_sops(filter)`, all scope-filtered | No |
+| **Department agent** (one config per space) | `answer` tier (Haiku 5.5) with escalation to `reasoning` tier (Sonnet 5.5), §5.2 | `search(query)`, `read_article(id)`, `read_index(path)`, `list_sops(filter)`, all scope-filtered | No |
 | **Curator** | `drafting` tier (Opus) | `parse_upload`, `propose_note`, `propose_sop_update`, `link_sources` | Only writes draft notes into the vault's `_proposals/` folder |
 | **Classifier** | `classifier` tier (local model via Ollama; Haiku as eval baseline) + deterministic safeguards | `read_note`, `list_spaces`, `propose_classification` | Writes proposals and auto-tightened labels only (§4.1) |
 | **Librarian** | `answer` tier + deterministic `wiki_core lint` | lint, staleness scan, conflict detection, gap report | Reports and tasks only |
@@ -430,7 +439,8 @@ class ModelGateway(Protocol):
   ```yaml
   router:     {provider: anthropic, model: claude-haiku-5-5}
   classifier: {provider: openai_compat, base_url: http://host.docker.internal:11434/v1, model: qwen3:8b}  # local (Ollama); Claude Haiku as eval baseline
-  answer:   {provider: anthropic, model: claude-sonnet-5-5}
+  answer:   {provider: anthropic, model: claude-haiku-5-5}
+  reasoning: {provider: anthropic, model: claude-sonnet-5-5}
   drafting: {provider: anthropic, model: claude-opus-5-5}
   # later, e.g.:
   # answer: {provider: openai_compat, base_url: http://ollama:11434/v1, model: qwen3:32b}
@@ -453,6 +463,55 @@ class ModelGateway(Protocol):
 - **Quality gate before switching:** the same eval set (§12, Phase 3) runs
   against each candidate local model, and a tier only moves to local when it
   meets the pass threshold.
+
+### 5.2 Cost efficiency (without weakening answers)
+
+Every lever here is **measured against the eval set** (Phase 3). A lever is
+only kept if answer accuracy and citation validity stay at the bar.
+
+1. **Cheapest capable model first, with escalation:**
+   - Department agents answer with **Haiku 5.5** by default. They escalate to
+     **Sonnet 5.5** only when the question needs real reasoning: the evidence
+     conflicts, the answer spans several SOPs, confidence is low, or the user
+     asks for a step-by-step plan.
+   - At list prices, Haiku 5.5 input is about 20× cheaper than Sonnet 5.5.
+   - The escalation rule is tuned on the eval set, not guessed.
+2. **Prompt caching:** system prompts, tool definitions and space configs are
+   frozen and placed first, so repeat requests read them from cache. Cache
+   reads cost a fraction of normal input.
+3. **Tight context:** only the top passages, at slide or section level, are
+   sent, never whole documents. Each agent has a per-question token cap.
+4. **Skip work that adds nothing:** when only one department answers, its
+   answer streams straight to the user without a separate synthesis call.
+   Routing runs at low effort.
+5. **Answer reuse:** an identical question, asked with the same access scopes
+   against the same document versions, reuses the stored answer. It is
+   invalidated automatically when any cited SOP changes. SOP questions repeat a
+   lot.
+6. **Batch for non-urgent work** (50% discount): Librarian scans, bulk
+   re-checks and overnight Curator drafts.
+7. **Everything that reads the whole vault is already local:** embeddings, the
+   Classifier, OCR and the name detector.
+8. **Visibility:** each request logs tokens and cost. A cost dashboard shows
+   cost per user, per space and per question. Budgets give a soft warning and
+   a hard daily cap.
+
+**Rough cost per question** (to be replaced by measured numbers from Phase 3):
+
+| Path | Approximate cost |
+|---|---|
+| Haiku answer (most questions) | ≈ $0.003–0.01 |
+| Sonnet escalation | ≈ $0.04–0.08 |
+| Blended (about 20% escalated) | ≈ **$0.015** |
+
+**When local models make sense:** switch an answering tier to local when
+**both** of these hold:
+- the monthly API bill for that tier, multiplied by 12–18 months, exceeds the
+  cost of the hardware that can serve it at peak concurrency
+- the local model passes the same evals
+
+Until then, staying on the API is cheaper and gives better answers. The cost
+dashboard shows when the crossover arrives.
 
 ### Department agent configuration
 
@@ -728,5 +787,3 @@ Still open (none block Phases 0–3):
 1. **Usage:** expected users and questions per day, for Claude API cost sizing.
 2. **Host spec:** once the machine is chosen, its memory (Mac) or GPU
    (Windows). This decides when answering agents can also move to local models.
-3. **Remote access:** Tailscale (staff install an app once) or Cloudflare
-   Tunnel (a company web address, nothing to install)?
