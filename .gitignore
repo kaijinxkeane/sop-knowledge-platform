@@ -1,0 +1,42 @@
+# Secrets and local config
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.claude/settings.local.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Node / Next.js (future frontend)
+node_modules/
+.next/
+out/
+coverage/
+
+# Test / eval artifacts
+tests/workspace/
+tests/results.json
+.promptfoo/
+
+# Local runtime data
+.tmp/
+*.log
+spaces/**/.cache/
+deploy/data/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+*.swp
