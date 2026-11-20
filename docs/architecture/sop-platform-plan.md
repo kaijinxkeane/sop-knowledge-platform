@@ -842,6 +842,10 @@ app, email, Slack or Teams subscribe without changes to the core.
 
 ## 8.1 Frontend (web app)
 
+The full screen-by-screen spec, wireframes and the v1 extras (onboarding
+paths, required reading with sign-off, PDF export, bookmarks and Ctrl+K) are
+in [`frontend-spec.md`](frontend-spec.md).
+
 ### Decisions (2026-11-20)
 
 | Topic | Decision |
