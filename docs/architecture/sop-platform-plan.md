@@ -35,6 +35,9 @@ polished UI.
 | Team | Core is **2–3 staff plus the CEO**. The CEO is `core-lead` and platform admin; the staff are `core-staff`. The vault is small but growing as SOPs are written. |
 | Classifier model | **Local from day one** at the company deployment (it reads every note, including the most restricted). Answering agents stay on Claude for now (§4.1 data note). |
 | AI models | **Claude API now**, behind a **model gateway**, so the system can move to **local models** later without code changes (§5.1). Embeddings run locally from day one. |
+| Vault host | The vault lives on a **local company device** (a server or a Mac). Staff sync it through a **self-hosted git server on that device**, which records **who wrote each change** (§3.2). |
+| Reviews | **Reviews and approvals happen in the platform**, where every reviewer is logged in. Each approval is tied to the exact version reviewed (§6). |
+| Training content | **Slides are the main format**, with PDFs mainly used as worksheets. Videos come later. Slides and PDFs are cited by slide or page number (§3.1). |
 | Dev environment | Built and tested on the developer's **MacBook** (Apple Silicon) with Docker Compose and a **synthetic demo vault**. |
 | Data handling | The developer **never handles real company data**. Real vaults are only mounted on the company's own machine, by company admins (§11). |
 
@@ -111,9 +114,21 @@ owning it**:
   - `[[wikilinks]]` and `[[note|alias]]`
   - `![[embeds]]`
   - `#tags`
-  - attachments, with text extracted for search: PDF, PowerPoint (`.pptx`),
-    Word (`.docx`) and images. Training videos and audio come later, using
-    local transcription (e.g. Whisper on the server).
+  - attachments, processed locally (nothing leaves the device):
+    - **Slide decks (main training format):** `.pptx` is read **slide by
+      slide**: title, body text, tables and **speaker notes**. Each slide is
+      its own searchable chunk, so answers cite "*Brand Foundations deck, slide
+      14*". Text inside images (diagrams, screenshots of frameworks) is read
+      with local OCR. Keynote and Google Slides files are indexed from a
+      `.pptx` or PDF export (see §13).
+    - **PDF worksheets:** text **and fillable form-field labels** are
+      extracted, cited by page. Scanned PDFs go through local OCR.
+    - **Word** (`.docx`) and images.
+    - **Videos and audio** come later, using local transcription (e.g. Whisper
+      on the device).
+    - **Access:** each attachment is classified like a note, and defaults to
+      `restricted`. Embedding a deck in a public note does **not** make the
+      deck public.
 
   It ignores `.obsidian/`, `.trash/` and `_templates/`. llm-wiki's link and
   frontmatter handling already covers most of this.
@@ -124,12 +139,46 @@ owning it**:
   bookmarks and folder habits keep working. Folders still help: an optional
   rule in `vault.yaml` (e.g. `Training Content/ → core`) counts as a human
   decision.
-- **Versioning:** recommend the vault is a git repo (the Obsidian Git plugin
-  auto-commits). Then every SOP has a history and an author per change. Without
-  git, the platform still keeps its own content-hash history of what it indexed.
+- **Versioning:** see §3.2. Every change to every note and attachment is a
+  git commit, so any past version can be shown and compared.
 - **Rebuildable:** Postgres is only an index. Deleting it and re-scanning the
   vault restores everything except users, permissions and the audit log, which
   are backed up separately.
+
+### 3.2 Who wrote what: a self-hosted git server on the vault device
+
+You need to know **who wrote each note**. That can't be worked out reliably if
+staff simply edit files in a shared network folder: file shares, Syncthing and
+Obsidian Sync don't record a trustworthy "edited by" for each change. So:
+
+```
+ Staff laptops (Obsidian + Obsidian Git plugin, own login)
+        │  auto pull/commit/push every few minutes
+        ▼
+ Company device (server or Mac)
+   ├─ Forgejo: lightweight self-hosted git server, one account per staff member
+   ├─ vault repo  ◀── the platform reads this (read-only checkout)
+   └─ SOP platform (docker compose)
+```
+
+- **Each staff member** has their own git account and an Obsidian Git plugin
+  configured with it. They write in Obsidian as usual; the plugin saves and
+  syncs in the background.
+- **Authorship comes from the authenticated push,** not the self-reported
+  commit name. Forgejo records which logged-in account pushed each change. The
+  platform maps git accounts to platform users, so "written by" is the person
+  who actually logged in.
+- **Edits that bypass git** (someone editing files directly on the device) are
+  flagged as **unattributed** in the governance report.
+- **Bonus:** git is also the sync mechanism, the off-device backup source and
+  the full version history, in one tool. With a team of 3–4, merge conflicts
+  are rare, and the plugin pulls before it pushes.
+- **Limits:**
+  - Obsidian Git works best on laptops/desktops; mobile editing is limited.
+  - Working away from the office needs network access to the device (e.g.
+    Tailscale or a VPN). See §13.
+- **Fallback:** if a note has no attributable commit, the `author:` field
+  pre-filled by the Obsidian template is shown, marked as self-reported.
 
 ## 4. Permission model (the core requirement)
 
@@ -390,6 +439,8 @@ status: published        # draft | in_review | published | retired
 space: core              # optional; human label overrides the AI Classifier (§4.1)
 sensitivity: internal    # public | internal | restricted (missing → restricted)
 owner: "[[Jane Tan]]"
+author: "[[Jane Tan]]"   # template default; the real author comes from git (§3.2)
+# reviewer / approved_by / approved_on are written by the platform after review
 reviewer: "[[Alex Lim]]"
 approved_by: "[[Alex Lim]]"
 approved_on: 2026-11-02
@@ -398,30 +449,47 @@ review_due: 2027-05-01
 tags: [workshop, discovery, onboarding]
 ```
 
-### Workflow
+### Workflow: write in Obsidian, review in the platform
 
 ```
-write in Obsidian (draft) ─▶ status: in_review ─▶ reviewer sets status: published
-       ▲                                                    │
-       └── Curator drafts land in _proposals/               ▼
-                                     Librarian flags review_due ─▶ new version | retired
+Author writes in Obsidian ─▶ sets status: in_review (or "Submit" in platform)
+                                         │
+                                         ▼
+          Reviewer opens it in the platform (logged in), sees the changes
+          compared with the last approved version, then approves or
+          requests changes
+                                         │ approve
+                                         ▼
+          Platform records reviewer, time, exact version ─▶ published
+          (optional: writes reviewed_by / approved_on into the note's
+           frontmatter as a commit by the "platform" account)
+                                         │
+                Librarian flags review_due ─▶ new version | retired
 ```
 
-- **Only `status: published` notes are used in answers.** Drafts, in-review
-  notes and `_proposals/` are visible only to users with `review` on that
-  space.
-- **The platform does not enforce who may change `status`.** That depends on
-  vault write access. To catch mistakes, the Librarian reports:
-  - published notes without `approved_by`
-  - an approver who doesn't hold the `approve` grant
-  - and, if the vault uses git, a `status: published` change committed by
-    someone other than the listed approver
-- **Every indexed version is recorded** by content hash, plus the git commit if
-  available. The bot cites the current published version. Earlier versions stay
-  available for audit.
+- **Who reviewed is recorded by the platform, not typed into the note.**
+  Reviewing requires a logged-in platform session. Each approval is stored with
+  the reviewer, the time, the git commit and the content hash. In the
+  frontmatter, `reviewer:` and `approved_by:` are **outputs** written back by
+  the platform; if someone types them by hand, they are ignored.
+- **An approval covers one exact version.** If the note is edited after
+  approval:
+  - The new version goes back to **pending review**.
+  - The bot **keeps citing the last approved version**, retrieved from git,
+    until the change is approved.
+
+  Published SOPs can't change silently.
+- **Who can approve:**
+  - In `core`, the **CEO (core lead)** approves SOPs.
+  - When the lead writes an SOP, they may approve it themselves. It is recorded
+    as *self-approved* and shown as such in reports.
+- **Only approved content is used in answers.** Drafts, in-review notes and
+  `_proposals/` are visible only to users with `review` on that space.
+- **Every version is kept,** with its author (from git), its reviewer (from the
+  platform) and its approval state. The bot cites the current approved version.
 - **Notes without frontmatter** (existing ordinary notes) are still indexed as
-  `doc_type: guide`. They get their sensitivity from the fail-closed rules in
-  §4, so the platform is useful on an untidy vault from day one.
+  `doc_type: guide`. They get their access from the classification rules in
+  §4.1, but are only cited after someone approves them.
 
 ## 7. Knowledge-retention features
 
@@ -471,7 +539,10 @@ app, email, Slack or Teams subscribe without changes to the core.
 - `documents(id, vault_path, doc_type, sop_id, title, status, owner, review_due, content_hash)`
 - `document_access(document_id, space_id, role: owner|shared, sensitivity, source: frontmatter|folder_rule|approved_ai|auto_tighten|safeguard|default, decided_by, decided_at)`: the labels actually in force
 - `classification_proposals(document_id, content_hash, proposed_space, proposed_sensitivity, proposed_shared_with, confidence, rationale, evidence_spans, model, status, reviewed_by, reviewed_at)`
-- `document_versions(document_id, version, content_hash, git_commit, approved_by, approved_on, indexed_at)`
+- `document_versions(document_id, version, content_hash, git_commit, authored_by, author_source: git_push|frontmatter|unattributed, indexed_at)`
+- `reviews(document_id, content_hash, git_commit, reviewer_id, decision: approved|changes_requested, self_approved, comment, decided_at)`: an approval applies only to that exact version
+- `git_identities(user_id, git_account)`
+- `attachment_parts(document_id, part: slide|page, number, title, speaker_notes)`: slide- and page-level citations
 - `document_links(from_id, to_id)` (resolved `[[wikilinks]]`, used for related SOPs and broken-link reports)
 - `chunks(id, document_id, version, text, embedding vector, tsv tsvector)`. Access comes from `document_access` via a join, and RLS is enforced there, so changing a label applies instantly without re-indexing.
 - `uploads`
@@ -504,7 +575,7 @@ platform/
 config/         vault.yaml (optional folder rules, safeguard terms), spaces/*.yaml, models.yaml
 demo-vault/     synthetic one-vault company (mixed, partly unsorted): the only data in git
 demo-vault-labels.yaml  correct space/sensitivity labels for every demo note (Classifier tests)
-deploy/docker-compose.yml       api, worker, postgres+pgvector, redis
+deploy/docker-compose.yml       api, worker, postgres+pgvector, redis, forgejo (git server)
 ```
 
 The real company vault is **never** in this repository. It is mounted at
@@ -548,14 +619,14 @@ Docker can't use the Mac GPU. Only `demo-vault/` is used.
 
 | Phase | Scope | Exit criteria |
 |---|---|---|
-| **0. Foundations** (1 wk) | Extract `wiki_core`, `platform/` skeleton, docker-compose (api, worker, postgres+pgvector, redis), Alembic, model gateway stub, CI enabled; synthetic one-vault `demo-vault/` (core methodology, training content, client delivery, IT, HR, deliberately partly unsorted) with correct labels | `docker compose up` gives a healthy API; existing `tests/*.sh` pass; gateway passes a smoke test with Claude and with a local Ollama model |
+| **0. Foundations** (1 wk) | Extract `wiki_core`, `platform/` skeleton, docker-compose (api, worker, postgres+pgvector, redis, Forgejo with a demo vault repo and demo staff accounts), Alembic, model gateway stub, CI enabled; synthetic one-vault `demo-vault/` (core methodology, training content, client delivery, IT, HR, deliberately partly unsorted) with correct labels | `docker compose up` gives a healthy API; existing `tests/*.sh` pass; gateway passes a smoke test with Claude and with a local Ollama model |
 | **1. Identity and RBAC** (1–2 wk) | Users, roles, grants, JWT auth, policy engine, fail-closed sensitivity resolver, RLS, audit log, admin endpoints | Policy unit tests; a note with missing or invalid sensitivity is never returned to a `public`-only user; RLS blocks raw SQL reads outside scope |
-| **2. Vault indexing and retrieval** (2 wk) | Obsidian parser (frontmatter, wikilinks, embeds, tags, PDF/PPTX/DOCX attachments), vault watcher plus nightly rescan, local embeddings, hybrid search; new notes enter quarantine | Editing a note in Obsidian is searchable within about 1 minute (to permitted users); leak suite at retrieval level passes |
+| **2. Vault indexing and retrieval** (2 wk) | Obsidian parser (frontmatter, wikilinks, embeds, tags), **slide-by-slide PPTX** with speaker notes and local OCR, PDF worksheets with form fields, DOCX; git-based change detection with authorship from Forgejo pushes, plus nightly rescan; local embeddings, hybrid search; new notes enter quarantine | Editing a note in Obsidian is searchable within about 1 minute (to permitted users); leak suite at retrieval level passes |
 | **2b. AI Classifier** (1–2 wk) | Classifier agent, deterministic safeguards, one-way rule, review queue with grouping and bulk approve, re-classification on edit, optional frontmatter write-back | On the demo vault: **0 over-exposures**; ≥ 85% of notes correctly placed without edits; a looser re-classification never takes effect without approval |
 | **3. Agents** (2 wk) | Core agent first, then IT and HR; Concierge routing and synthesis, SSE streaming, citations, "no answer" handling, gap logging | Eval set (about 50 Q&A per demo space) ≥ 90% correct with valid citations; zero leaks in the adversarial suite; same evals run against one local model as a baseline |
-| **4. SOP governance** (1 wk) | Frontmatter lifecycle, `_proposals/` writes, review queue, governance report, review-due reminders, Obsidian SOP template, webhooks | An SOP goes draft → in review → published in Obsidian and is cited in chat; governance report catches an unapproved publish |
+| **4. SOP governance** (1–2 wk) | In-platform review with changes shown against the last approved version, version-bound approvals, "last approved version stays live", self-approval flag, frontmatter write-back, `_proposals/` writes, governance report (unattributed edits, unreviewed changes), review-due reminders, Obsidian SOP template, webhooks | Demo: staff A edits an SOP → staff B (lead) approves in the platform → the bot cites it with "written by A, approved by B"; an edit after approval is not cited until re-approved |
 | **5. Retention features** (1–2 wk) | Capture sessions, gap clustering, staleness and bus-factor reports, conflict detection, retract | Reports exposed via API; retract verified across index, caches and history |
-| **6. Company deployment** (1 wk) | Install guide for company admins; deploy on the company machine with the real vault mounted by them; backups; rate limits; metrics; frozen OpenAPI v1 plus TypeScript client | Admin-run install succeeds; logs confirmed free of note text; API contract frozen |
+| **6. Company deployment** (1 wk) | Install guide for company admins (incl. Forgejo accounts and the Obsidian Git plugin on each laptop); deploy on the company machine with the real vault mounted by them; backups; rate limits; metrics; frozen OpenAPI v1 plus TypeScript client | Admin-run install succeeds; logs confirmed free of note text; API contract frozen |
 | **7. Local-model migration** (when hardware is ready) | Choose a GPU host or a high-memory Mac Studio, run the evals for each tier, switch tiers in `models.yaml` (`classifier` tier first, then `core`, optionally `local_only`) | Each switched tier meets the eval threshold; no cloud calls for `local_only` spaces (verified from gateway logs) |
 
 **Later:** SSO (Entra/Google/OIDC: groups map onto roles, so the grants model
@@ -566,24 +637,27 @@ is unchanged), Slack/Teams adapters, the dashboard app, ticketing integrations
 
 Resolved on 2026-11-20 (see §1):
 
-- Core team of 2–3 staff plus the CEO (CEO = core lead). Unplaced notes are
-  reviewed by their author or the department lead. The vault is small and
-  growing. The Classifier is local from day one.
-
 - `core` covers methodology, training programmes, client delivery and training
   content, with strict access and a public tier.
-- One Obsidian vault, edited directly, with AI-proposed and human-approved
-  access labels.
-- Claude now, with a path to local models.
-- Development on a MacBook; the developer does not handle real data.
+- Core team of 2–3 staff plus the CEO (CEO = core lead).
+- One Obsidian vault on a local company device, synced through a self-hosted
+  git server, which records who wrote each change.
+- Access labels are AI-proposed and human-approved. Unplaced notes are reviewed
+  by their author or the department lead.
+- Reviews and approvals happen in the platform and apply to one exact version.
+- Slides are the main training format, with PDF worksheets.
+- The Classifier is local from day one. Other agents use Claude for now, with a
+  path to local models.
+- Development on a MacBook with a synthetic vault; the developer does not
+  handle real data.
 
 Still open:
 
-1. **Vault git:** is the vault in git yet, with each person committing under
-   their own name? This is the most reliable way to know a note's author for
-   review routing. Otherwise the `author:` field in the template is used.
-2. **Training content format:** mostly slides, PDFs or videos? This decides
-   which file types are supported first.
+1. **Slide app:** PowerPoint, Keynote, Google Slides or Canva? `.pptx` is read
+   directly. The others need an export, which could be automated for Keynote
+   on a Mac.
+2. **Remote work:** do staff edit the vault away from the office? If so, the
+   device needs secure remote access (Tailscale is the simplest).
 3. **Client register:** is there a list of client names the safeguards can
    check against?
 4. **Target machine** for the company deployment and the later local models
