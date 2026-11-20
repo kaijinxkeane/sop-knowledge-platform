@@ -13,7 +13,7 @@ the departments the user's role allows.
 | Path | Purpose |
 |---|---|
 | `docs/architecture/` | Platform architecture and roadmap |
-| `scripts/llm-wiki` | Deterministic wiki helpers (lint, retract, index, schema), to be extracted into `packages/wiki_core` |
+| `scripts/llm-wiki` | Deterministic wiki helpers (lint, retract, index, schema), to be extracted into `backend/wiki_core` |
 | `scripts/llm-wiki-session` | Session-capture helper (basis for knowledge-capture sessions) |
 | `claude-plugin/` | Inherited llm-wiki workflow specs (ingest, compile, query, lint, librarian, refresh, retract), reused as agent prompt material |
 | `tests/` | Structural tests, golden and defect wiki fixtures, promptfoo evals |

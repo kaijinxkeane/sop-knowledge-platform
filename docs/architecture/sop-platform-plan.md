@@ -15,10 +15,10 @@ similar tools) into a self-hosted service:
 - Knowledge does not leave with people. There is capture tooling, gap detection
   and staleness tracking.
 
-**Frontend decision:** the chat UI and dashboard will be a **separate app built
-later**. This project is **API-first**. It ships a documented REST + streaming
-API, plus a minimal internal dev console for testing. It does not ship a
-polished UI.
+**Frontend decision (updated 2026-11-20):** the web app (chat, library,
+editor, review, dashboards) is built **in this repository**, in its own
+`frontend/` folder next to `backend/`, alongside each backend phase. The
+backend stays **API-first**, so other clients can be added later (§8.1).
 
 **Decisions taken:** built-in users and roles (SSO later), a Python backend
 (FastAPI), Postgres, Docker Compose, and the Claude API for agents.
@@ -79,7 +79,7 @@ still works and its tests still pass.
 ## 3. System architecture
 
 ```
-                 Future dashboard/chat app (Next.js)  ·  Dev console
+                    Web app (React SPA, frontend/)    
                                    │  HTTPS: REST + SSE, JWT
 ┌──────────────────────────────────▼─────────────────────────────────────┐
 │ API gateway (FastAPI)                                                   │
@@ -729,7 +729,7 @@ Author writes in the app ─▶ clicks "Submit for review" (status: in_review)
   conversation history and audit excerpts. This reuses `llm-wiki retract`
   verification. The vault itself is edited by its owners.
 
-## 8. API surface (contract for the future dashboard)
+## 8. API surface (contract for the web app)
 
 All endpoints are under `/api/v1` and documented in an OpenAPI spec generated
 by FastAPI.
@@ -748,6 +748,94 @@ by FastAPI.
 
 Outbound webhooks (review requested, SOP published, review due) let the future
 app, email, Slack or Teams subscribe without changes to the core.
+
+## 8.1 Frontend (web app)
+
+### Decisions (2026-11-20)
+
+| Topic | Decision |
+|---|---|
+| Devices | **Desktop web only** (laptops and desktops, modern Chrome, Edge, Safari or Firefox). Layouts target 1280 px+ wide and stay usable down to 1024 px. No phone or PWA support in v1. |
+| Editor | **Visual (Word-like) editor** that saves **Obsidian-compatible markdown** |
+| Look | **Clean, neutral default.** Theme values (colours, fonts, logo) live in one place, so company branding can be dropped in later without touching screens |
+| Code location | Same repository: **`backend/`** and **`frontend/`** as separate top-level folders |
+
+### Tech stack (chosen for the 16 GB Mac mini)
+
+- **React + TypeScript, built with Vite into static files.** No Node server
+  runs in production. The files are served by the same web server (Caddy)
+  that handles HTTPS in front of the API, so the frontend costs essentially no
+  memory on the host. All logic and permission checks stay in the backend.
+- **UI components:** shadcn/ui (Radix + Tailwind), which is accessible and
+  neutral, with theming through CSS variables for later branding.
+- **Data:** TanStack Query for server state, and a **typed API client
+  generated from the backend's OpenAPI spec**. When the backend changes, the
+  build fails if the frontend is out of date.
+- **Streaming chat** over SSE. **Charts** for dashboards with a small charting
+  library.
+- **Routing:** React Router.
+
+### Visual editor and Obsidian compatibility
+
+- Built on **Milkdown** (ProseMirror + the remark markdown parser). It is
+  markdown-first, so what's saved is clean markdown, not HTML.
+- **Custom nodes for Obsidian syntax:**
+  - `[[wikilinks]]` and `[[note|alias]]`, with autocomplete from the notes the
+    user can see
+  - `![[embeds]]`, shown as slide or PDF previews
+  - `#tags`
+  - callouts (`> [!note]`)
+- **Frontmatter is not shown as raw YAML.** It appears as a form above the
+  editor (owner, programme, stage, review cycle and so on). Platform-written
+  fields such as `approved_by` are read-only.
+- **Anything the editor doesn't understand is preserved untouched** as a raw
+  block, so the CEO's Obsidian-only syntax survives app edits.
+- **Round-trip test:** every note in the demo vault is opened and saved
+  without changes in CI, and the file must come out **identical**. This
+  guards Obsidian compatibility on every change.
+- **Edit clashes:** if a note changed since the user opened it, saving opens a
+  side-by-side merge screen (§3.2).
+
+### Slide and worksheet viewers
+
+- **Slides:**
+  - At upload, the worker renders each slide to an image using LibreOffice in
+    headless mode, run on demand and then exited, so it isn't resident in
+    memory.
+  - The viewer shows the slide image beside its extracted text and speaker
+    notes.
+  - Citations jump straight to the slide.
+- **PDF worksheets:** shown in the browser's PDF viewer, at the cited page.
+- **Images are permission-checked** like the documents they come from. URLs
+  are short-lived and tied to the signed-in user.
+
+### Screens
+
+| Area | Screens | Who |
+|---|---|---|
+| **Home** | Role-based dashboard: ask box; recent SOPs for my programmes; my drafts; reviews waiting for me | Everyone (cards vary by role) |
+| **Ask** | Chat with streaming answers; citations with version, author and approver badges that open the exact section or slide; programme/stage filters; 👍/👎 feedback; history; "who to contact" | Everyone |
+| **Library** | Browse by programme, stage or department; search; reading view with links and backlinks; slide and PDF viewers; version history with side-by-side changes | Everyone (filtered by permissions) |
+| **Write** | New SOP form; visual editor; attachment upload (with the original tool and a link back to the Google Slides or Canva design); submit for review; my drafts; merge screen | Staff with `contribute` |
+| **Review** | SOP changes shown against the last approved version; AI label suggestions (grouped, bulk approve, reasoning shown); unplaced notes; governance report | Leads; authors for their own notes |
+| **Retain** | Capture interview sessions; gap dashboards (leads: own space with example questions; **HR: anonymised cross-company view with follow-up status**); review-due list; bus-factor report | Leads, HR, CEO |
+| **Admin** | Users, roles and grants; invites with TOTP enrolment; staff notice editor; audit log search and export; retention settings; cost and usage dashboard; Classifier accuracy; system health; API key status | CEO / platform admin |
+| **Account** | Two-factor setup; staff notice acknowledgement; profile | Everyone |
+
+**Notifications:** in-app only in v1 (a bell icon for review requested,
+approved, review due, and gap follow-ups). Email would need an outside mail
+service, so it is left for later and kept optional.
+
+### Frontend testing
+
+- Component tests (Vitest + Testing Library).
+- End-to-end tests (Playwright) of the key journeys against the demo vault:
+  - ask → open citation
+  - write → submit → approve → cited
+  - permission checks: a core-staff user never sees restricted links or
+    badges
+- The editor round-trip test.
+- Accessibility checks on core screens.
 
 ## 9. Data model (Postgres)
 
@@ -783,22 +871,34 @@ at very large scale.
 ## 10. Repository layout
 
 ```
-claude-plugin/                  # inherited llm-wiki workflow specs (prompt material)
-packages/wiki_core/             # extracted deterministic helpers + Obsidian parser
-platform/
-  api/          FastAPI app: routers, auth, policy engine, SSE
-  agents/       concierge, department, curator, librarian + prompt templates
-  models/       model gateway: anthropic + openai_compat adapters, models.yaml
-  retrieval/    chunking, local embeddings, hybrid search
-  workers/      git change detection, parsing (PPTX/PDF/DOCX + OCR), name detector, lint and review-due jobs
-  db/           SQLAlchemy models, Alembic migrations, RLS policies
-  console/      minimal dev console (thin, replaceable)
+backend/                        # Python (FastAPI); everything server-side
+  app/
+    api/        routers, auth, policy engine, SSE
+    agents/     concierge, department, classifier, curator, librarian + prompt templates
+    models/     model gateway: anthropic + openai_compat adapters
+    retrieval/  chunking, local embeddings, hybrid search
+    workers/    git change detection, parsing (PPTX/PDF/DOCX + OCR), slide rendering,
+                name detector, lint, retention and review-due jobs
+    db/         SQLAlchemy models, Alembic migrations, RLS policies
+  wiki_core/    extracted deterministic llm-wiki helpers + Obsidian parser
   tests/        unit, RBAC-leak suite, agent evals
-config/         vault.yaml (optional folder rules, safeguard terms), spaces/*.yaml, models.yaml
+  pyproject.toml
+frontend/                       # React + TypeScript (Vite); built to static files
+  src/
+    app/        routing, layout, theme (single place for future branding)
+    features/   ask, library, write, review, retain, admin, account
+    editor/     Milkdown setup + Obsidian nodes (wikilinks, embeds, callouts, raw blocks)
+    api/        generated typed client (from backend OpenAPI)
+  tests/        component tests, Playwright end-to-end, editor round-trip
+  package.json
+config/         vault.yaml, spaces/*.yaml, models.yaml, notice.md
 demo-vault/     synthetic one-vault training company: Programmes/<Programme>/<Stage>/, Methodology/,
                 Shared Templates/, IT/, HR/, plus a deliberately unsorted Inbox/ (the only data in git)
-demo-vault-labels.yaml  correct space/sensitivity labels for every demo note (Classifier tests)
-deploy/docker-compose.yml       api, worker, postgres+pgvector, redis (Ollama runs natively on the host)
+demo-vault-labels.yaml  correct labels for every demo note (Classifier tests)
+deploy/         docker-compose.yml (caddy [serves frontend + TLS], api, worker, postgres+pgvector,
+                redis, headscale); Ollama runs natively on the host
+docs/           architecture, install guide, runbook
+claude-plugin/, scripts/, tests/   # inherited llm-wiki material and its tests
 ```
 
 The real company vault is **never** in this repository. It is a separate git
@@ -869,24 +969,24 @@ repo on the company device, mounted at deploy time via `VAULT_PATH`.
 - **Client data:** a personal-branding business will hold personal data about
   its clients. Keep client-identifying details out of SOPs where possible, or
   file them under a `restricted` folder. Retract covers removal (PDPA).
-- License: llm-wiki is MIT. Keep its notice in `packages/wiki_core`.
+- License: llm-wiki is MIT. Keep its notice in `backend/wiki_core`.
 
 ## 12. Phased plan
 
-Phases 0–5 are built and tested on a MacBook (Apple Silicon) using Docker
+Phases 0–5 (backend and frontend together) are built and tested on a MacBook (Apple Silicon) using Docker
 Compose. Ollama runs natively on the Mac for the local embeddings, because
 Docker can't use the Mac GPU. Only `demo-vault/` is used.
 
 | Phase | Scope | Exit criteria |
 |---|---|---|
-| **0. Foundations** (1 wk) | Extract `wiki_core`, `platform/` skeleton, docker-compose (api, worker, postgres+pgvector, redis), demo vault as a local git repo, Ollama on the host, Alembic, model gateway stub, CI enabled; synthetic one-vault `demo-vault/` (2–3 fictional programmes by stage, methodology, sample `.pptx` decks and PDF worksheets, IT, HR, a deliberately unsorted inbox) with correct labels; developer API key via `.env` | `docker compose up` gives a healthy API; existing `tests/*.sh` pass; gateway passes a smoke test with Claude and with a local Ollama model |
-| **1. Identity and RBAC** (1–2 wk) | Users, roles, grants, JWT auth with required TOTP, policy engine, fail-closed sensitivity resolver, RLS, audit log, admin endpoints | Policy unit tests; a note with missing or invalid sensitivity is never returned to a `public`-only user; RLS blocks raw SQL reads outside scope |
-| **2. Vault indexing and retrieval** (2 wk) | Obsidian parser (frontmatter, wikilinks, embeds, tags), **slide-by-slide PPTX** with speaker notes and local OCR, PDF worksheets with form fields, DOCX; **editing API** (create/edit/upload, permission-checked, committed in the user's name, edit-clash detection); change detection from git commits plus a nightly check for unattributed changes; local embeddings, hybrid search; new notes enter quarantine | A note saved through the API is committed in the user's name and searchable within about 1 minute (to permitted users); an edit clash is refused, not overwritten; a user without `contribute` can't save; leak suite at retrieval level passes |
-| **2b. AI Classifier** (1–2 wk) | Classifier agent, deterministic safeguards incl. the local name detector (staff names excluded), one-way rule, review queue with grouping and bulk approve, re-classification on edit, optional frontmatter write-back | On the demo vault: **0 over-exposures**; ≥ 85% of notes correctly placed without edits; a looser re-classification never takes effect without approval |
-| **3. Agents** (2 wk) | Core agent first, then IT and HR; Concierge routing and synthesis, SSE streaming, citations, "no answer" handling, gap logging | Eval set (about 50 Q&A per demo space) ≥ 90% correct with valid citations; zero leaks in the adversarial suite; same evals run against one local model as a baseline |
-| **4. SOP governance** (1–2 wk) | In-platform review with changes shown against the last approved version, version-bound approvals, "last approved version stays live", self-approval flag, frontmatter write-back, `_proposals/` writes, governance report (unattributed edits, unreviewed changes), review-due reminders, Obsidian SOP template, webhooks | Demo: staff A edits an SOP → staff B (lead) approves in the platform → the bot cites it with "written by A, approved by B"; an edit after approval is not cited until re-approved |
-| **5. Retention features** (1–2 wk) | Capture sessions, gap topics with HR's anonymised view (minimum 3 people) and follow-up tracking, staleness and bus-factor reports, conflict detection, retract, 24-month retention job, staff notice and acknowledgement | Reports exposed via API; retract verified across index, caches and history |
-| **6. Company deployment** (1 wk) | Install guide for company admins (Mac mini and Windows/WSL2 variants, Obsidian + Obsidian Git on the device for the admin, Headscale with embedded relay and ACLs (CGNAT/public-IP check, port-forward, domain + TLS), TOTP enrolment, backups); deploy on the company machine with the real vault mounted by them; backups; rate limits; metrics; frozen OpenAPI v1 plus TypeScript client | Admin-run install succeeds; logs confirmed free of note text; API contract frozen |
+| **0. Foundations** (1–1.5 wk) | Extract `wiki_core` into `backend/`, `backend/` skeleton, **`frontend/` skeleton (Vite + React + TS, shadcn/ui, neutral theme, generated API client, sign-in page)**, docker-compose (api, worker, postgres+pgvector, redis), demo vault as a local git repo, Ollama on the host, Alembic, model gateway stub, CI enabled; synthetic one-vault `demo-vault/` (2–3 fictional programmes by stage, methodology, sample `.pptx` decks and PDF worksheets, IT, HR, a deliberately unsorted inbox) with correct labels; developer API key via `.env` | `docker compose up` gives a healthy API and serves the frontend; existing `tests/*.sh` pass; gateway passes a smoke test with Claude and with a local Ollama model |
+| **1. Identity and RBAC** (1–2 wk) | Users, roles, grants, JWT auth with required TOTP, policy engine, fail-closed sensitivity resolver, RLS, audit log, admin endpoints. **UI:** sign-in + TOTP enrolment, staff notice, admin users/roles/grants | Policy unit tests; a note with missing or invalid sensitivity is never returned to a `public`-only user; RLS blocks raw SQL reads outside scope |
+| **2. Vault indexing and retrieval** (2 wk) | Obsidian parser (frontmatter, wikilinks, embeds, tags), **slide-by-slide PPTX** with speaker notes and local OCR, PDF worksheets with form fields, DOCX; **editing API** (create/edit/upload, permission-checked, committed in the user's name, edit-clash detection); change detection from git commits plus a nightly check for unattributed changes; local embeddings, hybrid search; new notes enter quarantine. **UI:** Library (browse by programme/stage/department, reading view, slide and PDF viewers, version history), **visual editor** with Obsidian nodes and the round-trip test, upload, merge screen | A note saved through the API is committed in the user's name and searchable within about 1 minute (to permitted users); an edit clash is refused, not overwritten; a user without `contribute` can't save; leak suite at retrieval level passes |
+| **2b. AI Classifier** (1–2 wk) | Classifier agent, deterministic safeguards incl. the local name detector (staff names excluded), one-way rule, review queue with grouping and bulk approve, re-classification on edit, optional frontmatter write-back. **UI:** Review → AI label suggestions and unplaced notes | On the demo vault: **0 over-exposures**; ≥ 85% of notes correctly placed without edits; a looser re-classification never takes effect without approval |
+| **3. Agents** (2 wk) | Core agent first, then IT and HR; Concierge routing and synthesis, SSE streaming, citations, "no answer" handling, gap logging. **UI:** Ask (streaming chat, citation badges that open the slide or section, feedback, history), role-based Home | Eval set (about 50 Q&A per demo space) ≥ 90% correct with valid citations; zero leaks in the adversarial suite; same evals run against one local model as a baseline |
+| **4. SOP governance** (1–2 wk) | In-platform review with changes shown against the last approved version, version-bound approvals, "last approved version stays live", self-approval flag, frontmatter write-back, `_proposals/` writes, governance report (unattributed edits, unreviewed changes), review-due reminders, Obsidian SOP template, webhooks. **UI:** Review → SOP changes with side-by-side diff, approve/request changes; in-app notifications | Demo: staff A edits an SOP → staff B (lead) approves in the platform → the bot cites it with "written by A, approved by B"; an edit after approval is not cited until re-approved |
+| **5. Retention features** (1–2 wk) | Capture sessions, gap topics with HR's anonymised view (minimum 3 people) and follow-up tracking, staleness and bus-factor reports, conflict detection, retract, 24-month retention job, staff notice and acknowledgement. **UI:** Retain (capture interviews, gap dashboards incl. HR's anonymised view, review-due, bus factor), cost and usage dashboard, audit log viewer | Reports exposed via API; retract verified across index, caches and history |
+| **6. Company deployment** (1 wk) | Install guide for company admins (Mac mini and Windows/WSL2 variants, Obsidian + Obsidian Git on the device for the admin, Headscale with embedded relay and ACLs (CGNAT/public-IP check, port-forward, domain + TLS), TOTP enrolment, backups); deploy on the company machine with the real vault mounted by them; backups; rate limits; metrics; frozen OpenAPI v1; Playwright end-to-end suite green on the deployed machine | Admin-run install succeeds; logs confirmed free of note text; API contract frozen |
 | **7. Local-model migration** (when hardware is ready) | Choose a GPU host or a high-memory Mac Studio, run the evals for each tier, switch tiers in `models.yaml` (`classifier` tier first, then `core`, optionally `local_only`) | Each switched tier meets the eval threshold; no cloud calls for `local_only` spaces (verified from gateway logs) |
 
 **Later:** SSO (Entra/Google/OIDC: groups map onto roles, so the grants model

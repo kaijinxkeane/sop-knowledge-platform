@@ -39,7 +39,7 @@ Behavioral evals (when changing workflow/prompt logic; needs
 
 ```
 docs/architecture/       — platform design + phased plan
-scripts/llm-wiki         — deterministic wiki helpers (to become packages/wiki_core)
+scripts/llm-wiki         — deterministic wiki helpers (to become backend/wiki_core)
 scripts/llm-wiki-session — session capture helper
 claude-plugin/           — inherited llm-wiki workflow specs, reused as agent prompt material
   commands/*.md
@@ -48,9 +48,10 @@ tests/                   — structural tests, fixtures (golden-wiki, defects), 
 tests/ci/plugin-tests.yml — CI workflow (copy to .github/workflows/ to activate)
 ```
 
-Planned (see the roadmap): `packages/wiki_core/`, `platform/` (FastAPI API,
-agents, retrieval, workers, db), `spaces/` (department knowledge repos), and
-`deploy/` (docker-compose).
+Planned (see the roadmap): `backend/` (FastAPI API, agents, retrieval,
+workers, db, `wiki_core`), `frontend/` (React + TypeScript via Vite, built to
+static files), `config/`, `demo-vault/` (synthetic data only), and `deploy/`
+(docker-compose).
 
 ## Security rules for platform code
 
