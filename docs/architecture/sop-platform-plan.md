@@ -495,7 +495,7 @@ questions; everything else is local or done by people.
 
 | Process | Model | Where |
 |---|---|---|
-| Answering questions | `answer` (Haiku 5.5), escalating to `reasoning` (Sonnet 5.5) | Claude; Phase 3 eval decides whether it moves local |
+| Answering questions | `answer` (Haiku 5.5), escalating to `reasoning` (Sonnet 5.5) | Claude; the local answering eval (§5.2) decides whether it moves local |
 | Writing SOPs | **People**, in the editor from the SOP template. No AI drafting: staff know the systems and the pain points | — |
 | Routing | permissions + search; `router` (`qwen3:4b`) only when unclear | Local |
 | Combining answers from several departments | no model: one section per department | Local |
@@ -620,6 +620,56 @@ only kept if answer accuracy and citation validity stay at the bar.
 
 Until then, staying on the API is cheaper and gives better answers. The cost
 dashboard shows when the crossover arrives.
+
+#### Local answering eval (decided 2026-11-21; runs in Phase 3)
+
+Goal: find out whether a local model can replace Haiku for answering and
+Sonnet for hard questions, and how much memory the Mac mini needs for it.
+Candidates live in `config/eval/answer-candidates.yaml`:
+
+| Candidate | Type | Smallest Mac | Why it's in the test |
+|---|---|---|---|
+| `qwen3:8b` | dense 8B | 16 GB | The realistic ceiling on 16 GB |
+| `qwen3.5:9b` | dense 9B | 16 GB | Newer generation, same size |
+| `qwen3:14b` | dense 14B | 32 GB | Strongest dense model at usable speed |
+| `qwen3:30b-a3b` | MoE, 3B active | 32 GB | **Likeliest Haiku replacement**: big-model knowledge, near-4B speed |
+| `gpt-oss:20b` | MoE, 3.6B active | 32 GB | Strong reasoning and tool use; reasoning-tier candidate |
+| `hermes4:14b` | dense 14B | 32 GB | Tuned for tool use and structured instructions |
+
+References: Haiku 5.5 (answering) and Sonnet 5.5 (hard subset). Ollama tags
+are checked at run time and newer releases can be added to the file.
+
+**Question sets** (demo vault only, fictional data):
+
+1. **Answering** (~50 per demo space): single-SOP questions, slide and
+   speaker-note questions, programme/stage-filtered questions.
+2. **Logic and reasoning** (~30): conflicting SOPs (which version wins and
+   why), multi-step procedures ("client missed two sessions and the strategy
+   session is next week: what happens?"), cross-department questions, numbers
+   and dates (lead times, floor prices, leave rules).
+3. **Abstention** (~20): questions the vault does not cover, or covers only in
+   spaces the user can't read. The right answer is "no SOP covers this".
+4. **Tool use** (~20): the agent must search, read the right note and cite it.
+
+**Measured:**
+
+| Metric | Pass bar for replacing Haiku |
+|---|---|
+| Correct answers (graded per question) | within 5 points of Haiku |
+| Valid citations (cited passage supports the claim) | ≥ 95% |
+| Correct abstention | ≥ Haiku (a confident wrong answer is the worst failure) |
+| Logic and reasoning set | within 5 points of Haiku; compared with Sonnet for the reasoning tier |
+| Valid tool calls | ≥ 98% |
+| Time to first word (realistic prompt) | ≤ 4 s on the target Mac |
+| Peak memory | fits the target Mac next to the stack |
+
+**How it runs:** quality doesn't depend on the machine (same model, same
+quantization), so models too big for the 16 GB dev MacBook can be tested on a
+rented machine; the data is fictional, so nothing real leaves. Speed is
+measured on the Mac mini, or estimated from its memory bandwidth before
+buying. Each model gets its own prompt tuning (§5.3, point 1) before it is
+judged. The result decides two things: whether answering moves local, and
+whether the Mac mini needs 32 GB.
 
 ### 5.3 Making the models better over time (especially local ones)
 
@@ -1149,7 +1199,7 @@ Docker can't use the Mac GPU. Only `demo-vault/` is used.
 | **1. Identity and RBAC** (1–2 wk) | Users, roles, grants, JWT auth with required TOTP, policy engine, fail-closed sensitivity resolver, RLS, audit log, admin endpoints. **UI:** sign-in + TOTP enrolment, staff notice, admin users/roles/grants | Policy unit tests; a note with missing or invalid sensitivity is never returned to a `public`-only user; RLS blocks raw SQL reads outside scope |
 | **2. Vault indexing and retrieval** (2 wk) | Obsidian parser (frontmatter, wikilinks, embeds, tags), **slide-by-slide PPTX** with speaker notes and local OCR, PDF worksheets with form fields, DOCX; **editing API** (create/edit/upload, permission-checked, committed in the user's name, edit-clash detection); change detection from git commits plus a nightly check for unattributed changes; local embeddings, hybrid search; new notes enter quarantine. **UI:** Library (browse by programme/stage/department, reading view, slide and PDF viewers, version history), **visual editor** with Obsidian nodes and the round-trip test, upload, merge screen | A note saved through the API is committed in the user's name and searchable within about 1 minute (to permitted users); an edit clash is refused, not overwritten; a user without `contribute` can't save; leak suite at retrieval level passes |
 | **2b. AI Classifier** (1–2 wk) | Classifier agent, deterministic safeguards incl. the local name detector (staff names excluded), one-way rule, review queue with grouping and bulk approve, re-classification on edit, optional frontmatter write-back. **UI:** Review → AI label suggestions and unplaced notes | **`qwen3:4b` vs `qwen3:8b` compared** on the demo vault (8B unloads when idle on 16 GB); the smaller model that passes is chosen. On the demo vault: **0 over-exposures**; ≥ 85% of notes correctly placed without edits; a looser re-classification never takes effect without approval |
-| **3. Agents** (2 wk) | Core agent first, then IT and HR; Concierge routing (permissions + search, local model only when unclear), one answer section per department, SSE streaming, citations, "no answer" handling, gap logging. **UI:** Ask (streaming chat, citation badges that open the slide or section, feedback, history), role-based Home | Eval set (about 50 Q&A per demo space) ≥ 90% correct with valid citations; zero leaks in the adversarial suite; same evals run against local candidates (`qwen3:8b`, Qwen 9B, Qwen3 30B-A3B), including routing accuracy and time to first word, to decide whether answering moves local |
+| **3. Agents** (2 wk) | Core agent first, then IT and HR; Concierge routing (permissions + search, local model only when unclear), one answer section per department, SSE streaming, citations, "no answer" handling, gap logging. **UI:** Ask (streaming chat, citation badges that open the slide or section, feedback, history), role-based Home | Eval set (about 50 Q&A per demo space) ≥ 90% correct with valid citations; zero leaks in the adversarial suite; **local answering eval** (§5.2) for every candidate in `config/eval/answer-candidates.yaml`, plus routing accuracy, to decide whether answering moves local and how much memory the host needs |
 | **4. SOP governance** (1–2 wk) | In-platform review with changes shown against the last approved version and a short summary of the change (local `background` tier, generated on save), version-bound approvals, "last approved version stays live", self-approval flag, frontmatter write-back, governance report (unattributed edits, unreviewed changes), review-due reminders, Obsidian SOP template, webhooks. **UI:** Review → SOP changes with side-by-side diff, approve/request changes; in-app notifications | Demo: staff A edits an SOP → staff B (lead) approves in the platform → the bot cites it with "written by A, approved by B"; an edit after approval is not cited until re-approved |
 | **5. Retention features** (1–2 wk) | Handover notes (template, receiver-only access, acknowledgement, local completeness check), gap topics with HR's anonymised view (minimum 3 people) and follow-up tracking, staleness and bus-factor reports, conflict detection, retract, 24-month retention job, staff notice and acknowledgement, **personal gap recommendations from searches, access gaps, coverage map**. **UI:** Retain (handover notes, gap dashboards incl. HR's anonymised view, review-due, bus factor), cost and usage dashboard, audit log viewer | Reports exposed via API; retract verified across index, caches and history |
 | **6. Company deployment** (1 wk) | Install guide for company admins (Mac mini and Windows/WSL2 variants, Obsidian + Obsidian Git on the device for the admin, Headscale with embedded relay and ACLs (CGNAT/public-IP check, port-forward, domain + TLS), TOTP enrolment, backups); deploy on the company machine with the real vault mounted by them; backups; rate limits; metrics; frozen OpenAPI v1; Playwright end-to-end suite green on the deployed machine | Admin-run install succeeds; logs confirmed free of note text; API contract frozen |
@@ -1166,14 +1216,15 @@ Resolved on 2026-11-20 (see §1):
 - `core` covers methodology, training programmes, client delivery and training
   content, with strict access and a public tier.
 - Core team of 2–3 staff plus the CEO (CEO = core lead).
-- One Obsidian vault on a local company device, synced through a self-hosted
-  git server, which records who wrote each change.
+- One Obsidian-format vault, a git repo on a local company device. Every app
+  save is a commit in the logged-in user's name (no separate git server).
 - Access labels are AI-proposed and human-approved. Unplaced notes are reviewed
   by their author or the department lead.
 - Reviews and approvals happen in the platform and apply to one exact version.
 - Slides are the main training format, with PDF worksheets.
-- The Classifier is local from day one. Other agents use Claude for now, with a
-  path to local models.
+- Claude is used only to answer questions (Haiku, escalating to Sonnet);
+  routing, classification, search and background writing are local, and
+  people write SOPs (2026-11-21).
 - Development on a MacBook with a synthetic vault; the developer does not
   handle real data.
 - All staff edit through the app; only the CEO/admin uses Obsidian, on the
@@ -1194,9 +1245,12 @@ Still open (none block Phases 0–5):
 
 1. **Usage:** expected users and questions per day, to refine cost estimates
    (the cost dashboard will measure this anyway).
-2. **Host memory:** 16 GB works with a 4B Classifier. Consider 24 GB (or 32 GB+
-   for later local answering) before buying, since it can't be upgraded.
-   Phase 2b's measurements will inform this.
+2. **Host memory:** local text jobs now use `qwen3:4b` (Classifier, router)
+   and `qwen3:8b` (background). On 16 GB only one of them fits alongside the
+   stack, so they load one at a time; if the Phase 2b eval picks 8B for the
+   Classifier, one 8B model serves every local text job. 32 GB keeps both
+   loaded and leaves room for local answering. Decide before buying, since
+   Mac memory can't be upgraded.
 3. **Office internet:** does it have a public IP (no CGNAT)? Needed for
    Headscale (§3.3).
 4. **Programme and stage names:** the real list, or keep the placeholders

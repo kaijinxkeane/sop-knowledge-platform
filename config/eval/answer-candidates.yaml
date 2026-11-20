@@ -1,0 +1,38 @@
+# Local models tested against Claude for answering (plan §5.2, "Local answering
+# eval"; run in Phase 3). Quality and speed are measured separately:
+#   - quality: same quantization (Q4_K_M) on any machine; demo data only, so a
+#     rented machine is fine for models too big for the dev MacBook
+#   - speed: measured on the Mac mini (or estimated from memory bandwidth)
+#
+# min_memory_gb = smallest Mac that can keep the model loaded next to the stack.
+# Ollama tags are checked when the eval runs; newer releases can be added here.
+
+references:            # what a local model must match
+  answer: claude-haiku-5-5      # default answering tier
+  reasoning: claude-sonnet-5-5  # escalation tier (hard subset only)
+
+candidates:
+  - tag: qwen3:8b
+    kind: dense 8B
+    min_memory_gb: 16
+    why: Already installed; the realistic ceiling on a 16 GB machine.
+  - tag: qwen3.5:9b
+    kind: dense 9B
+    min_memory_gb: 16
+    why: Newer generation at the same size; best 16 GB option if the tag exists.
+  - tag: qwen3:14b
+    kind: dense 14B
+    min_memory_gb: 32
+    why: Strongest dense model that runs at usable speed on a base M4.
+  - tag: qwen3:30b-a3b
+    kind: mixture-of-experts, 30B total / 3B active
+    min_memory_gb: 32
+    why: Likeliest Haiku replacement - large-model knowledge at near-4B speed.
+  - tag: gpt-oss:20b
+    kind: mixture-of-experts, 21B total / 3.6B active
+    min_memory_gb: 32
+    why: Strong step-by-step reasoning and tool use; candidate for the reasoning tier.
+  - tag: hermes4:14b
+    kind: dense 14B (Qwen3-based, Nous Research)
+    min_memory_gb: 32
+    why: Tuned for tool use and following structured instructions (plan §5.3).
