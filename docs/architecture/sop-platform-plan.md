@@ -36,7 +36,7 @@ polished UI.
 | Team | Core is **2–3 staff plus the CEO**. The CEO is `core-lead` and platform admin; the staff are `core-staff`. The vault is small but growing as SOPs are written. |
 | Classifier model | **Local from day one** at the company deployment (it reads every note, including the most restricted). Answering agents stay on Claude for now (§4.1 data note). |
 | AI models | **Claude API now**, behind a **model gateway**, so the system can move to **local models** later without code changes (§5.1). Embeddings run locally from day one. |
-| Host machine | **Mac mini or Windows PC** in the office. It runs the app, the database and the vault. Remote staff reach **only the app**, over a private network link (§3.3). |
+| Host machine | Likely a **Mac mini with 16 GB** memory (still under discussion; memory budget in §3.4), otherwise a Windows PC, in the office. It runs the app, the database and the vault. Remote staff reach **only the app**, over a private network link (§3.3). |
 | Authorship | Every save made through the app is a git commit **under the logged-in user's name**, so who wrote what is always known (§3.2). |
 | Reviews | **Reviews and approvals happen in the platform**, where every reviewer is logged in. Each approval is tied to the exact version reviewed (§6). |
 | Training content | **Slides are the main format** (PowerPoint, Google Slides, Canva), with PDFs mainly used as worksheets. Videos come later. Slides and PDFs are cited by slide or page number (§3.1). |
@@ -268,6 +268,36 @@ Both are supported with the same Docker Compose setup:
 | Obsidian for the admin | Yes | Yes |
 | Notes | Quiet, low power, always on. 24 GB+ memory is comfortable for the local Classifier and embeddings; 32–64 GB leaves room to move answering agents local later | Keep the vault and Docker data **inside WSL2**, not on a `C:\` folder, for speed. Check sleep/update settings so it stays on |
 
+#### Memory budget on a 16 GB Mac mini
+
+| Component | Approx. memory |
+|---|---|
+| macOS and background services | 3–4 GB |
+| Docker: Postgres, Redis, API, worker (parsing, OCR) | 3–4 GB |
+| Embedding model (`bge-m3`) | ~1.2 GB |
+| Name detector (small local model) | ~0.5–1 GB |
+| **Classifier model** | **~3 GB (4B-class) or ~5 GB (8B-class)** |
+| **Total** | **~11–12 GB with a 4B Classifier**; ~13–15 GB with an 8B one (too tight) |
+
+What this means on 16 GB:
+
+- **The Classifier uses a 4B-class model by default.** It loads when there is
+  work and unloads when idle (Ollama `keep_alive`). Notes are classified one
+  at a time from a queue.
+- If the 4B model misses the accuracy bar on the demo vault, the **8B model
+  runs in a scheduled window** (e.g. after hours) with other heavy jobs
+  paused. This is safe because unclassified notes stay quarantined, so a delay
+  never exposes anything; new notes just take longer to be released.
+- **Answering stays on the Claude API** on this machine. Local answering
+  models good enough to keep the logic sound need roughly 32 GB or more.
+- **Mac mini memory can't be upgraded after purchase.** If the budget allows,
+  **24 GB** gives comfortable headroom (8B Classifier always loaded, no
+  scheduling), and **32 GB+** keeps the door open to moving the everyday
+  answering tier local later (§5.2). Phase 2b measures the 4B and 8B
+  Classifiers on the demo vault, which will settle whether 16 GB is enough.
+- Storage: the vault, slides, database and indexes are small. 512 GB is ample,
+  plus an external drive for backups.
+
 Backups (both): nightly encrypted copies of the git repo and the database to
 an external drive or the company's chosen storage.
 
@@ -467,7 +497,7 @@ class ModelGateway(Protocol):
 
   ```yaml
   router:     {provider: anthropic, model: claude-haiku-5-5}
-  classifier: {provider: openai_compat, base_url: http://host.docker.internal:11434/v1, model: qwen3:8b}  # local (Ollama); Claude Haiku as eval baseline
+  classifier: {provider: openai_compat, base_url: http://host.docker.internal:11434/v1, model: qwen3:4b, keep_alive: 5m}  # local (Ollama); 8B and Claude Haiku as eval baselines
   answer:   {provider: anthropic, model: claude-haiku-5-5}
   reasoning: {provider: anthropic, model: claude-sonnet-5-5}
   drafting: {provider: anthropic, model: claude-opus-5-5}
@@ -799,8 +829,7 @@ repo on the company device, mounted at deploy time via `VAULT_PATH`.
     year, so records can be up to about 2 years old at audit time.
   - After the retention period, records are deleted, or archived encrypted if
     the company prefers.
-  - The company should confirm the period with its auditor, since some
-    records may need longer.
+  - The 24-month period is **confirmed with the auditor** (2026-11-20).
   - The audit log is append-only and hash-chained (tamper-evident), and can be
     exported for the auditor.
 - **Who can see staff questions:**
@@ -892,14 +921,17 @@ Also resolved: developer API key for testing, company key before go-live;
 English with a multilingual index; organisation by programme and stage;
 anonymised gap reports for HR; 24-month retention; a staff notice.
 
+Also resolved: 24-month retention confirmed with the auditor; the host is
+likely a 16 GB Mac mini (§3.4).
+
 Still open (none block Phases 0–5):
 
 1. **Usage:** expected users and questions per day, to refine cost estimates
    (the cost dashboard will measure this anyway).
-2. **Host spec:** once the machine is chosen, its memory (Mac) or GPU
-   (Windows).
+2. **Host memory:** 16 GB works with a 4B Classifier. Consider 24 GB (or 32 GB+
+   for later local answering) before buying, since it can't be upgraded.
+   Phase 2b's measurements will inform this.
 3. **Office internet:** does it have a public IP (no CGNAT)? Needed for
    Headscale (§3.3).
-4. **Retention period:** confirm 24 months with the company's auditor.
-5. **Programme and stage names:** the real list, or keep the placeholders
+4. **Programme and stage names:** the real list, or keep the placeholders
    until go-live.
