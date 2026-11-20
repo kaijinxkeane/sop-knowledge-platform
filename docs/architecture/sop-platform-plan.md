@@ -28,9 +28,10 @@ polished UI.
 | Topic | Decision |
 |---|---|
 | Company | Personal branding and training business. Internal use only. |
-| First space | **`core`**: the company's delivery know-how (branding methodology, training programmes, client-delivery processes). It is the company's core IP, so it gets the **strictest** access. `it` and `hr` follow as ordinary spaces. *(Assumed scope; confirm.)* |
+| First space | **`core`**: branding methodology, training programmes, client-delivery processes, and the **content used in training** (slides, workbooks, exercises, scripts). It is the company's core IP, so it gets the **strictest** access. `it` and `hr` follow as ordinary spaces. *(Confirmed.)* |
 | Access to `core` | A small **public tier** that everyone can read (e.g. "how to book a training room"). Everything else is core-staff only, and the most sensitive material is restricted to named roles. Notes with missing or invalid access metadata **fail closed** (treated as restricted). |
-| Source of truth | An existing **Obsidian vault** on a private company computer or server. Staff keep **writing in Obsidian**. The platform watches and indexes the vault **read-only** (§3.1). |
+| Source of truth | **One Obsidian vault for the whole company**, on a private company computer or server. Staff keep **writing in Obsidian**. The platform watches and indexes the vault **read-only** (§3.1). |
+| Who can see what | An **AI Classifier** reads each note and **proposes** which department owns it and how sensitive it is. It can make access tighter on its own, but **only a human can make access wider** (§4.1). |
 | AI models | **Claude API now**, behind a **model gateway**, so the system can move to **local models** later without code changes (§5.1). Embeddings run locally from day one. |
 | Dev environment | Built and tested on the developer's **MacBook** (Apple Silicon) with Docker Compose and a **synthetic demo vault**. |
 | Data handling | The developer **never handles real company data**. Real vaults are only mounted on the company's own machine, by company admins (§11). |
@@ -44,7 +45,7 @@ The design leaves room for each of these.
 
 | llm-wiki asset | Becomes |
 |---|---|
-| Hub → `topics/<name>/` topic wikis | One **knowledge space** per department, mapped to top-level vault folders (`Core/`, `IT/`, `HR/`) |
+| Hub → `topics/<name>/` topic wikis | One **knowledge space** per department (`core`, `it`, `hr`), assigned per note by classification within a single vault (§4.1) |
 | `raw/` (immutable sources) / `wiki/` (compiled articles) split | SOP source docs vs published SOP and knowledge articles |
 | Frontmatter (`sources`, `confidence`, `volatility`, `verified`, `summary`) | Kept. SOP fields are added on top (§6) |
 | `_index.md` index-first retrieval (`references/query-lite.md`) | Department agent retrieval strategy, backed by a search index |
@@ -108,12 +109,19 @@ owning it**:
   - `[[wikilinks]]` and `[[note|alias]]`
   - `![[embeds]]`
   - `#tags`
-  - attachments (images and PDFs, with text extracted from the PDFs)
+  - attachments, with text extracted for search: PDF, PowerPoint (`.pptx`),
+    Word (`.docx`) and images. Training videos and audio come later, using
+    local transcription (e.g. Whisper on the server).
 
   It ignores `.obsidian/`, `.trash/` and `_templates/`. llm-wiki's link and
   frontmatter handling already covers most of this.
-- **Spaces map to top-level folders:** `Core/`, `IT/`, `HR/` (configurable in
-  `vault.yaml`).
+- **One vault, logical spaces:** the vault does not have to be pre-sorted
+  into department folders. Which space a note belongs to is decided by
+  classification (§4.1) and stored in the platform's database. Notes are
+  **never moved or renamed** by the platform, so Obsidian links, staff
+  bookmarks and folder habits keep working. Folders still help: an optional
+  rule in `vault.yaml` (e.g. `Training Content/ → core`) counts as a human
+  decision.
 - **Versioning:** recommend the vault is a git repo (the Obsidian Git plugin
   auto-commits). Then every SOP has a history and an author per change. Without
   git, the platform still keeps its own content-hash history of what it indexed.
@@ -150,20 +158,88 @@ SOP). Only core staff can read the delivery playbooks, and only core leads can
 read restricted material such as proprietary frameworks, pricing logic or
 client-specific delivery notes.
 
-### How a note gets its sensitivity (fail closed)
+### 4.1 How a note gets its space and sensitivity
 
-Authors shouldn't have to tag every note. Sensitivity is resolved in this order:
+With a single vault, every note needs two labels:
 
-1. The note's own frontmatter: `sensitivity: public | internal | restricted`.
-2. The nearest folder rule in `vault.yaml` (e.g. `Core/Public/ → public`,
-   `Core/Frameworks/ → restricted`).
-3. The space default. For `core` this is **`restricted`**. For `it` and `hr`
-   it is `internal`.
+- **owning space:** `core`, `it` or `hr`
+- **sensitivity:** `public`, `internal` or `restricted`
 
-A missing, misspelled or unparseable value resolves to **`restricted`**, never
-`public`. A note becomes public only when someone deliberately marks it public.
-The Librarian reports notes that inherited `restricted` by default, so owners
-can classify them properly.
+A note can also be **shared with** extra spaces (e.g. a client-onboarding SOP
+owned by `core` but shared with `hr` at `internal`).
+
+Authors shouldn't have to label everything, so an **AI Classifier** proposes
+the labels. Because a wrong label could leak core IP, the AI's power is limited
+by these rules.
+
+**Order of authority** (highest wins):
+
+1. **Human labels in the note's frontmatter:** `space:`, `sensitivity:`,
+   `shared_with:`.
+2. **Human folder rules** in `vault.yaml`.
+3. **AI classifications approved by a human** in the review queue.
+4. **Automatic safeguards** (below).
+5. **Default:** `restricted` and **unassigned**. Only reviewers can retrieve
+   the note, so it is effectively quarantined.
+
+**The one-way rule.** The AI may make a note **more restricted** by itself. It
+may **never make a note less restricted**, or give access to another
+department, without a human approving it:
+
+| AI proposal | What happens |
+|---|---|
+| `restricted` in a space (confidence ≥ threshold) | Applied automatically. Only that space's leads can see it |
+| `internal` or `public`, or `shared_with` another space | Goes to the **review queue**. Until approved, the note stays restricted |
+| Low confidence or "unsure" | Stays quarantined and goes to the review queue with the AI's reasoning |
+| Re-classification after an edit makes it **stricter** | Applied immediately |
+| Re-classification after an edit makes it **looser** | Queued for approval. The current, stricter label stays in force |
+
+**Automatic safeguards** (deterministic, no AI involved) force `restricted`
+whatever the AI says, when a note contains:
+
+- personal data patterns: NRIC/FIN, phone numbers, email addresses, bank details
+- a name from the client register (an optional list kept by core leads)
+- terms that are flagged in `vault.yaml` (e.g. "pricing", "rate card", "contract")
+
+Notes with missing, misspelled or unparseable labels resolve to `restricted`,
+never `public`.
+
+**Reviewing the AI's suggestions:**
+
+- **The review queue** shows each proposal with:
+  - the AI's reasoning
+  - the passages it relied on
+  - a one-click approve, edit or reject
+- **Grouping:** similar notes are grouped (by folder, tags and topic), so a
+  reviewer can approve, say, "these 40 workshop worksheets → `core`/`internal`"
+  in one action.
+- **Who reviews:** each space's admins and leads review proposals for their
+  own space. Notes the AI couldn't place go to platform admins.
+- **First run:** the initial pass over the whole vault produces one review
+  queue, grouped this way, to work through once.
+- **Optional write-back:** an approved label can be written into the note's
+  frontmatter, so the decision is visible in Obsidian too. This is the only
+  change the platform makes to existing notes, and it is off by default.
+
+**Accuracy is measured, not assumed.** The demo vault comes with correct labels
+for every note, and the Classifier is tested against them on every change. Two
+numbers are tracked separately:
+
+- **over-exposure rate:** labelled looser than it should be. The target is
+  **0**. This is the dangerous error.
+- **over-restriction rate:** labelled stricter than it should be. This is
+  annoying but safe.
+
+Auto-applying a looser label could be allowed later, only for a space whose
+admins opt in, and only after the over-exposure rate has stayed at zero on real
+review history.
+
+**Data note:** to classify a note, the Classifier has to read it. While the
+Classifier uses the Claude API, that means every note's text goes to Claude
+once, at first index and after edits. Classification is a simple task that
+small models handle well, so the `classifier` tier is the **first candidate to
+move to a local model** (§5.1, Phase 7). If that matters before then, it can be
+pinned to local from the start.
 
 ### Enforcement: in code, never by prompt
 
@@ -209,6 +285,7 @@ injected by the server, and they call models only through the model gateway
 | **Concierge** | `router` tier (Haiku) for routing, `answer` tier (Sonnet) for synthesis | `ask_<space>_agent` (only allowed spaces), `get_user_profile`, `create_ticket_handoff` (optional) | No |
 | **Department agent** (one config per space) | `answer` tier (Sonnet) | `search(query)`, `read_article(id)`, `read_index(path)`, `list_sops(filter)`, all scope-filtered | No |
 | **Curator** | `drafting` tier (Opus) | `parse_upload`, `propose_note`, `propose_sop_update`, `link_sources` | Only writes draft notes into the vault's `_proposals/` folder |
+| **Classifier** | `classifier` tier (Haiku now; first to go local) + deterministic safeguards | `read_note`, `list_spaces`, `propose_classification` | Writes proposals and auto-tightened labels only (§4.1) |
 | **Librarian** | `answer` tier + deterministic `wiki_core lint` | lint, staleness scan, conflict detection, gap report | Reports and tasks only |
 
 ### 5.1 Model gateway (Claude now, local later)
@@ -225,7 +302,8 @@ class ModelGateway(Protocol):
   `models.yaml` maps each tier to a provider and model:
 
   ```yaml
-  router:   {provider: anthropic, model: claude-haiku-5-5}
+  router:     {provider: anthropic, model: claude-haiku-5-5}
+  classifier: {provider: anthropic, model: claude-haiku-5-5}
   answer:   {provider: anthropic, model: claude-sonnet-5-5}
   drafting: {provider: anthropic, model: claude-opus-5-5}
   # later, e.g.:
@@ -291,7 +369,7 @@ sop_id: CORE-TRN-004
 title: "Running a Personal Brand Discovery Workshop"
 version: 1.2
 status: published        # draft | in_review | published | retired
-space: core              # optional; normally inferred from the top-level folder
+space: core              # optional; human label overrides the AI Classifier (§4.1)
 sensitivity: internal    # public | internal | restricted (missing → restricted)
 owner: "[[Jane Tan]]"
 reviewer: "[[Alex Lim]]"
@@ -356,6 +434,7 @@ by FastAPI.
 | Auth | `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /me` (incl. effective scopes) |
 | Chat | `POST /conversations`, `GET /conversations`, `POST /conversations/{id}/messages` (SSE stream: tokens, `agent_dispatched`, `citation`, `done`), `POST /messages/{id}/feedback` |
 | Knowledge | `GET /spaces`, `GET /spaces/{s}/documents`, `GET /documents/{id}` (+`/versions`), `POST /spaces/{s}/uploads` (goes to the Curator, then `_proposals/`) |
+| Classification | `GET /classifications/queue` (grouped), `POST /classifications/{id}/approve`, `/reject`, `/edit`, `POST /classifications/bulk-approve`, `GET /reports/classification-accuracy` |
 | Workflow | `GET /reviews` (in-review notes + proposals), `GET /reports/governance` (unapproved publishes, unclassified notes), `POST /admin/reindex` |
 | Retention | `GET /spaces/{s}/gaps`, `GET /spaces/{s}/stale`, `POST /capture-sessions`, `GET /reports/bus-factor` |
 | Admin | CRUD `/users`, `/roles`, `/grants`, `/spaces`; `GET /audit` (filterable, exportable); `POST /retractions` |
@@ -371,10 +450,12 @@ app, email, Slack or Teams subscribe without changes to the core.
 - `user_roles`
 - `spaces`
 - `grants(role_id, space_id, max_sensitivity, actions[])`
-- `documents(id, space_id, vault_path, doc_type, sop_id, title, status, sensitivity, sensitivity_source, owner, review_due, content_hash)`
+- `documents(id, vault_path, doc_type, sop_id, title, status, owner, review_due, content_hash)`
+- `document_access(document_id, space_id, role: owner|shared, sensitivity, source: frontmatter|folder_rule|approved_ai|auto_tighten|safeguard|default, decided_by, decided_at)`: the labels actually in force
+- `classification_proposals(document_id, content_hash, proposed_space, proposed_sensitivity, proposed_shared_with, confidence, rationale, evidence_spans, model, status, reviewed_by, reviewed_at)`
 - `document_versions(document_id, version, content_hash, git_commit, approved_by, approved_on, indexed_at)`
 - `document_links(from_id, to_id)` (resolved `[[wikilinks]]`, used for related SOPs and broken-link reports)
-- `chunks(id, document_id, version, space_id, sensitivity, text, embedding vector, tsv tsvector)`. RLS applies on `space_id` and `sensitivity`.
+- `chunks(id, document_id, version, text, embedding vector, tsv tsvector)`. Access comes from `document_access` via a join, and RLS is enforced there, so changing a label applies instantly without re-indexing.
 - `uploads`
 - `conversations`
 - `messages`
@@ -402,8 +483,9 @@ platform/
   db/           SQLAlchemy models, Alembic migrations, RLS policies
   console/      minimal dev console (thin, replaceable)
   tests/        unit, RBAC-leak suite, agent evals
-config/         vault.yaml (folders → spaces/sensitivity), spaces/*.yaml, models.yaml
-demo-vault/     synthetic Obsidian vault (Core/, IT/, HR/): the only data in git
+config/         vault.yaml (optional folder rules, safeguard terms), spaces/*.yaml, models.yaml
+demo-vault/     synthetic one-vault company (mixed, partly unsorted): the only data in git
+demo-vault-labels.yaml  correct space/sensitivity labels for every demo note (Classifier tests)
 deploy/docker-compose.yml       api, worker, postgres+pgvector, redis
 ```
 
@@ -448,14 +530,15 @@ Docker can't use the Mac GPU. Only `demo-vault/` is used.
 
 | Phase | Scope | Exit criteria |
 |---|---|---|
-| **0. Foundations** (1 wk) | Extract `wiki_core`, `platform/` skeleton, docker-compose (api, worker, postgres+pgvector, redis), Alembic, model gateway stub, CI enabled; synthetic `demo-vault/` with `Core/`, `IT/`, `HR/` | `docker compose up` gives a healthy API; existing `tests/*.sh` pass; gateway passes a smoke test with Claude and with a local Ollama model |
+| **0. Foundations** (1 wk) | Extract `wiki_core`, `platform/` skeleton, docker-compose (api, worker, postgres+pgvector, redis), Alembic, model gateway stub, CI enabled; synthetic one-vault `demo-vault/` (core methodology, training content, client delivery, IT, HR, deliberately partly unsorted) with correct labels | `docker compose up` gives a healthy API; existing `tests/*.sh` pass; gateway passes a smoke test with Claude and with a local Ollama model |
 | **1. Identity and RBAC** (1–2 wk) | Users, roles, grants, JWT auth, policy engine, fail-closed sensitivity resolver, RLS, audit log, admin endpoints | Policy unit tests; a note with missing or invalid sensitivity is never returned to a `public`-only user; RLS blocks raw SQL reads outside scope |
-| **2. Vault indexing and retrieval** (2 wk) | Obsidian parser (frontmatter, wikilinks, embeds, tags, PDF attachments), vault watcher plus nightly rescan, `vault.yaml` folder rules, local embeddings, hybrid search | Editing a note in Obsidian is searchable within about 1 minute; leak suite at retrieval level passes |
+| **2. Vault indexing and retrieval** (2 wk) | Obsidian parser (frontmatter, wikilinks, embeds, tags, PDF/PPTX/DOCX attachments), vault watcher plus nightly rescan, local embeddings, hybrid search; new notes enter quarantine | Editing a note in Obsidian is searchable within about 1 minute (to permitted users); leak suite at retrieval level passes |
+| **2b. AI Classifier** (1–2 wk) | Classifier agent, deterministic safeguards, one-way rule, review queue with grouping and bulk approve, re-classification on edit, optional frontmatter write-back | On the demo vault: **0 over-exposures**; ≥ 85% of notes correctly placed without edits; a looser re-classification never takes effect without approval |
 | **3. Agents** (2 wk) | Core agent first, then IT and HR; Concierge routing and synthesis, SSE streaming, citations, "no answer" handling, gap logging | Eval set (about 50 Q&A per demo space) ≥ 90% correct with valid citations; zero leaks in the adversarial suite; same evals run against one local model as a baseline |
 | **4. SOP governance** (1 wk) | Frontmatter lifecycle, `_proposals/` writes, review queue, governance report, review-due reminders, Obsidian SOP template, webhooks | An SOP goes draft → in review → published in Obsidian and is cited in chat; governance report catches an unapproved publish |
 | **5. Retention features** (1–2 wk) | Capture sessions, gap clustering, staleness and bus-factor reports, conflict detection, retract | Reports exposed via API; retract verified across index, caches and history |
 | **6. Company deployment** (1 wk) | Install guide for company admins; deploy on the company machine with the real vault mounted by them; backups; rate limits; metrics; frozen OpenAPI v1 plus TypeScript client | Admin-run install succeeds; logs confirmed free of note text; API contract frozen |
-| **7. Local-model migration** (when hardware is ready) | Choose a GPU host or a high-memory Mac Studio, run the evals for each tier, switch tiers in `models.yaml` (`core` first, optionally `local_only`) | Each switched tier meets the eval threshold; no cloud calls for `local_only` spaces (verified from gateway logs) |
+| **7. Local-model migration** (when hardware is ready) | Choose a GPU host or a high-memory Mac Studio, run the evals for each tier, switch tiers in `models.yaml` (`classifier` tier first, then `core`, optionally `local_only`) | Each switched tier meets the eval threshold; no cloud calls for `local_only` spaces (verified from gateway logs) |
 
 **Later:** SSO (Entra/Google/OIDC: groups map onto roles, so the grants model
 is unchanged), Slack/Teams adapters, the dashboard app, ticketing integrations
@@ -463,20 +546,25 @@ is unchanged), Slack/Teams adapters, the dashboard app, ticketing integrations
 
 ## 13. Open questions for the owner
 
-Resolved on 2026-11-20 (see §1): start with the `core` space, with strict
-access and a public tier; the source is an Obsidian vault edited directly;
-Claude now with a path to local models; MacBook development; the developer
-does not handle real data.
+Resolved on 2026-11-20 (see §1):
+
+- `core` covers methodology, training programmes, client delivery and training
+  content, with strict access and a public tier.
+- One Obsidian vault, edited directly, with AI-proposed and human-approved
+  access labels.
+- Claude now, with a path to local models.
+- Development on a MacBook; the developer does not handle real data.
 
 Still open:
 
-1. **Confirm the `core` scope:** is it branding methodology, training
-   programmes and client delivery? Or does "technical" mean something else in
-   your company (e.g. content or video production, the learning platform)?
-2. **Roles inside core:** who should be `core-lead` (restricted access) versus
-   `core-staff`? Rough headcounts are enough.
-3. **Vault layout:** is there one vault for the whole company or one per
-   department? Is it already in git (Obsidian Git plugin)?
+1. **Roles inside core:** who should be `core-lead` (restricted access) versus
+   `core-staff`? Rough headcounts are enough. Core leads will also review the
+   Classifier's proposals for `core`.
+2. **Vault size and format:** roughly how many notes and attachments? Is the
+   training content mostly slides, PDFs or videos? Is the vault already in git
+   (Obsidian Git plugin)?
+3. **Client register:** is there a list of client names the safeguards can
+   check against?
 4. **Target machine** for the company deployment and the later local models
    (Mac mini/Studio, a Linux server with a GPU, a NAS…)?
 5. Should the bot only advise, or also take actions (e.g. open a ticket)? The
