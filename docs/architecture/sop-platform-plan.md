@@ -42,6 +42,12 @@ polished UI.
 | Training content | **Slides are the main format** (PowerPoint, Google Slides, Canva), with PDFs mainly used as worksheets. Videos come later. Slides and PDFs are cited by slide or page number (§3.1). |
 | Client names | There is no client list, and notes may contain client names. A **local name detector** (§4.1 safeguards) treats possible client names as restricted. |
 | Bot role | **Advisory only.** It answers and points to people; it takes no actions. |
+| API account | **Developer's Claude API key during development and testing**, with demo data only. It is swapped for the **company's own key before any real vault is connected**. That is a config change (`ANTHROPIC_API_KEY` in the server's env file), never committed to git. |
+| Language | **English now, other languages later.** The search index is multilingual from day one, so adding a language later does not mean rebuilding it (§5.1). |
+| Content organisation | Content is organised **by programme and by stage** of delivery. Both are first-class fields, so staff can browse either way (§6). |
+| Knowledge gaps | **HR sees anonymised, aggregated knowledge-gap reports** across departments, to plan follow-up training (§7). |
+| Retention | Chat history and audit logs are kept **24 months** by default, enough for the yearly audit with margin (§11). |
+| Staff notice | Staff see a **short notice** about what is logged and who can see it, and acknowledge it at first sign-in (§11). |
 | Dev environment | Built and tested on the developer's **MacBook** (Apple Silicon) with Docker Compose and a **synthetic demo vault**. |
 | Data handling | The developer **never handles real company data**. Real vaults are only mounted on the company's own machine, by company admins (§11). |
 
@@ -287,6 +293,7 @@ Example grants, with `core` as the strictest space:
 | core-lead (the CEO) | core | restricted | ask, review, approve |
 | it-staff | it | internal | ask, contribute |
 | hr-staff | hr | internal | ask, contribute, review |
+| hr-staff | *(all spaces)* | — | `view_gap_reports` (anonymised, aggregated only, §7) |
 | space-admin:core | core | restricted | all |
 
 So every employee can ask "how do I book a training room?" (a public `core`
@@ -475,10 +482,14 @@ class ModelGateway(Protocol):
   is ready, while other spaces stay on Claude. A space can also be set to
   `local_only: true`. The gateway then refuses to send that space's text to any
   cloud provider, even if the config is wrong.
-- **Embeddings are local from day one.** A small open embedding model runs on
-  the server (e.g. `bge-m3` or `nomic-embed-text` via Ollama, which runs on
-  Apple Silicon with Metal acceleration). So indexing never sends text out, and
-  moving the chat model to local later does not mean re-indexing the vault.
+- **Embeddings are local from day one.** **`bge-m3`** runs on the server via
+  Ollama, which uses Apple Silicon's GPU (Metal). It is chosen because it is
+  **multilingual**: English content now, and Chinese, Malay and other
+  languages later, all land in the same index without re-indexing. A question
+  in one language can even find an SOP written in another. Indexing never
+  sends text out, and moving the chat model to local later does not mean
+  re-indexing. Each chunk also stores its detected language, so language-aware
+  full-text search can be added when a second language arrives.
 - **Portable tool use:** agent loops use a provider-neutral tool and message
   format. The adapters translate it. Local models with weaker tool-calling get
   a stricter JSON-mode fallback.
@@ -587,8 +598,29 @@ approved_by: "[[Alex Lim]]"
 approved_on: 2026-11-02
 review_cycle_days: 180
 review_due: 2027-05-01
+programme: "[[Signature Personal Brand Programme]]"   # browse by programme
+stage: discovery         # discovery | strategy | content | delivery | follow-up (configurable)
 tags: [workshop, discovery, onboarding]
 ```
+
+### Organising by programme and stage
+
+Content can be browsed **by programme** (e.g. *Signature Personal Brand
+Programme*, *Executive Presence Workshop*) or **by stage** of delivery (e.g.
+discovery → strategy → content → delivery → follow-up; the stage list lives in
+`config/vault.yaml` and can be changed).
+
+- Both are frontmatter fields, so a single note sits in one place in the vault
+  but appears in both views.
+- The suggested folder layout for new content is
+  `Programmes/<Programme>/<NN Stage>/…`, with cross-programme material under
+  `Methodology/` and `Shared Templates/`. The platform doesn't depend on it.
+- For notes missing these fields, the Classifier proposes them along with
+  space and sensitivity. Adding them carries no exposure risk, so they are
+  applied after the author confirms, with no lead approval needed.
+- Agents use programme and stage as search filters. "What's step 3 of the
+  discovery stage for the Signature programme?" goes straight to the right
+  notes.
 
 ### Workflow: write in the app, review in the app
 
@@ -639,8 +671,24 @@ Author writes in the app ─▶ clicks "Submit for review" (status: in_review)
   how you run a brand-audit engagement"). The transcript and the Curator's
   draft SOPs land in the vault's `_proposals/` folder for review. This builds on
   llm-wiki's sessions and lessons-learned flows.
-- **Gap detection:** unanswered or low-confidence questions are clustered per
-  space into a "top missing SOPs" list for space admins.
+- **Gap detection, used by HR for follow-up training:**
+  - **What's collected:** unanswered or low-confidence questions, and answers
+    marked "not helpful", are grouped into **gap topics** per space, programme
+    and stage. For example: "*Delivery stage, Executive Presence, handling
+    camera-shy clients*: 9 questions from 4 people this month".
+  - **Space leads** see their space's gap topics, with example questions, to
+    write missing SOPs.
+  - **HR sees anonymised, aggregated gap reports across all spaces:**
+    - **topics and counts only,** broken down by team or role, never by
+      person
+    - a topic is shown only once it involves **at least 3 people**, so no
+      individual can be singled out
+    - **no restricted content:** a topic's label is written from the
+      questions, never from restricted SOP text
+  - **Follow-up tracking:** each gap topic has a status: open → training
+    planned → addressed. It is marked addressed when an SOP is published or
+    the training is delivered, and HR and leads can see whether questions on
+    that topic actually drop afterwards.
 - **Staleness:** a `review_due` dashboard, plus llm-wiki `volatility` and
   `verified` checks.
 - **Bus-factor report:** SOPs whose only owner or contributor is one person,
@@ -691,7 +739,9 @@ app, email, Slack or Teams subscribe without changes to the core.
 - `conversations`
 - `messages`
 - `message_citations`
-- `knowledge_gaps`
+- `gap_topics(id, space_id, programme, stage, label, question_count, distinct_people, status: open|training_planned|addressed, owner_id)`
+- `gap_events(gap_topic_id, message_id, reason: no_answer|low_confidence|not_helpful)`: links to messages; never exposed to HR
+- `notice_acknowledgements(user_id, notice_version, acknowledged_at)`
 - `capture_sessions`
 - `audit_events` (append-only, hash-chained)
 
@@ -715,7 +765,8 @@ platform/
   console/      minimal dev console (thin, replaceable)
   tests/        unit, RBAC-leak suite, agent evals
 config/         vault.yaml (optional folder rules, safeguard terms), spaces/*.yaml, models.yaml
-demo-vault/     synthetic one-vault company (mixed, partly unsorted): the only data in git
+demo-vault/     synthetic one-vault training company: Programmes/<Programme>/<Stage>/, Methodology/,
+                Shared Templates/, IT/, HR/, plus a deliberately unsorted Inbox/ (the only data in git)
 demo-vault-labels.yaml  correct space/sensitivity labels for every demo note (Classifier tests)
 deploy/docker-compose.yml       api, worker, postgres+pgvector, redis (Ollama runs natively on the host)
 ```
@@ -737,9 +788,42 @@ repo on the company device, mounted at deploy time via `VAULT_PATH`.
   the disciplinary SOP say?" asked as an employee). CI fails if any restricted
   document ID shows up in retrieval or the answer.
 - Secrets (Anthropic key, database credentials) come from env or a secret
-  store, never from git.
-- PII redaction is optional at ingest. Retention policy per space. Audit log
-  export.
+  store, never from git. **The developer's API key is used only with demo
+  data.** The go-live checklist requires swapping in the company's key before
+  the real vault is mounted, and a startup check warns if the key's
+  organisation doesn't match the one configured for production.
+- PII redaction is optional at ingest.
+- **Retention:**
+  - Chat history and audit logs are kept **24 months** by default
+    (configurable). A yearly audit usually examines the previous financial
+    year, so records can be up to about 2 years old at audit time.
+  - After the retention period, records are deleted, or archived encrypted if
+    the company prefers.
+  - The company should confirm the period with its auditor, since some
+    records may need longer.
+  - The audit log is append-only and hash-chained (tamper-evident), and can be
+    exported for the auditor.
+- **Who can see staff questions:**
+  - Individual chat history is visible only to the user and to the platform
+    admin (the CEO), for audit and investigations. Every admin view is itself
+    audit-logged.
+  - HR sees only anonymised gap reports (§7).
+  - Space leads see example questions, without names, for their own space.
+- **Staff notice:**
+  - Shown at first sign-in and whenever it changes. Each acknowledgement is
+    recorded with the notice version.
+  - The text lives in `config/notice.md`.
+  - Draft:
+
+  > **How this assistant uses your information.** Your questions and the
+  > assistant's answers are stored for **24 months** so the company can meet
+  > its yearly audit and improve its SOPs. Your conversation history can be
+  > viewed by you and by the platform administrator; every such view is
+  > logged. HR sees only **anonymised, combined** reports about topics where
+  > SOPs or training are missing; never who asked what. Parts of your
+  > question and relevant SOP passages are sent to an AI service to generate
+  > answers. Please don't enter personal data about clients or colleagues
+  > unless needed. Questions? Contact [admin contact].
 - **Data boundary:**
   - The developer works only with `demo-vault/`.
   - Real vaults are mounted by company admins on the company's machine.
@@ -766,13 +850,13 @@ Docker can't use the Mac GPU. Only `demo-vault/` is used.
 
 | Phase | Scope | Exit criteria |
 |---|---|---|
-| **0. Foundations** (1 wk) | Extract `wiki_core`, `platform/` skeleton, docker-compose (api, worker, postgres+pgvector, redis), demo vault as a local git repo, Ollama on the host, Alembic, model gateway stub, CI enabled; synthetic one-vault `demo-vault/` (core methodology, training content, client delivery, IT, HR, deliberately partly unsorted) with correct labels | `docker compose up` gives a healthy API; existing `tests/*.sh` pass; gateway passes a smoke test with Claude and with a local Ollama model |
+| **0. Foundations** (1 wk) | Extract `wiki_core`, `platform/` skeleton, docker-compose (api, worker, postgres+pgvector, redis), demo vault as a local git repo, Ollama on the host, Alembic, model gateway stub, CI enabled; synthetic one-vault `demo-vault/` (2–3 fictional programmes by stage, methodology, sample `.pptx` decks and PDF worksheets, IT, HR, a deliberately unsorted inbox) with correct labels; developer API key via `.env` | `docker compose up` gives a healthy API; existing `tests/*.sh` pass; gateway passes a smoke test with Claude and with a local Ollama model |
 | **1. Identity and RBAC** (1–2 wk) | Users, roles, grants, JWT auth with required TOTP, policy engine, fail-closed sensitivity resolver, RLS, audit log, admin endpoints | Policy unit tests; a note with missing or invalid sensitivity is never returned to a `public`-only user; RLS blocks raw SQL reads outside scope |
 | **2. Vault indexing and retrieval** (2 wk) | Obsidian parser (frontmatter, wikilinks, embeds, tags), **slide-by-slide PPTX** with speaker notes and local OCR, PDF worksheets with form fields, DOCX; **editing API** (create/edit/upload, permission-checked, committed in the user's name, edit-clash detection); change detection from git commits plus a nightly check for unattributed changes; local embeddings, hybrid search; new notes enter quarantine | A note saved through the API is committed in the user's name and searchable within about 1 minute (to permitted users); an edit clash is refused, not overwritten; a user without `contribute` can't save; leak suite at retrieval level passes |
 | **2b. AI Classifier** (1–2 wk) | Classifier agent, deterministic safeguards incl. the local name detector (staff names excluded), one-way rule, review queue with grouping and bulk approve, re-classification on edit, optional frontmatter write-back | On the demo vault: **0 over-exposures**; ≥ 85% of notes correctly placed without edits; a looser re-classification never takes effect without approval |
 | **3. Agents** (2 wk) | Core agent first, then IT and HR; Concierge routing and synthesis, SSE streaming, citations, "no answer" handling, gap logging | Eval set (about 50 Q&A per demo space) ≥ 90% correct with valid citations; zero leaks in the adversarial suite; same evals run against one local model as a baseline |
 | **4. SOP governance** (1–2 wk) | In-platform review with changes shown against the last approved version, version-bound approvals, "last approved version stays live", self-approval flag, frontmatter write-back, `_proposals/` writes, governance report (unattributed edits, unreviewed changes), review-due reminders, Obsidian SOP template, webhooks | Demo: staff A edits an SOP → staff B (lead) approves in the platform → the bot cites it with "written by A, approved by B"; an edit after approval is not cited until re-approved |
-| **5. Retention features** (1–2 wk) | Capture sessions, gap clustering, staleness and bus-factor reports, conflict detection, retract | Reports exposed via API; retract verified across index, caches and history |
+| **5. Retention features** (1–2 wk) | Capture sessions, gap topics with HR's anonymised view (minimum 3 people) and follow-up tracking, staleness and bus-factor reports, conflict detection, retract, 24-month retention job, staff notice and acknowledgement | Reports exposed via API; retract verified across index, caches and history |
 | **6. Company deployment** (1 wk) | Install guide for company admins (Mac mini and Windows/WSL2 variants, Obsidian + Obsidian Git on the device for the admin, Headscale with embedded relay and ACLs (CGNAT/public-IP check, port-forward, domain + TLS), TOTP enrolment, backups); deploy on the company machine with the real vault mounted by them; backups; rate limits; metrics; frozen OpenAPI v1 plus TypeScript client | Admin-run install succeeds; logs confirmed free of note text; API contract frozen |
 | **7. Local-model migration** (when hardware is ready) | Choose a GPU host or a high-memory Mac Studio, run the evals for each tier, switch tiers in `models.yaml` (`classifier` tier first, then `core`, optionally `local_only`) | Each switched tier meets the eval threshold; no cloud calls for `local_only` spaces (verified from gateway logs) |
 
@@ -804,8 +888,18 @@ Resolved on 2026-11-20 (see §1):
 - There is no client list; a local name detector is used instead.
 - Host is a Mac mini or a Windows PC. The bot is advisory only.
 
-Still open (none block Phases 0–3):
+Also resolved: developer API key for testing, company key before go-live;
+English with a multilingual index; organisation by programme and stage;
+anonymised gap reports for HR; 24-month retention; a staff notice.
 
-1. **Usage:** expected users and questions per day, for Claude API cost sizing.
+Still open (none block Phases 0–5):
+
+1. **Usage:** expected users and questions per day, to refine cost estimates
+   (the cost dashboard will measure this anyway).
 2. **Host spec:** once the machine is chosen, its memory (Mac) or GPU
-   (Windows). This decides when answering agents can also move to local models.
+   (Windows).
+3. **Office internet:** does it have a public IP (no CGNAT)? Needed for
+   Headscale (§3.3).
+4. **Retention period:** confirm 24 months with the company's auditor.
+5. **Programme and stage names:** the real list, or keep the placeholders
+   until go-live.
