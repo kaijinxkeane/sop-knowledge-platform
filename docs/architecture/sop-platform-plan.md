@@ -274,10 +274,10 @@ Both are supported with the same Docker Compose setup:
 |---|---|
 | macOS and background services | 3–4 GB |
 | Docker: Postgres, Redis, API, worker (parsing, OCR) | 3–4 GB |
-| Embedding model (`bge-m3`) | ~1.2 GB |
+| Embedding model (`qwen3-embedding:0.6b`) | ~0.6 GB |
 | Name detector (small local model) | ~0.5–1 GB |
 | **Classifier model** | **~3 GB (4B-class) or ~5 GB (8B-class)** |
-| **Total** | **~11–12 GB with a 4B Classifier**; ~13–15 GB with an 8B one (too tight) |
+| **Total** | **~10.5–11.5 GB with a 4B Classifier**; ~12.5–14.5 GB with an 8B one (only if it unloads when idle) |
 
 What this means on 16 GB:
 
@@ -476,7 +476,7 @@ injected by the server, and they call models only through the model gateway
 
 | Agent | Model (default) | Tools | Writes? |
 |---|---|---|---|
-| **Concierge** | `router` tier (Haiku) for routing, `answer` tier (Sonnet) for synthesis | `ask_<space>_agent` (only allowed spaces), `get_user_profile`, `create_ticket_handoff` (optional) | No |
+| **Concierge** | Routing: permissions plus search, local `router` tier (`qwen3`) only when unclear, never Claude (see *Routing* below); `answer` tier for synthesis | `ask_<space>_agent` (only allowed spaces), `get_user_profile`, `create_ticket_handoff` (optional) | No |
 | **Department agent** (one config per space) | `answer` tier (Haiku 5.5) with escalation to `reasoning` tier (Sonnet 5.5), §5.2 | `search(query)`, `read_article(id)`, `read_index(path)`, `list_sops(filter)`, all scope-filtered | No |
 | **Curator** | `drafting` tier (Opus) | `parse_upload`, `propose_note`, `propose_sop_update`, `link_sources` | Only writes draft notes into the vault's `_proposals/` folder |
 | **Classifier** | `classifier` tier (local model via Ollama; Haiku as eval baseline) + deterministic safeguards | `read_note`, `list_spaces`, `propose_classification` | Writes proposals and auto-tightened labels only (§4.1) |
@@ -492,11 +492,36 @@ class ModelGateway(Protocol):
     async def embed(self, texts: list[str]) -> list[list[float]]: ...
 ```
 
+**Routing: permissions plus search, model only when unclear (decided 2026-11-20).**
+Claude is never used to route.
+
+1. **Permissions decide where to look.** Search only covers spaces the user
+   may read (policy engine + retrieval filters). A user with one space is
+   routed to that space's agent, no further step.
+2. **Search decides where the answer is, with no model.** Results carry their
+   space. If the strong matches clearly come from one space, only that agent
+   answers; if they clearly come from two, both answer and the Concierge
+   combines them.
+3. **Unclear cases only go to the local `router` tier** (`qwen3:4b`, thinking
+   off). "Unclear" means: strong matches split across three or more spaces
+   with no clear leader, or every match below the relevance threshold (vague
+   question). The model sees the question and one-line agent descriptions
+   (no vault content) and picks the agents. If the 4B is busy, the request
+   waits briefly or `qwen3:8b` takes it, whichever the eval shows is faster.
+4. **If Ollama is down, no model is used:** every permitted space that
+   appears in the results is asked, and the Concierge combines the answers.
+
+Every routing decision logs its reason (`single_space`, `search`, `model`,
+`fallback`) and the chosen spaces, never the question, so "why was HR asked?"
+is auditable. The thresholds are tuned in the Phase 3 eval, which also tracks
+how often step 3 runs, routing accuracy and latency. If step 3 runs rarely,
+it stays; with many more departments it may be needed more often.
+
 - **Tiers, not model names:** agents ask for `router`, `answer` or `drafting`.
   `models.yaml` maps each tier to a provider and model:
 
   ```yaml
-  router:     {provider: anthropic, model: claude-haiku-5-5}
+  router:     {provider: openai_compat, location: local, model: qwen3:4b}  # local; shares the Classifier's model
   classifier: {provider: openai_compat, base_url: http://host.docker.internal:11434/v1, model: qwen3:4b, keep_alive: 5m}  # local (Ollama); 8B and Claude Haiku as eval baselines
   answer:   {provider: anthropic, model: claude-haiku-5-5}
   reasoning: {provider: anthropic, model: claude-sonnet-5-5}
@@ -512,9 +537,13 @@ class ModelGateway(Protocol):
   is ready, while other spaces stay on Claude. A space can also be set to
   `local_only: true`. The gateway then refuses to send that space's text to any
   cloud provider, even if the config is wrong.
-- **Embeddings are local from day one.** **`bge-m3`** runs on the server via
-  Ollama, which uses Apple Silicon's GPU (Metal). It is chosen because it is
-  **multilingual**: English content now, and Chinese, Malay and other
+- **Embeddings are local from day one.** **`qwen3-embedding:0.6b`** runs on
+  the server via Ollama, which uses Apple Silicon's GPU (Metal). It was chosen
+  over `bge-m3` (decided 2026-11-20) because it uses about half the memory
+  (~0.6 GB), reads very long passages (32k tokens) and is **multilingual**.
+  Search queries are embedded with a short instruction prefix; documents are
+  embedded as-is. Both output 1024-dimension vectors, so the index schema is
+  the same. Being multilingual means: English content now, and Chinese, Malay and other
   languages later, all land in the same index without re-indexing. A question
   in one language can even find an SOP written in another. Indexing never
   sends text out, and moving the chat model to local later does not mean
@@ -546,7 +575,7 @@ only kept if answer accuracy and citation validity stay at the bar.
    sent, never whole documents. Each agent has a per-question token cap.
 4. **Skip work that adds nothing:** when only one department answers, its
    answer streams straight to the user without a separate synthesis call.
-   Routing runs at low effort.
+   Routing needs no model in most cases and never uses Claude (*Routing*).
 5. **Answer reuse:** an identical question, asked with the same access scopes
    against the same document versions, reuses the stored answer. It is
    invalidated automatically when any cited SOP changes. SOP questions repeat a
@@ -805,7 +834,8 @@ Author writes in the app ─▶ clicks "Submit for review" (status: in_review)
     without access keep asking about something covered by a restricted SOP;
     consider publishing a public or internal version*".
   - **Cost:** grouping runs nightly as a batch job. Embeddings are local, and
-    topic labels are written by the low-cost `router` tier.
+    topic labels are written by the local `router` tier, so gap data never
+    leaves the server.
 - **Coverage map (gaps nobody has searched for yet):** a programme × stage
   grid showing which cells have no published SOPs, or only stale ones (e.g.
   *Executive Presence → follow-up: 0 SOPs*). It is shown to leads and the
@@ -1082,7 +1112,7 @@ Docker can't use the Mac GPU. Only `demo-vault/` is used.
 | **0. Foundations** (1–1.5 wk) | Extract `wiki_core` into `backend/`, `backend/` skeleton, **`frontend/` skeleton (Vite + React + TS, shadcn/ui, neutral theme, generated API client, sign-in page)**, docker-compose (api, worker, postgres+pgvector, redis), demo vault as a local git repo, Ollama on the host, Alembic, model gateway stub, CI enabled; synthetic one-vault `demo-vault/` (2–3 fictional programmes by stage, methodology, sample `.pptx` decks and PDF worksheets, IT, HR, a deliberately unsorted inbox) with correct labels; developer API key via `.env` | `docker compose up` gives a healthy API and serves the frontend; existing `tests/*.sh` pass; gateway passes a smoke test with Claude and with a local Ollama model |
 | **1. Identity and RBAC** (1–2 wk) | Users, roles, grants, JWT auth with required TOTP, policy engine, fail-closed sensitivity resolver, RLS, audit log, admin endpoints. **UI:** sign-in + TOTP enrolment, staff notice, admin users/roles/grants | Policy unit tests; a note with missing or invalid sensitivity is never returned to a `public`-only user; RLS blocks raw SQL reads outside scope |
 | **2. Vault indexing and retrieval** (2 wk) | Obsidian parser (frontmatter, wikilinks, embeds, tags), **slide-by-slide PPTX** with speaker notes and local OCR, PDF worksheets with form fields, DOCX; **editing API** (create/edit/upload, permission-checked, committed in the user's name, edit-clash detection); change detection from git commits plus a nightly check for unattributed changes; local embeddings, hybrid search; new notes enter quarantine. **UI:** Library (browse by programme/stage/department, reading view, slide and PDF viewers, version history), **visual editor** with Obsidian nodes and the round-trip test, upload, merge screen | A note saved through the API is committed in the user's name and searchable within about 1 minute (to permitted users); an edit clash is refused, not overwritten; a user without `contribute` can't save; leak suite at retrieval level passes |
-| **2b. AI Classifier** (1–2 wk) | Classifier agent, deterministic safeguards incl. the local name detector (staff names excluded), one-way rule, review queue with grouping and bulk approve, re-classification on edit, optional frontmatter write-back. **UI:** Review → AI label suggestions and unplaced notes | On the demo vault: **0 over-exposures**; ≥ 85% of notes correctly placed without edits; a looser re-classification never takes effect without approval |
+| **2b. AI Classifier** (1–2 wk) | Classifier agent, deterministic safeguards incl. the local name detector (staff names excluded), one-way rule, review queue with grouping and bulk approve, re-classification on edit, optional frontmatter write-back. **UI:** Review → AI label suggestions and unplaced notes | **`qwen3:4b` vs `qwen3:8b` compared** on the demo vault (8B unloads when idle on 16 GB); the smaller model that passes is chosen. On the demo vault: **0 over-exposures**; ≥ 85% of notes correctly placed without edits; a looser re-classification never takes effect without approval |
 | **3. Agents** (2 wk) | Core agent first, then IT and HR; Concierge routing and synthesis, SSE streaming, citations, "no answer" handling, gap logging. **UI:** Ask (streaming chat, citation badges that open the slide or section, feedback, history), role-based Home | Eval set (about 50 Q&A per demo space) ≥ 90% correct with valid citations; zero leaks in the adversarial suite; same evals run against one local model as a baseline |
 | **4. SOP governance** (1–2 wk) | In-platform review with changes shown against the last approved version, version-bound approvals, "last approved version stays live", self-approval flag, frontmatter write-back, `_proposals/` writes, governance report (unattributed edits, unreviewed changes), review-due reminders, Obsidian SOP template, webhooks. **UI:** Review → SOP changes with side-by-side diff, approve/request changes; in-app notifications | Demo: staff A edits an SOP → staff B (lead) approves in the platform → the bot cites it with "written by A, approved by B"; an edit after approval is not cited until re-approved |
 | **5. Retention features** (1–2 wk) | Capture sessions, gap topics with HR's anonymised view (minimum 3 people) and follow-up tracking, staleness and bus-factor reports, conflict detection, retract, 24-month retention job, staff notice and acknowledgement, **personal gap recommendations from searches, access gaps, coverage map**. **UI:** Retain (capture interviews, gap dashboards incl. HR's anonymised view, review-due, bus factor), cost and usage dashboard, audit log viewer | Reports exposed via API; retract verified across index, caches and history |

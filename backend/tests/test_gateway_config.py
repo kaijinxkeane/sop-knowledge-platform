@@ -29,7 +29,8 @@ def test_cloud_tiers_use_current_models():
     assert cfg.tier("answer").model == "claude-haiku-5-5"
     assert cfg.tier("reasoning").model == "claude-sonnet-5-5"
     assert cfg.tier("drafting").model == "claude-opus-5-5"
-    assert cfg.tier("router").location == "cloud"
+    # Routing is local: questions never go to Claude just to be routed.
+    assert cfg.tier("router").location == "local"
 
 
 def _write(tmp_path: Path, models: str, spaces: dict[str, str] | None = None) -> Path:

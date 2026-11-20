@@ -40,3 +40,21 @@ deploy/data/
 .idea/
 .vscode/
 *.swp
+
+# AI model files (never in git). Ollama keeps models in ~/.ollama, outside the
+# repo; these rules catch weights or fine-tune output placed here by mistake.
+*.gguf
+*.safetensors
+*.onnx
+*.pt
+*.pth
+*.ckpt
+*.mlmodel
+*.mlpackage/
+.ollama/
+models/
+!backend/app/models/
+adapters/
+!backend/app/models/adapters/
+mlx_models/
+fine-tune/output/

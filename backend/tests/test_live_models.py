@@ -13,11 +13,11 @@ pytestmark = [
 ]
 
 
-async def test_router_tier_on_claude():
+async def test_answer_tier_on_claude():
     if not os.environ.get("ANTHROPIC_API_KEY"):
         pytest.skip("ANTHROPIC_API_KEY not set")
     result = await build_gateway().chat(
-        "router",
+        "answer",
         messages=[Message("user", "Reply with: ready")],
         scope=ContentScope.none(),
         max_tokens=256,

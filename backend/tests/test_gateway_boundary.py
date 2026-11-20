@@ -29,7 +29,11 @@ def gateway():
                 "local", "openai_compat", "qwen3:4b", "local", base_url="http://x/v1"
             ),
             "embedding": TierConfig(
-                "embedding", "openai_compat", "bge-m3", "local", base_url="http://x/v1"
+                "embedding",
+                "openai_compat",
+                "qwen3-embedding:0.6b",
+                "local",
+                base_url="http://x/v1",
             ),
         },
         spaces={

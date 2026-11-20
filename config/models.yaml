@@ -9,12 +9,15 @@
 # content are refused by cloud tiers.
 
 tiers:
-  # Routes a question to departments. Sees the question, not vault content.
+  # Routing is permissions + search with no model (plan §5, Routing). This
+  # tier is used only when search is unclear, and for nightly gap-topic labels.
+  # Local and shares the Classifier's model; never falls back to Claude.
   router:
-    provider: anthropic
-    model: claude-haiku-5-5
-    effort: low
-    max_tokens: 1024
+    provider: openai_compat
+    location: local
+    base_url: ${OLLAMA_BASE_URL}/v1
+    model: qwen3:4b
+    max_tokens: 256
 
   # Default answering tier (most questions).
   answer:
@@ -44,12 +47,14 @@ tiers:
     provider: openai_compat
     location: local
     base_url: ${OLLAMA_BASE_URL}/v1
+    # qwen3:4b vs qwen3:8b decided by the Phase 2b Classifier eval.
     model: qwen3:4b
     max_tokens: 1024
 
-  # Search index embeddings (multilingual) -> always local.
+  # Search index embeddings (multilingual, long context, 1024-dim) -> always local.
+  # Queries need an instruction prefix; documents are embedded as-is.
   embedding:
     provider: openai_compat
     location: local
     base_url: ${OLLAMA_BASE_URL}/v1
-    model: bge-m3
+    model: qwen3-embedding:0.6b
