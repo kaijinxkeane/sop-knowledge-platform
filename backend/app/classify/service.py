@@ -161,7 +161,10 @@ class ClassifierService:
         sessions: async_sessionmaker,
         classifier: Classifier,
         config: VaultConfig | None = None,
-        use_examples: bool = True,
+        # Off by default: on the blind eval, examples from 30/60/120 labelled
+        # notes gave 71.7/79.2/77.5% vs 79.2% without (no significant gain).
+        # Re-run `eval-classifier --example-pool N` on real labels before enabling.
+        use_examples: bool = False,
     ):
         self.sessions, self.classifier = sessions, classifier
         self.use_examples = use_examples

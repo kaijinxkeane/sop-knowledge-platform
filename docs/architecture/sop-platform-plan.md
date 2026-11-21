@@ -1264,6 +1264,17 @@ Phase 2b *backend* done (2026-11-21):
   63.3% (CI 58.2-68.1%), p = 0.002. Both are below the 85% bar, which is why
   the AI only suggests for unplaced notes. (An earlier 32-file run that showed
   real folder paths scored 94%; the folder names gave the answer away.)
+- **Few-shot from human labels** (built, off by default): the Classifier can be
+  shown up to 4 similar notes that people labelled (frontmatter, folder rule
+  or approved AI label; distance ≤ 0.6). Evidence that isn't in the note is
+  dropped, and so is a rationale copied from an example. Blind eval, 1 run, pools of
+  0/30/60/120 labelled notes: 79.2 / 71.7 / 79.2 / 77.5% placed correctly,
+  over-exposed 11.7 / 15.0 / 10.8 / 10.8%. None of the differences is
+  significant (McNemar p ≥ 0.11), so `ClassifierService(use_examples=False)`
+  is the default. Caveat: the eval cases come in clusters, so neighbours
+  are unusually close; re-run `eval-classifier --example-pool N` on
+  real reviewer labels before switching it on. A LoRA fine-tune on those labels
+  (Phase 7) is the likelier path to a real gain.
 - **Local models and thinking**: `qwen3:4b` on Ollama is now the 2507
   *Thinking* build, which can't switch thinking off. The `router` and
   `classifier` tiers therefore use `qwen3:4b-instruct`. Thinking is switched
@@ -1280,11 +1291,27 @@ Phase 3 *backend* done (2026-11-21):
   private to their owner, and gap events and audit events hold ids only.
 - **Local fallback**: `answer` and `reasoning` fall back to the local
   `answer-local` tier (`qwen3:8b`) when Claude has no key or is down.
-- **Answering eval**: `python -m app.cli eval-answers [--model TAG]` runs 62
-  questions in `config/eval/questions.yaml` (answering, reasoning, abstention,
-  adversarial), graded deterministically.
-- **Still to do in Phase 3**: the Ask UI, answer reuse (cost lever 5), gap
-  topics (Phase 5) and a larger question set (about 50 per space).
+- **Answering eval**: `python -m app.cli eval-answers [--model TAG] [--repeats N]`
+  runs 226 tuning questions in `config/eval/questions.yaml`, graded
+  deterministically with 95% CIs. Model comparisons use the 54 held-out
+  questions in `questions-holdout.yaml`, which are never used for tuning.
+  Held-out, 2 runs: `qwen3:8b` 87.0% vs `qwen3:4b-instruct` 77.8%. The 4B
+  wrongly says "no answer" more often (14% vs 4%) and covers fewer required facts.
+  Decision: 8B answers, 4B routes.
+- **Search expansion** (`retrieval.search.expand`): a matched document of
+  ≤ 4000 characters is passed whole, in order. Longer ones get the matched chunks
+  plus their neighbours, within 8000 characters per space, and only documents
+  already in the RLS-filtered hits are read. `eval-retrieval`: questions with
+  every required fact in the context went from 77.3% to 99.5% (tuning set) and
+  97.6% (held-out), and the median context went from about 1.8k to 4k characters. Held-out answers,
+  8B, 2 runs: 86.1% vs 87.0% before (p = 1.0). Wrong "no answer" replies fell
+  from 4% to 0%, and the remaining failures are answers that leave out a required fact
+  although it is in the context. That is model answer quality, not search. First
+  word: median 5.5 s, p90 11.3 s on the 16 GB MacBook.
+- **Outage handling**: when an agent's model call fails, its section is marked
+  `unavailable`. The user is told to try again and no knowledge gap is logged.
+- **Still to do in Phase 3**: the Ask UI, answer reuse (cost lever 5) and gap
+  topics (Phase 5).
 
 Phases 0–5 (backend and frontend together) are built and tested on a MacBook (Apple Silicon) using Docker
 Compose. Ollama runs natively on the Mac for the local embeddings, because

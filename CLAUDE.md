@@ -71,10 +71,10 @@ backend/                 — FastAPI app (uv project, Python 3.12)
   app/models/            — model gateway: tiers, data boundary, anthropic + openai_compat adapters
   app/db/                — SQLAlchemy models, Alembic migrations (incl. RLS), scoped reader
   app/vault/             — parsers (md/pptx/pdf/docx), rule labels + safeguards, git layer, indexer, write rules
-  app/retrieval/         — local embeddings, hybrid search (RLS + policy engine, distance cutoff)
-  app/classify/          — local Classifier, one-way rule, name detector, review service, eval
+  app/retrieval/         — local embeddings, hybrid search (RLS + policy engine, distance cutoff), small-to-big expansion of hits
+  app/classify/          — local Classifier, one-way rule, name detector, review service, eval (few-shot examples: built, off by default)
   app/agents/            — Concierge routing, department agents (answer contract), orchestration
-  app/eval/              — answering eval runner (config/eval/questions.yaml)
+  app/eval/              — answering + retrieval eval runners, stats (tune on questions.yaml, compare on questions-holdout.yaml)
   app/workers/           — arq worker: index git changes every minute, nightly unattributed check
   wiki_core/             — loads scripts/llm-wiki in place (single copy of the helpers)
   tests/
