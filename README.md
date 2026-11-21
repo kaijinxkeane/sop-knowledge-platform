@@ -18,6 +18,9 @@ make env                 # creates .env; add ANTHROPIC_API_KEY for the Claude ti
 make demo-vault          # creates the dev vault repo from demo-vault/ (fictional data)
 make up                  # postgres + redis + api + worker
 curl -s localhost:8000/api/v1/health
+make seed-demo           # fictional demo users (password: demo-password-2026) + document labels
+                         # two-factor code for a demo user:
+                         #   cd backend && uv run python -m app.cli totp-code avery.tan@staff.example.com
 ollama pull qwen3:4b && ollama pull qwen3:8b && ollama pull qwen3-embedding:0.6b   # Classifier candidates + embeddings
 make smoke               # calls each model tier once
 make test                # backend lint + tests

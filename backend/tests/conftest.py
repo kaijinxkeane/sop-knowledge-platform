@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
+
+# A fixed signing key for tests only (never used outside the test run).
+os.environ.setdefault("SOP_SECRET_KEY", "test-only-secret-key-" + "x" * 32)
 
 import pytest
 

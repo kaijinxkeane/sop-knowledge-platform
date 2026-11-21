@@ -1,0 +1,51 @@
+# Default roles and grants (plan §4). `python -m app.cli sync-config` creates any
+# role that doesn't exist yet; after that, roles are managed in the Admin
+# screens and this file is not re-applied (use --reset-roles to force it).
+#
+# A grant is {space, max_sensitivity, actions}:
+#   space actions:   ask | contribute | review | approve | admin   (admin = all)
+#   global actions:  manage_users | view_audit | view_gap_reports  (no space)
+
+roles:
+  employee:
+    description: Every member of staff. Public SOPs in every space.
+    grants:
+      - {space: core, max_sensitivity: public, actions: [ask]}
+      - {space: it, max_sensitivity: public, actions: [ask]}
+      - {space: hr, max_sensitivity: public, actions: [ask]}
+
+  core-staff:
+    description: Trainers and delivery staff.
+    grants:
+      - {space: core, max_sensitivity: internal, actions: [ask, contribute]}
+
+  core-lead:
+    description: Leads the core team (the CEO). Approves core SOPs and sees restricted IP.
+    grants:
+      - {space: core, max_sensitivity: restricted, actions: [ask, contribute, review, approve]}
+
+  it-staff:
+    description: IT team members.
+    grants:
+      - {space: it, max_sensitivity: internal, actions: [ask, contribute]}
+
+  it-lead:
+    description: Approves IT SOPs.
+    grants:
+      - {space: it, max_sensitivity: restricted, actions: [ask, contribute, review, approve]}
+
+  hr-staff:
+    description: HR team members. Sees anonymised gap reports for every space.
+    grants:
+      - {space: hr, max_sensitivity: internal, actions: [ask, contribute, review]}
+      - {space: null, max_sensitivity: public, actions: [view_gap_reports]}
+
+  hr-lead:
+    description: Approves HR SOPs and sees restricted HR material.
+    grants:
+      - {space: hr, max_sensitivity: restricted, actions: [ask, contribute, review, approve]}
+
+  platform-admin:
+    description: Manages users, roles and grants and reads the audit log. Grants no content by itself.
+    grants:
+      - {space: null, max_sensitivity: public, actions: [manage_users, view_audit]}

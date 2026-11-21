@@ -1,0 +1,27 @@
+# How the platform reads the vault (plan §3.1, §4.1). Human decisions only:
+# folder rules here rank second, after labels in a note's own frontmatter.
+# Anything no rule covers stays unassigned and restricted (quarantined) until
+# a reviewer places it (Phase 2b review queue).
+
+ignore: [".git/", ".obsidian/", ".trash/", "_templates/"]
+
+# Delivery stages, in order (frontmatter `stage:` values).
+stages: [discovery, strategy, content, delivery, follow-up]
+
+# Where uploads from the app are stored.
+attachments_folder: "Training Content/Attachments"
+
+# Longest matching prefix wins. `sensitivity` is used only when the note
+# doesn't declare one itself.
+folder_rules:
+  - {path: "Programmes/", space: core, sensitivity: internal}
+  - {path: "Methodology/", space: core, sensitivity: internal}
+  - {path: "Shared Templates/", space: core, sensitivity: internal}
+  - {path: "Training Content/", space: core, sensitivity: internal}
+  - {path: "Commercial/", space: core, sensitivity: restricted}
+  - {path: "Public/", space: core, sensitivity: public}
+  - {path: "IT/", space: it, sensitivity: internal}
+  - {path: "HR/", space: hr, sensitivity: internal}
+
+# Deterministic safeguards: any match forces `restricted`, whatever else says.
+flagged_terms: ["rate card", "floor price", "pricing", "discount"]

@@ -15,6 +15,19 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: sop
+          POSTGRES_PASSWORD: sop-dev-only
+          POSTGRES_DB: sop
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sop -d sop" --health-interval 5s
+          --health-timeout 3s --health-retries 20
+    env:
+      SOP_REQUIRE_DB: "1"   # database tests must run in CI, never silently skip
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5

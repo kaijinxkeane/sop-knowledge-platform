@@ -1,13 +1,15 @@
 # Common development commands. Run from the repository root.
 COMPOSE := docker compose --env-file .env -f deploy/docker-compose.yml
 
-.PHONY: help env demo-vault up down logs ps test lint smoke smoke-docker plugin-tests
+.PHONY: help env demo-vault up down logs ps test lint smoke smoke-docker plugin-tests seed-demo admin index
 
 help:
 	@echo "make env          create .env from .env.example (then add your API key)"
 	@echo "make demo-vault   create the development vault repo from demo-vault/ (fictional data)"
 	@echo "make up / down    start / stop the stack (postgres, redis, api, worker)"
-	@echo "make test         backend unit tests + lint"
+	@echo "make seed-demo    demo users (fictional) + demo document labels, dev only"
+	@echo "make admin EMAIL=you@company.com NAME='Your Name'   create the first admin"
+	@echo "make test         backend unit tests + lint (database tests need \`make up\`)"
 	@echo "make smoke        call every model tier once (Claude + local Ollama)"
 	@echo "make plugin-tests inherited llm-wiki structural tests"
 
@@ -19,6 +21,13 @@ demo-vault:
 
 up: env
 	$(COMPOSE) up -d --build
+
+# Runs on the host (demo data isn't in the image), against the stack's database.
+seed-demo:
+	cd backend && uv run python -m app.cli seed-demo
+
+admin:
+	$(COMPOSE) exec api python -m app.cli create-admin "$(EMAIL)" "$(NAME)"
 
 down:
 	$(COMPOSE) down
@@ -42,3 +51,6 @@ plugin-tests:
 	@for t in tests/test-plugin-validate.sh tests/test-structure.sh tests/test-local-cli-lint.sh \
 	  tests/test-local-cli-retract.sh tests/test-local-cli-captions.sh tests/test-session-capture.sh \
 	  tests/test-session-concurrency.sh; do bash $$t >/dev/null 2>&1 && echo "PASS $$t" || { echo "FAIL $$t"; exit 1; }; done
+
+index:  ## (re)index the vault now; ARGS="--full" rebuilds everything
+	$(COMPOSE) exec api python -m app.cli index $(ARGS)

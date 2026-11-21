@@ -26,4 +26,4 @@ RUN useradd --system --uid 10001 --home /app sop && chown -R sop /app
 USER sop
 
 EXPOSE 8000
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --no-access-log"]
+CMD ["sh", "-c", "alembic upgrade head && python -m app.cli sync-config && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --no-access-log"]

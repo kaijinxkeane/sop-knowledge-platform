@@ -42,9 +42,20 @@ class Settings(BaseSettings):
 
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
+    # Signs tokens and encrypts TOTP secrets. Required outside development.
+    secret_key: SecretStr | None = Field(default=None, alias="SOP_SECRET_KEY")
+    access_token_minutes: int = Field(default=15, alias="ACCESS_TOKEN_MINUTES")
+    refresh_token_days: int = Field(default=14, alias="REFRESH_TOKEN_DAYS")
+    invite_hours: int = Field(default=72, alias="INVITE_HOURS")
+
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
+
+    @property
+    def cookie_secure(self) -> bool:
+        # Plain http is only acceptable on a developer's own machine.
+        return self.environment != "development"
 
 
 @lru_cache

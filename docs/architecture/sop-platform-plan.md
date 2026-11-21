@@ -942,14 +942,14 @@ by FastAPI.
 
 | Area | Endpoints |
 |---|---|
-| Auth | `POST /auth/login` (password + TOTP), `POST /auth/refresh`, `POST /auth/logout`, `POST /auth/totp/enroll`, `GET /me` (incl. effective scopes) |
+| Auth | `POST /auth/login` (password → step token), `POST /auth/totp/verify`, `POST /auth/totp/enroll` + `/enroll/confirm` (first sign-in), `POST /auth/refresh` (rotating HttpOnly cookie; reuse revokes the session), `POST /auth/logout`, `POST /auth/invite/accept`; `GET /me` (incl. effective scopes), `GET /notice`, `POST /notice/acknowledge`, `GET /spaces` |
 | Chat | `POST /conversations`, `GET /conversations`, `POST /conversations/{id}/messages` (SSE stream: tokens, `agent_dispatched`, `citation`, `done`), `POST /messages/{id}/feedback` |
 | Knowledge | `GET /spaces`, `GET /spaces/{s}/documents`, `GET /documents/{id}` (+`/versions`), `POST /spaces/{s}/uploads` (parsed by the ingestion worker, no model; saved in the uploader's name, then classified) |
 | Editing | `POST /notes` (new draft), `GET /notes/{id}/source`, `PUT /notes/{id}` (with `base_version`; refused if the note changed meanwhile), `POST /notes/{id}/attachments` (PPTX/PDF/DOCX/images, with source tool + original link), `POST /notes/{id}/submit`, `GET /notes/{id}/diff?from=&to=`. All are permission-checked and committed in the user's name |
 | Classification | `GET /classifications/queue` (grouped), `POST /classifications/{id}/approve`, `/reject`, `/edit`, `POST /classifications/bulk-approve`, `GET /reports/classification-accuracy` |
 | Workflow | `GET /reviews` (in-review notes + proposals), `GET /reports/governance` (unapproved publishes, unclassified notes), `POST /admin/reindex` |
 | Retention | `GET /spaces/{s}/gaps`, `GET /spaces/{s}/stale`, `POST /handovers`, `POST /handovers/{id}/acknowledge`, `GET /reports/bus-factor` |
-| Admin | CRUD `/users`, `/roles`, `/grants`, `/spaces`; `GET /audit` (filterable, exportable); `POST /retractions` |
+| Admin | `/admin/users` (create → one-time invite, update roles/active, `/invite`, `/reset-totp`, `/unlock`), `/admin/roles` (+ `/grants`), `/admin/grants/{id}`; `GET /admin/audit` (filterable), `GET /admin/audit/verify` (hash chain); `POST /retractions`. Spaces come from `config/spaces/*.yaml` |
 | Ops | `GET /health`, `GET /metrics` (Prometheus) |
 
 Outbound webhooks (review requested, SOP published, review due) let the future
@@ -1059,7 +1059,8 @@ service, so it is left for later and kept optional.
 - `classification_proposals(document_id, content_hash, proposed_space, proposed_sensitivity, proposed_shared_with, confidence, rationale, evidence_spans, model, status, reviewed_by, reviewed_at)`
 - `document_versions(document_id, version, content_hash, git_commit, authored_by, author_source: git_push|frontmatter|unattributed, indexed_at)`
 - `reviews(document_id, content_hash, git_commit, reviewer_id, decision: approved|changes_requested, self_approved, comment, decided_at)`: an approval applies only to that exact version
-- `git_identities(user_id, git_account)`
+- `one_time_tokens(user_id, purpose: invite, token_hash, expires_at, used_at)`: set-password links; only the hash is stored
+- `refresh_tokens(user_id, family_id, token_hash, expires_at, revoked_at)`: rotation with reuse detection
 - `attachment_parts(document_id, part: slide|page, number, title, speaker_notes)`: slide- and page-level citations
 - `document_links(from_id, to_id)` (resolved `[[wikilinks]]`, used for related SOPs and broken-link reports)
 - `chunks(id, document_id, version, text, embedding vector, tsv tsvector)`. Access comes from `document_access` via a join, and RLS is enforced there, so changing a label applies instantly without re-indexing.
@@ -1188,6 +1189,46 @@ repo on the company device, mounted at deploy time via `VAULT_PATH`.
 boundary, the Docker stack, migrations, the demo vault, CI and a content-free
 logging policy. The Phase 0 *frontend* skeleton follows when frontend work
 starts (backend first, by decision).
+
+Phase 1 *backend* done (2026-11-21): sign-in with password then mandatory
+TOTP (enrolment on first sign-in, replay protection, lockout after 5
+failures, per-address rate limit), rotating refresh cookie with reuse
+detection, invite links (no email needed), the policy engine
+(`app/policy/engine.py`: fail-closed sensitivity, scopes, grant validation),
+Postgres RLS via the `sop_reader` role (`app/db/scoped.py`), append-only
+hash-chained audit log, staff notice acknowledgement, admin API with
+last-admin protection, default roles in `config/roles.yaml`, and a CLI
+(`python -m app.cli`). The Phase 1 *UI* (sign-in, TOTP enrolment, notice,
+admin screens) comes with the frontend skeleton.
+
+Phase 2 *backend* done (2026-11-21), except OCR:
+- **Parsers** (`app/vault/parse.py`): Obsidian notes (frontmatter, wikilinks,
+  embeds, tags, heading-path chunks), PPTX slide by slide with speaker notes,
+  PDF pages with form-field labels, and DOCX.
+- **Labels from rules** (`config/vault.yaml` folder rules, then frontmatter,
+  then safeguards: email, phone, NRIC, bank account and flagged terms force
+  `restricted`). Anything else is unassigned and quarantined. On the demo
+  vault this gives 0 over-exposures and quarantines the 4 Inbox notes.
+- **Git layer** (`app/vault/git.py`): path safety, an `SOP-User:` trailer,
+  the platform as committer, and an `SOP-Unattributed:` trailer for the
+  nightly check.
+- **Migration 0003**: versions, chunks (pgvector HNSW plus a weighted
+  tsvector), links, slide/page parts and tags. RLS on every derived table goes
+  through `sop_doc_visible()`, so drafts are visible only to their author and
+  the space's reviewers.
+- **Indexer**: incremental via git diff; human label decisions are kept;
+  embeddings failed while Ollama was down are filled in later.
+- **Hybrid search** `GET /search`: RRF over vector and keyword results, with a
+  0.65 cosine cutoff so a question nothing answers returns nothing, and
+  keyword-only search when embeddings are down.
+- **Editing API** `/notes`: create, source, save with `base_version` (409 on
+  an edit clash), and attachment upload. Each save is committed in the user's
+  name and re-indexed immediately. The one-way rule applies to people's saves
+  too.
+- **Library endpoints**: filters, `/parts`, `/versions` and `/file`.
+- **Worker**: indexes Obsidian commits every minute; nightly 02:05 check.
+
+Still to do in Phase 2: local OCR for images, and the Library/editor UI.
 
 Phases 0–5 (backend and frontend together) are built and tested on a MacBook (Apple Silicon) using Docker
 Compose. Ollama runs natively on the Mac for the local embeddings, because
