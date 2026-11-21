@@ -147,6 +147,10 @@ def citations_for(text: str, passages: list[Hit]) -> tuple[list[dict], int]:
                     "part": h.part,
                     "part_number": h.part_number,
                     "version": h.version,
+                    **{
+                        k: (h.provenance or {}).get(k)
+                        for k in ("written_by", "approved_by", "approval", "approved_on")
+                    },
                 }
     return [seen[n] for n in sorted(seen)], invalid
 

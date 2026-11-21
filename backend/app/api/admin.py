@@ -8,7 +8,7 @@ refused, and admins can't deactivate themselves.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -51,6 +51,7 @@ class UserOut(BaseModel):
     locked: bool
     created_at: datetime
     last_login_at: datetime | None
+    leaving_on: date | None = None
 
 
 class UserCreateIn(BaseModel):
@@ -71,6 +72,7 @@ class UserUpdateIn(BaseModel):
     roles: list[str] | None = None
     home_space: str | None = None
     is_active: bool | None = None
+    leaving_on: date | None = None  # last working day (bus-factor report)
 
 
 class GrantIn(BaseModel):
@@ -134,6 +136,7 @@ def _user_out(u: User) -> UserOut:
         locked=u.locked_until is not None and u.locked_until > now,
         created_at=u.created_at,
         last_login_at=u.last_login_at,
+        leaving_on=u.leaving_on,
     )
 
 
@@ -276,6 +279,9 @@ async def update_user(
         after = set(body.roles)
         changed["roles_added"] = sorted(after - before)
         changed["roles_removed"] = sorted(before - after)
+    if "leaving_on" in body.model_fields_set:
+        user.leaving_on = body.leaving_on
+        changed["leaving_on"] = body.leaving_on.isoformat() if body.leaving_on else None
     if body.is_active is not None and body.is_active != user.is_active:
         if user.id == me.user.id and not body.is_active:
             raise HTTPException(status.HTTP_409_CONFLICT, "you can't deactivate yourself")
@@ -536,7 +542,10 @@ async def verify_audit(
     me: CurrentUser = Depends(view_audit), session: AsyncSession = Depends(get_db)
 ) -> ChainOut:
     events = (await session.execute(select(AuditEvent).order_by(AuditEvent.id))).scalars().all()
-    ok, bad = audit.verify_chain(events)
+    from app.db.models import VaultState
+
+    anchor = await session.get(VaultState, audit.ANCHOR_KEY)
+    ok, bad = audit.verify_chain(events, anchor.value if anchor else audit.GENESIS)
     await audit.record(
         session, "audit_verified", actor_id=me.user.id, details={"ok": ok, "events": len(events)}
     )

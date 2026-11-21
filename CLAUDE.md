@@ -74,6 +74,8 @@ backend/                 — FastAPI app (uv project, Python 3.12)
   app/retrieval/         — local embeddings, hybrid search (RLS + policy engine, distance cutoff), small-to-big expansion of hits
   app/classify/          — local Classifier, one-way rule, name detector, review service, eval (few-shot examples: built, off by default)
   app/agents/            — Concierge routing, department agents (answer contract), orchestration
+  app/governance/        — version-bound approvals (live vs current chunks), reviews jobs, notifications, webhooks
+  app/retention/         — handovers, gap topics + personal gaps, conflicts, retract, 24-month retention
   app/eval/              — answering + retrieval eval runners, stats (tune on questions.yaml, compare on questions-holdout.yaml)
   app/workers/           — arq worker: index git changes every minute, nightly unattributed check
   wiki_core/             — loads scripts/llm-wiki in place (single copy of the helpers)
@@ -111,6 +113,12 @@ static files), agents, retrieval and Caddy/Headscale in `deploy/`.
   floor in both `sop_doc_visible()` and `policy.engine.can_view_document` (keep them in sync).
 - Agents get passages retrieved under RLS before any model call; they have no DB access.
   Routing never uses a cloud tier.
+- Answers use approved text only (`search(..., live_only=True)`): an edit is not
+  cited until a lead approves that exact version. Unapproved changes are shown
+  only to the note's editors (RLS `sop_doc_wip_visible` + `can_see_unapproved`).
+- Handover notes have no space rows; only people in `document_readers` can read
+  them (visibility v3, RLS and policy engine). HR gap reports need >= 3 people;
+  never name askers or show restricted titles to people who can't read them.
   `tests/test_vault_labels.py` must keep zero over-exposure on the demo vault.
 - Never commit secrets (`.env`, API keys, `.claude/settings.local.json`).
 - Every model call goes through `ModelGateway` with an explicit `ContentScope`;

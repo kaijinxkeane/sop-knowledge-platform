@@ -30,9 +30,9 @@ from app.api.deps import (
     get_session_factory,
 )
 from app.db.models import Document, DocumentAccess, Space
-from app.db.scoped import apply_reader_scope, visible
+from app.db.scoped import apply_reader_scope, has_pending_change, sees_latest, visible
 from app.policy.engine import Sensitivity
-from app.vault.git import GitVault, VaultPathError
+from app.vault.git import GitError, GitVault, VaultPathError
 from app.vault.indexer import Indexer
 from app.vault.labels import labels_from_rows, resolve_labels, vault_config
 from app.vault.parse import ATTACHMENT_EXT, parse_note
@@ -115,6 +115,17 @@ async def _visible_note(
 
 async def _reindex(sessions: async_sessionmaker, git: GitVault, embed, paths: list[str]) -> None:
     await Indexer(git, sessions, embed).index_paths(paths)
+
+
+def read_for(me: CurrentUser, doc: Document, git: GitVault) -> bytes:
+    """The file as this user may read it: the latest version for its editors
+    (and notes never approved), the approved version for everyone else."""
+    if has_pending_change(doc) and doc.approved_commit and not sees_latest(me.principal, doc):
+        try:
+            return git.show(doc.vault_path, doc.approved_commit)
+        except GitError:
+            raise NOT_FOUND from None
+    return git.safe_path(doc.vault_path).read_bytes()
 
 
 def _deny(exc: WriteDenied) -> HTTPException:
@@ -207,7 +218,7 @@ async def get_source(
     git: GitVault = Depends(get_git),
 ) -> SourceOut:
     doc, _ = await _visible_note(session, me, note_id)
-    data = git.safe_path(doc.vault_path).read_bytes()
+    data = read_for(me, doc, git)
     return SourceOut(
         id=str(doc.id),
         vault_path=doc.vault_path,
@@ -243,7 +254,13 @@ async def update_note(
     )
     new_status = str(parsed.frontmatter.get("status") or "") or None
     try:
-        check_write(me.principal, old_labels, new, old_status=doc.status, new_status=new_status)
+        check_write(
+            me.principal,
+            old_labels,
+            new,
+            old_status=str((doc.frontmatter or {}).get("status") or "") or None,
+            new_status=new_status,
+        )
     except WriteDenied as exc:
         raise _deny(exc) from None
 

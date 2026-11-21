@@ -147,3 +147,19 @@ def test_document_visibility_rules():
     assert can_view_document(lead, rows, status="draft")
     assert can_view_document(me, [], author_id=me.user_id)  # authors see their own
     assert not can_view_document(me, [("core", "Public")])  # still fail-closed
+
+
+def test_named_readers_and_unapproved_changes():
+    """Handover notes have no space rows: only people named on them can read them.
+    Unapproved changes are for the author and contributors/reviewers of the space."""
+    from app.policy.engine import can_see_unapproved, can_view_document
+
+    reader = principal(GrantRule("core", Sensitivity.RESTRICTED, frozenset({"ask"})))
+    staff = principal(GrantRule("core", Sensitivity.INTERNAL, frozenset({"ask", "contribute"})))
+    assert not can_view_document(reader, [])  # no rows, not named: nobody
+    assert can_view_document(reader, [], readers=[reader.user_id])
+    assert not can_view_document(staff, [], readers=[reader.user_id])
+    rows = [("core", "internal")]
+    assert can_see_unapproved(staff, rows)
+    assert not can_see_unapproved(reader, rows)
+    assert can_see_unapproved(reader, rows, author_id=reader.user_id)

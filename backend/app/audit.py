@@ -88,9 +88,13 @@ async def record(
     return event
 
 
-def verify_chain(events: Iterable[AuditEvent]) -> tuple[bool, int | None]:
-    """(ok, id of the first bad event). Events must be in id order from the start."""
-    prev = GENESIS
+ANCHOR_KEY = "audit_anchor"  # vault_state: hash before the oldest kept event
+
+
+def verify_chain(events: Iterable[AuditEvent], start: str = GENESIS) -> tuple[bool, int | None]:
+    """(ok, id of the first bad event). Events must be in id order from the start
+    (or from the retention anchor, when the retention job removed older events)."""
+    prev = start
     for e in events:
         expected = compute_hash(
             prev, e.ts, e.actor_id, e.action, e.target_type, e.target_id, e.details or {}

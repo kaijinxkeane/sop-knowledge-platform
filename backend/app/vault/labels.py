@@ -45,6 +45,15 @@ class VaultConfig:
     name_check_spaces: tuple[str, ...] = ()
     known_names: tuple[str, ...] = ()
     unplaced_reviewers: str | None = None
+    review_cycle_days: int = 180
+    reminder_days: int = 14
+    write_back: bool = False
+    handover_folder: str = "Handovers"
+    handover_roles: tuple[str, ...] = ()
+    retention_months: int = 24
+
+    def is_handover(self, path: str) -> bool:
+        return path.startswith(self.handover_folder + "/")
 
     def is_ignored(self, path: str) -> bool:
         if any(seg.startswith(".") for seg in path.split("/")):
@@ -73,6 +82,12 @@ def load_vault_config(config_dir: Path | None = None) -> VaultConfig:
         name_check_spaces=tuple(data.get("name_check_spaces") or ()),
         known_names=tuple(str(n).strip().lower() for n in data.get("known_names") or ()),
         unplaced_reviewers=data.get("unplaced_reviewers"),
+        review_cycle_days=int((data.get("governance") or {}).get("review_cycle_days") or 180),
+        reminder_days=int((data.get("governance") or {}).get("reminder_days") or 14),
+        write_back=bool((data.get("governance") or {}).get("write_back", False)),
+        handover_folder=str((data.get("handovers") or {}).get("folder") or "Handovers").strip("/"),
+        handover_roles=tuple((data.get("handovers") or {}).get("always_visible_roles") or ()),
+        retention_months=int(data.get("retention_months") or 24),
     )
 
 
@@ -118,6 +133,15 @@ def resolve_labels(
     config: VaultConfig,
     frontmatter_error: bool = False,
 ) -> Labels:
+    if config.is_handover(path):
+        # Handover notes name clients: no space can read them. Access is per
+        # person (author, receivers, leads, CEO) through document_readers.
+        return Labels(
+            space=None,
+            sensitivity=Sensitivity.RESTRICTED,
+            source="handover",
+            safeguards=safeguard_hits(text, config.flagged_terms),
+        )
     rule = config.rule_for(path)
     source = "default"
 

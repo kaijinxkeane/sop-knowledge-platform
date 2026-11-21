@@ -24,6 +24,7 @@ from app.agents.department import Section, answer
 from app.agents.router import Route, route
 from app.db.models import DocumentAccess
 from app.db.scoped import apply_reader_scope
+from app.governance.approvals import provenance
 from app.models.gateway import ModelGateway
 from app.models.types import ContentScope
 from app.policy.engine import Principal
@@ -45,18 +46,34 @@ async def retrieve(
     readable = sorted(principal.scopes())
     async with sessions() as s:
         await apply_reader_scope(s, principal)
-        hits = await search(s, principal, question, query_vector=vector, limit=ROUTE_HITS)
+        # Answers use approved text only (plan §6): live chunks, not retired.
+        hits = await search(
+            s, principal, question, query_vector=vector, limit=ROUTE_HITS, live_only=True
+        )
         chosen = await route(question, hits, readable, profiles, gateway)
         per_space = {
             sp: await expand(
                 s,
                 await search(
-                    s, principal, question, query_vector=vector, space=sp, limit=SPACE_HITS
+                    s,
+                    principal,
+                    question,
+                    query_vector=vector,
+                    space=sp,
+                    limit=SPACE_HITS,
+                    live_only=True,
                 ),
+                live_only=True,
             )
             for sp in chosen.spaces
         }
         await s.rollback()
+    all_hits = [h for hs in per_space.values() for h in hs]
+    if all_hits:
+        async with sessions() as s:
+            info = await provenance(s, [h.document_id for h in all_hits])
+        for h in all_hits:
+            h.provenance = info.get(h.document_id)
     return chosen, per_space
 
 

@@ -1154,7 +1154,8 @@ repo on the company device, mounted at deploy time via `VAULT_PATH`.
   - Shown at first sign-in and whenever it changes. Each acknowledgement is
     recorded with the notice version.
   - The text lives in `config/notice.md`.
-  - Draft:
+  - Draft (superseded by the current `config/notice.md`, version 2026-11-21,
+    which also covers search history, the leads' anonymous view and handovers):
 
   > **How this assistant uses your information.** Your questions and the
   > assistant's answers are stored for **24 months** so the company can meet
@@ -1310,8 +1311,94 @@ Phase 3 *backend* done (2026-11-21):
   word: median 5.5 s, p90 11.3 s on the 16 GB MacBook.
 - **Outage handling**: when an agent's model call fails, its section is marked
   `unavailable`. The user is told to try again and no knowledge gap is logged.
-- **Still to do in Phase 3**: the Ask UI, answer reuse (cost lever 5) and gap
-  topics (Phase 5).
+- **Still to do in Phase 3**: the Ask UI and answer reuse (cost lever 5).
+
+Phase 4 *backend* done (2026-11-21):
+- **Version-bound approvals** (`app/governance/`): an approval covers one
+  *governed hash*. That is the file without the keys the platform writes itself
+  (`status`, `reviewer`, `approved_by`, `approved_on`, `review_due`). So
+  write-back, or someone typing `approved_by:` by hand, never changes what was
+  approved, and any other edit does.
+- **Last approved version stays live**: chunks carry `live` (approved, used in
+  answers) and `current` (latest). After an edit, answers keep citing the
+  approved text until a lead approves the new version. The Library and file
+  downloads show the change only to its editors (the author, or people with
+  contribute/review on the space); everyone else gets the approved version.
+  This is enforced in RLS (`sop_doc_wip_visible`, `sop_doc_editor`) and in the
+  policy engine (`can_see_unapproved`). Retired notes are never cited.
+- **Status is decided by the platform**: approved means published. Never
+  approved means draft or in review as written, otherwise *unreviewed*
+  (readable, never cited). On first connection, notes already marked
+  `published` (and all attachments) are approved once as `baseline`. The
+  governance report lists them as "published outside the platform".
+  Attachments embedded in a note are approved together with it.
+- **Review API** (`/notes/{id}/submit|diff|approve|retire`,
+  `/reviews/...`): the diff is against the last approved version; a change
+  summary is written by the local `background` tier in the worker. Approving
+  is refused (409) if the note changed after it was submitted.
+  Self-approval is allowed for leads and recorded as `self`.
+- **Citations** carry `written_by`, `approved_by`, `approval` and `approved_on`.
+- **Governance report** (`/reports/governance`): unattributed edits, changes
+  awaiting review, never approved, published outside the platform,
+  self-approved, review overdue.
+- **Notifications** (`/notifications`, ids only), **review-due reminders**
+  (daily, each due date once), **webhooks** (`config/webhooks.yaml`, an outbox,
+  HMAC-signed, payloads hold ids only), and **write-back** of the approval
+  into the frontmatter as a platform commit (`governance.write_back`).
+- Note: in name-checked spaces (`core`), a new version stays `restricted`
+  until the name check runs (about a minute), as before.
+
+Phase 5 *backend* done (2026-11-21):
+- **Handover notes** (`/handovers`): rendered from the template into
+  `Handovers/<space>/`, with no space access rows. They are readable only by
+  the author, the receivers, the space's leads and the CEO roles
+  (`handovers.always_visible_roles`), through per-person `document_readers`
+  rows. This is visibility v3, in both RLS and the policy engine. Handovers are
+  never used in answers and skip the Classifier. There is a deterministic
+  completeness check (missing sections, actions without owner or date,
+  sessions without date) plus an optional local-model check, send,
+  acknowledgement and comments.
+- **Gap topics** (nightly `group_gaps`): gap events now record the asker and
+  the question. Similar questions in a space are grouped with local
+  embeddings, and labelled by the local router from the questions only.
+  Programme and stage come from the nearest approved SOP. An *access gap*
+  records a document that covers the topic but the askers couldn't read
+  (leads only).
+  - Leads see topics with anonymous example questions (`/spaces/{s}/gaps`).
+  - HR sees topics only once at least 3 people asked, by role (roles with
+    fewer than 3 people are grouped as "other"), with a before/after trend
+    once a topic is addressed (`/reports/gaps`).
+  - Topic status: open, then training planned, then addressed.
+- **Gaps from your searches** (`/me/gaps`): Library searches are kept per
+  user, as private history covered by the retention period. Weak searches and
+  unanswered questions are grouped. Related SOPs and experts come only from
+  what the user can read, so a restricted SOP is never confirmed.
+  "Request an SOP" tells the leads anonymously. Not yet: the "opened results
+  but used none" signal (it needs the frontend).
+- **Coverage map** (`/reports/coverage`; titles for leads, counts for HR),
+  **staleness** (`/spaces/{s}/stale`), **bus factor** (`/reports/bus-factor`;
+  sole human author, and people with a `leaving_on` date set by the admin).
+- **Conflict detection** (nightly, at most 10 local-model checks): the closest
+  passage pairs between approved SOPs. Each pair of approved versions is
+  checked once. Results go to people who can read both SOPs and lead one of
+  their spaces.
+- **Retract** (`POST /retractions`, `manage_users`): a document, or a value
+  plus its common encodings (llm-wiki's `retract_patterns`).
+  - What it purges: the index, answers that cited the document, chat text,
+    titles, searches, review summaries, handover text, AI proposals and
+    conflicts.
+  - It then re-scans and returns the remaining counts (they must be 0), and
+    counts the vault files still holding the value (llm-wiki's scanner), so
+    the owners know what to edit.
+  - The value is stored only as a hash. The indexer skips a retracted file
+    until its content changes.
+- **Retention** (nightly, `retention_months: 24`): deletes old conversations,
+  searches, gap events, notifications, webhook deliveries and audit events. The
+  audit chain stays verifiable through a stored anchor hash. Handovers and SOPs
+  are kept.
+- **Staff notice** updated (version 2026-11-21) to cover search history,
+  anonymous leads' view and handovers. Everyone is asked to acknowledge it
+  again.
 
 Phases 0–5 (backend and frontend together) are built and tested on a MacBook (Apple Silicon) using Docker
 Compose. Ollama runs natively on the Mac for the local embeddings, because

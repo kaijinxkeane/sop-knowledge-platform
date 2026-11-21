@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import mimetypes
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, current_user, get_db, get_git
 from app.db.models import AttachmentPart, Document, DocumentAccess, DocumentVersion
-from app.db.scoped import apply_reader_scope, visible
+from app.db.scoped import apply_reader_scope, has_pending_change, sees_latest, visible
 from app.policy.engine import effective_access
 from app.vault.git import GitVault
 
@@ -43,6 +43,9 @@ class DocumentOut(BaseModel):
     stage: str | None
     owner: str | None
     access: list[AccessOut]
+    approved: bool = False  # has an approved version (only that is cited)
+    pending_change: bool = False  # editors only: the latest version isn't approved yet
+    review_due: date | None = None
 
 
 class PartOut(BaseModel):
@@ -77,6 +80,9 @@ def _out(doc: Document, me: CurrentUser) -> DocumentOut | None:
         access=[
             AccessOut(space=s, sensitivity=v.label) for s, v in rows if me.principal.can_read(s, v)
         ],
+        approved=doc.approved_hash is not None,
+        pending_change=has_pending_change(doc) and sees_latest(me.principal, doc),
+        review_due=doc.review_due,
     )
 
 
@@ -186,8 +192,10 @@ async def get_file(
 ) -> Response:
     """The original file (deck, PDF, note), only to users who may read it."""
     doc = await _visible(session, me, document_id)
+    from app.api.notes import read_for
+
     try:
-        data = git.safe_path(doc.vault_path).read_bytes()
+        data = read_for(me, doc, git)
     except (OSError, ValueError):
         raise NOT_FOUND from None
     media = mimetypes.guess_type(doc.vault_path)[0] or "application/octet-stream"

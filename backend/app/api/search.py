@@ -1,7 +1,10 @@
 """Search across everything the user may read (plan §9: hybrid, scope-filtered).
 
-The query text is never logged. If the local embedding model is unavailable,
-results come from keyword search alone and `semantic` is false.
+The query text is never logged. It is stored (with its vector and how well
+it matched) as the user's own search history, which only they see, for
+"gaps from your searches" (plan §7); it is deleted after the retention period.
+If the local embedding model is unavailable, results come from keyword search
+alone and `semantic` is false.
 """
 
 from __future__ import annotations
@@ -11,6 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, current_user, get_db, get_query_embedder
+from app.db.models import SearchEvent
 from app.db.scoped import apply_reader_scope
 from app.retrieval.search import search
 
@@ -70,6 +74,19 @@ async def search_endpoint(
         kind=kind,
         limit=limit,
     )
+    user_id = me.principal.user_id
+    await session.rollback()  # leave reader mode before writing the history row
+    distances = [h.distance for h in hits if h.distance is not None]
+    session.add(
+        SearchEvent(
+            user_id=user_id,
+            query=q,
+            vector=vector,
+            results=len(hits),
+            best_distance=min(distances) if distances else None,
+        )
+    )
+    await session.commit()
     return SearchOut(
         semantic=vector is not None,
         results=[

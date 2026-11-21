@@ -20,6 +20,7 @@ PLATFORM_NAME = "SOP Platform"
 PLATFORM_EMAIL = "platform@sop.local"
 USER_TRAILER = "SOP-User"
 UNATTRIBUTED_TRAILER = "SOP-Unattributed"
+PLATFORM_TRAILER = "SOP-Platform"  # the platform's own bookkeeping (e.g. approval write-back)
 
 
 class VaultPathError(ValueError):
@@ -38,6 +39,7 @@ class CommitInfo:
     committed_at: datetime
     user_id: uuid.UUID | None
     unattributed: bool
+    platform: bool = False
 
 
 class GitVault:
@@ -168,8 +170,11 @@ class GitVault:
         author_email: str,
         user_id: uuid.UUID | None = None,
         unattributed: bool = False,
+        platform: bool = False,
     ) -> str:
         trailers = []
+        if platform:
+            trailers.append(f"{PLATFORM_TRAILER}: true")
         if user_id is not None:
             trailers.append(f"{USER_TRAILER}: {user_id}")
         if unattributed:
@@ -202,7 +207,7 @@ def _parse_log(out: str) -> list[CommitInfo]:
         if not record:
             continue
         sha, name, email, when, body = record.split("\x1f", 4)
-        user_id, unattributed = None, False
+        user_id, unattributed, platform = None, False, False
         for line in body.splitlines():
             key, _, value = line.partition(":")
             if key.strip() == USER_TRAILER:
@@ -212,6 +217,8 @@ def _parse_log(out: str) -> list[CommitInfo]:
                     pass
             elif key.strip() == UNATTRIBUTED_TRAILER:
                 unattributed = True
+            elif key.strip() == PLATFORM_TRAILER:
+                platform = True
         commits.append(
             CommitInfo(
                 sha=sha.strip(),
@@ -220,6 +227,7 @@ def _parse_log(out: str) -> list[CommitInfo]:
                 committed_at=datetime.fromisoformat(when.strip()),
                 user_id=user_id,
                 unattributed=unattributed,
+                platform=platform,
             )
         )
     return commits

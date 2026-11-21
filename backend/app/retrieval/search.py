@@ -4,6 +4,11 @@ Must run in a session already under `apply_reader_scope`: RLS limits every
 table to what the user may read, *before* ranking. Results are checked again
 with the policy engine.
 
+Which version: answers (`live_only=True`) use only approved text from notes
+that are not retired. The Library shows the latest text to the note's
+editors (and for notes never approved), and the approved text to everyone
+else; RLS enforces the same rule (sop_doc_wip_visible).
+
 Semantic matches further than MAX_DISTANCE (cosine) are dropped, so a question
 nothing answers returns nothing instead of the nearest unrelated passages
 (qwen3-embedding:0.6b on the demo vault: relevant ~0.30-0.55, unrelated
@@ -20,7 +25,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Document
-from app.db.scoped import visible
+from app.db.scoped import sees_latest, visible
 from app.policy.engine import Principal
 
 RRF_K = 60
@@ -49,6 +54,15 @@ class Hit:
     version: str | None = None  # git commit of the indexed version
     chunk_id: uuid.UUID | None = None
     ord: int | None = None  # position of the passage in its document
+    provenance: dict | None = None  # written_by / approved_by of the live version
+
+
+LIVE = "c.live AND d.status <> 'retired' AND d.doc_type <> 'handover'"
+LIBRARY = "(CASE WHEN sop_doc_wip_visible(c.document_id) THEN c.current ELSE c.live END)"
+
+
+def _version_filter(live_only: bool) -> str:
+    return LIVE if live_only else LIBRARY
 
 
 def _filters(space, programme, stage, doc_type, kind) -> tuple[str, dict]:
@@ -84,8 +98,10 @@ async def search(
     kind: str | None = None,
     limit: int = 10,
     max_distance: float = MAX_DISTANCE,
+    live_only: bool = False,
 ) -> list[Hit]:
     extra, params = _filters(space, programme, stage, doc_type, kind)
+    extra += " AND " + _version_filter(live_only)
     params |= {"q": query, "n": CANDIDATES}
     tsquery = (
         "websearch_to_tsquery('english', :q)"
@@ -138,6 +154,7 @@ async def search(
             await session.execute(
                 text("""
         SELECT c.id, c.document_id, c.ord, c.heading, c.part, c.part_number, c.text,
+               c.live, c.current,
                ts_headline('english', c.text, plainto_tsquery('english', :q),
                            'MaxWords=40, MinWords=15, MaxFragments=2') AS snippet
         FROM chunks c WHERE c.id = ANY(:ids)"""),
@@ -159,6 +176,10 @@ async def search(
         docs[doc.id] = doc
         # Second, independent check (the policy engine), on top of RLS.
         if not visible(principal, doc):
+            continue
+        if not row.live and not sees_latest(principal, doc):
+            continue  # an unapproved change, and this user isn't one of its editors
+        if live_only and (not row.live or doc.status == "retired"):
             continue
         if per_doc.get(doc.id, 0) >= 2:  # at most two passages per document
             continue
@@ -184,7 +205,7 @@ async def search(
                 ),
                 distance=distances.get(cid),
                 text=row.text,
-                version=doc.current_commit,
+                version=_version(doc, row),
                 chunk_id=row.id,
                 ord=row.ord,
             )
@@ -192,6 +213,14 @@ async def search(
         if len(hits) >= limit:
             break
     return hits
+
+
+def _version(doc: Document, row) -> str | None:
+    """The git commit this passage comes from: the approved one for live text
+    that has since changed, otherwise the latest."""
+    if row.live and not row.current:
+        return doc.approved_commit
+    return doc.current_commit
 
 
 EXPAND_DOC_CHARS = 4000  # a document this short is passed whole
@@ -204,6 +233,7 @@ async def expand(
     *,
     doc_chars: int = EXPAND_DOC_CHARS,
     budget: int = CONTEXT_BUDGET,
+    live_only: bool = False,
 ) -> list[Hit]:
     """Small-to-big: turn passage hits into answerable context.
 
@@ -220,9 +250,12 @@ async def expand(
         by_doc.setdefault(h.document_id, []).append(h)
     rows = (
         await session.execute(
-            text("""
-            SELECT id, document_id, ord, heading, part, part_number, text FROM chunks
-            WHERE document_id = ANY(:ids) ORDER BY document_id, ord"""),
+            text(f"""
+            SELECT c.id, c.document_id, c.ord, c.heading, c.part, c.part_number, c.text,
+                   c.live, c.current
+            FROM chunks c JOIN documents d ON d.id = c.document_id
+            WHERE c.document_id = ANY(:ids) AND {_version_filter(live_only)}
+            ORDER BY c.document_id, c.ord"""),
             {"ids": list(by_doc)},
         )
     ).all()
@@ -267,7 +300,7 @@ async def expand(
                     space=best.space,
                     distance=match.distance if match else None,
                     text=r.text,
-                    version=best.version,
+                    version=best.version,  # same version set as the hit
                     chunk_id=r.id,
                     ord=r.ord,
                 )

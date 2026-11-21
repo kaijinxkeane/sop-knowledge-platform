@@ -4,7 +4,8 @@ Events on POST /conversations/{id}/messages (text/event-stream):
   routing          {spaces, reason, semantic}
   agent_dispatched {space, title}
   token            {space, text}
-  citation         {space, n, document_id, title, vault_path, heading, part, part_number}
+  citation         {space, n, document_id, title, vault_path, heading, part, part_number,
+                    version, written_by, approved_by, approval, approved_on}
   section_done     {space, no_answer, unavailable, confidence, model, escalated, contact?}
   done             {message_id, answered}
 Conversations are private to their owner. The audit log and the gap log get
@@ -172,7 +173,7 @@ async def post_message(
     if not conv.title:
         conv.title = question[:80]
     await session.commit()
-    principal, user_id, conv_id = me.principal, me.user.id, conv.id
+    principal, user_id, conv_id, question_id = me.principal, me.user.id, conv.id, user_msg.id
     profiles = space_profiles()
 
     async def events():
@@ -249,10 +250,16 @@ async def post_message(
             for sec in sections:
                 if sec.error:
                     continue  # an outage is not a gap in the SOPs
+                gap = {
+                    "space": sec.space,
+                    "message_id": msg.id,
+                    "user_id": user_id,
+                    "question_id": question_id,
+                }
                 if sec.no_answer and not answered:
-                    s.add(GapEvent(space=sec.space, message_id=msg.id, reason="no_answer"))
+                    s.add(GapEvent(**gap, reason="no_answer"))
                 elif not sec.no_answer and sec.confidence == "low":
-                    s.add(GapEvent(space=sec.space, message_id=msg.id, reason="low_confidence"))
+                    s.add(GapEvent(**gap, reason="low_confidence"))
             conv = await s.get(Conversation, conv_id)
             conv.updated_at = datetime.now(UTC)
             await audit.record(
@@ -300,7 +307,25 @@ async def feedback(
         )
     )
     if not body.helpful:
+        question = await session.scalar(
+            select(ChatMessage.id)
+            .where(
+                ChatMessage.conversation_id == msg.conversation_id,
+                ChatMessage.role == "user",
+                ChatMessage.created_at <= msg.created_at,
+            )
+            .order_by(ChatMessage.created_at.desc())
+            .limit(1)
+        )
         for sec in msg.sections:
             if not sec.get("no_answer"):
-                session.add(GapEvent(space=sec["space"], message_id=msg.id, reason="not_helpful"))
+                session.add(
+                    GapEvent(
+                        space=sec["space"],
+                        message_id=msg.id,
+                        reason="not_helpful",
+                        user_id=me.user.id,
+                        question_id=question,
+                    )
+                )
     await session.commit()

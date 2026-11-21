@@ -152,14 +152,18 @@ def can_view_document(
     safeguards: Iterable[str] = (),
     status: str | None = None,
     author_id: object | None = None,
+    readers: Iterable[object] = (),
 ) -> bool:
     """Python twin of the database's sop_doc_visible() (both must agree):
 
     - the author of a note made in the app always sees it
+    - so does anyone listed as a reader of that one document (handovers)
     - otherwise some access row must be readable after the safeguard floor
     - drafts and notes in review also need `review` on one of those spaces
     """
     if author_id is not None and author_id == principal.user_id:
+        return True
+    if principal.user_id in set(readers):
         return True
     rows = [
         (s, lvl) for s, lvl in effective_access(access, safeguards) if principal.can_read(s, lvl)
@@ -169,3 +173,26 @@ def can_view_document(
     if status in UNPUBLISHED:
         return any(principal.can("review", s) for s, _ in rows)
     return True
+
+
+EDIT_ACTIONS = frozenset({"contribute", "review"})
+
+
+def edit_spaces(principal: Principal) -> list[str]:
+    """Spaces where the user may see work in progress (unapproved changes)."""
+    return sorted(s for s, acts in principal.space_actions().items() if acts & EDIT_ACTIONS)
+
+
+def can_see_unapproved(
+    principal: Principal,
+    access: Iterable[tuple[str, object]],
+    *,
+    author_id: object | None = None,
+) -> bool:
+    """Python twin of sop_doc_editor() (on top of can_view_document): the author,
+    or someone with contribute/review on one of the document's spaces, sees a
+    change that is not approved yet. Everyone else sees the approved version."""
+    if author_id is not None and author_id == principal.user_id:
+        return True
+    spaces = set(edit_spaces(principal))
+    return any(space in spaces for space, _ in access)

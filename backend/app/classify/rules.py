@@ -16,7 +16,8 @@ from app.vault.labels import Labels
 NAMES_PENDING = "names_pending"  # not checked yet for this version
 NAMES_FOUND = "names_unconfirmed"  # possible client names, awaiting a reviewer
 NAME_FLAGS = frozenset({NAMES_PENDING, NAMES_FOUND})
-RULE_SOURCES = frozenset({"frontmatter", "folder_rule"})  # humans already decided
+# humans (or, for handovers, the platform's per-person rule) already decided
+RULE_SOURCES = frozenset({"frontmatter", "folder_rule", "handover"})
 AI_SOURCES = frozenset({"auto_tighten", "approved_ai"})
 CONFIDENCE_THRESHOLD = 0.7
 

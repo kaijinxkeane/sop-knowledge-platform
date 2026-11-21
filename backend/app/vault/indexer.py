@@ -15,7 +15,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from sqlalchemy import delete, func, select, text
+from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.classify.service import refresh_name_flags
@@ -31,6 +31,9 @@ from app.db.models import (
     User,
     VaultState,
 )
+from app.governance.approvals import apply_baseline, baseline_needed
+from app.governance.versions import governed_hash
+from app.retention.retract import is_retracted
 from app.retrieval.embed import Embedder
 from app.vault.git import GitVault
 from app.vault.labels import Labels, VaultConfig, resolve_labels, vault_config
@@ -52,6 +55,7 @@ class IndexReport:
     skipped: list[str] = field(default_factory=list)
     embed_failures: int = 0
     commit: str | None = None
+    baseline: int = 0  # documents approved as already published (first run only)
 
     def summary(self) -> dict:
         return {
@@ -100,6 +104,9 @@ class Indexer:
             deleted = sorted(known - set(changed))
         report = await self.index_paths(changed, deleted)
         report.commit = head
+        async with self.sessions() as s, s.begin():
+            if await baseline_needed(s):
+                report.baseline = await apply_baseline(s, self.config)
         await self.embed_missing(report)
         if head:
             async with self.sessions() as s:
@@ -178,6 +185,8 @@ class Indexer:
             return "skipped"
         data = full.read_bytes()
         digest = hashlib.sha256(data).hexdigest()
+        if await is_retracted(s, rel, digest):
+            return "skipped"  # purged by an admin; back only once its owners change it
         try:
             parsed = parse_file(rel, data)
         except Exception:  # noqa: BLE001 - a corrupt file must not stop indexing
@@ -199,6 +208,8 @@ class Indexer:
             doc = Document(vault_path=rel, title=parsed.title)
             s.add(doc)
         self._apply_metadata(doc, parsed, labels, digest)
+        doc.governed_hash = governed_hash(rel, data)
+        doc.status = derived_status(doc, parsed.frontmatter)
         await s.flush()
         await self._apply_access(s, doc, labels)
         await s.flush()
@@ -242,7 +253,7 @@ class Indexer:
             .all()
         )
         preserved = [r for r in rows if r.source not in DERIVED_SOURCES]
-        authoritative = labels.source in ("frontmatter", "folder_rule")
+        authoritative = labels.source in ("frontmatter", "folder_rule", "handover")
         if authoritative or not preserved:
             for r in rows:
                 await s.delete(r)
@@ -269,6 +280,8 @@ class Indexer:
         authored_by, source = commit.user_id, "app" if commit.user_id else "git"
         if commit.unattributed:
             authored_by, source = None, "unattributed"
+        elif commit.platform:
+            authored_by, source = None, "platform"
         elif authored_by is None:
             authored_by = await s.scalar(
                 select(User.id).where(func.lower(User.email) == commit.author_email.lower())
@@ -288,8 +301,15 @@ class Indexer:
     async def _replace_content(
         self, s: AsyncSession, doc: Document, parsed: Parsed, report: IndexReport
     ) -> None:
+        # The approved version's chunks stay (live) until a new version is
+        # approved; only the previous unapproved version is replaced.
+        await s.execute(delete(Chunk).where(Chunk.document_id == doc.id, Chunk.live.is_(False)))
+        is_approved = doc.approved_hash is not None and doc.approved_hash == doc.governed_hash
+        if is_approved:
+            await s.execute(delete(Chunk).where(Chunk.document_id == doc.id))
+        else:
+            await s.execute(update(Chunk).where(Chunk.document_id == doc.id).values(current=False))
         for model, col in (
-            (Chunk, Chunk.document_id),
             (DocumentLink, DocumentLink.from_id),
             (DocumentTag, DocumentTag.document_id),
             (AttachmentPart, AttachmentPart.document_id),
@@ -313,6 +333,8 @@ class Indexer:
                     part_number=c.number,
                     text=c.text,
                     embedding=v,
+                    live=is_approved,
+                    current=True,
                 )
             )
         for link in parsed.links:
@@ -338,6 +360,18 @@ class Indexer:
         links = (await s.execute(select(DocumentLink))).scalars().all()
         for link in links:
             link.to_id = by_name.get(link.target)
+
+
+def derived_status(doc: Document, frontmatter: dict) -> str:
+    """The platform decides whether a note is published, not its frontmatter:
+    approved -> published (unless retired); never approved -> draft/in_review
+    as written, otherwise unreviewed (readable, never cited)."""
+    written = str(frontmatter.get("status") or "").strip()
+    if written == "retired":
+        return "retired"
+    if doc.approved_hash is not None:
+        return "published"
+    return written if written in ("draft", "in_review") else "unreviewed"
 
 
 def _link_key(target: str) -> str:

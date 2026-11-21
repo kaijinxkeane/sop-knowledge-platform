@@ -1,0 +1,10 @@
+# Outbound webhooks (plan §8). Each subscriber gets a JSON POST holding ids,
+# spaces and times only (never titles or text):
+#   {"event": "sop_published", "document_id": "...", "space": "core", "at": "..."}
+# Events: review_requested, changes_requested, sop_published, review_due.
+# With `secret_env`, the body is signed: X-SOP-Signature: sha256=<hmac hex>,
+# using the secret in that environment variable (never in this file).
+webhooks: []
+#  - url: https://hooks.example.com/sop
+#    events: [sop_published, review_due]
+#    secret_env: SOP_WEBHOOK_SECRET

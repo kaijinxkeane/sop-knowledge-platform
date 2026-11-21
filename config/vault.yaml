@@ -41,3 +41,23 @@ known_names:   # the company's own names, programme and method names: never flag
 # Notes the Classifier can't place go to their author (app creator, or the
 # first commit's author), otherwise to the leads (`approve`) of this space.
 unplaced_reviewers: core
+
+# SOP governance (plan §6, Phase 4).
+governance:
+  review_cycle_days: 180     # default when a note has no review_cycle_days
+  reminder_days: 14          # remind owners and leads this long before review_due
+  # After approval, write status/reviewer/approved_by/approved_on/review_due back
+  # into the note's frontmatter as a commit by the platform account. These keys
+  # never count as a change to the approved content.
+  write_back: true
+
+# Knowledge retention (plan §7, Phase 5).
+handovers:
+  folder: Handovers          # handover notes live here, one folder per space
+  # Besides the author, the receivers and the space's leads (`approve`), these
+  # roles can read every handover (the CEO).
+  always_visible_roles: [core-lead]
+
+# Chat history, searches, gap events and notifications are deleted after this
+# many months (plan §11; confirmed with the auditor 2026-11-20).
+retention_months: 24

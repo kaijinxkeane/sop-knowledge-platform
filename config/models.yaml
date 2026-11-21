@@ -16,7 +16,7 @@ tiers:
     provider: openai_compat
     location: local
     base_url: ${OLLAMA_BASE_URL}/v1
-    model: qwen3:4b-instruct
+    model: qwen3:8b  # TRIAL: one resident chat model on 16 GB
     max_tokens: 256
     think: false
 

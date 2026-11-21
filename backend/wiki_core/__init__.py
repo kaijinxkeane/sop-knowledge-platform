@@ -58,6 +58,10 @@ wikilink_slug = _cli.wikilink_slug
 slugify = _cli.slugify
 parse_date = _cli.parse_date
 
+# Retract helpers: the value plus its common encodings, and the file scanner.
+retract_patterns = _cli.retract_patterns
+scan_retract_roots = _cli.scan_retract_roots
+
 # Full CLI entry point (lint, retract, ...), for jobs that shell out in-process.
 cli_main = _cli.main
 
@@ -67,6 +71,8 @@ __all__ = [
     "extract_markdown_links",
     "parse_date",
     "parse_frontmatter_block",
+    "retract_patterns",
+    "scan_retract_roots",
     "slugify",
     "split_markdown_frontmatter",
     "wikilink_slug",

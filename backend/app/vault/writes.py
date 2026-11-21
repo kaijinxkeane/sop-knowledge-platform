@@ -47,5 +47,5 @@ def check_write(
     if {s for s, _ in new.shared_with} - old_shared and not approver:
         raise WriteDenied("sharing a note with another space needs approval from the space lead")
 
-    if new_status in ("published",) and new_status != old_status and not approver:
-        raise WriteDenied("only the space lead can publish a note")
+    if new_status in ("published", "retired") and new_status != old_status and not approver:
+        raise WriteDenied(f"only the space lead can mark a note {new_status}")
