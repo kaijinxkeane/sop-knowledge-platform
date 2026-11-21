@@ -6,6 +6,7 @@ from app.eval.answers import allowed_by_truth, principal_for_roles
 from tests.conftest import CONFIG_DIR, REPO_ROOT
 
 Q = yaml.safe_load((CONFIG_DIR / "eval" / "questions.yaml").read_text())
+H = yaml.safe_load((CONFIG_DIR / "eval" / "questions-holdout.yaml").read_text())
 ROLES = yaml.safe_load((CONFIG_DIR / "roles.yaml").read_text())
 T = yaml.safe_load((REPO_ROOT / "demo-vault-labels.yaml").read_text())
 TRUTH = {**T["notes"], **T["attachments"]}
@@ -14,6 +15,9 @@ TRUTH = {**T["notes"], **T["attachments"]}
 def test_ids_unique_and_sets_known():
     ids = [q["id"] for q in Q["questions"]]
     assert len(ids) == len(set(ids))
+    held = [q["id"] for q in H["questions"]]
+    assert len(held) == len(set(held)) and not set(held) & set(ids)
+    assert not {q["question"] for q in H["questions"]} & {q["question"] for q in Q["questions"]}
     assert {q["set"] for q in Q["questions"]} <= {
         "answering",
         "reasoning",
@@ -23,7 +27,7 @@ def test_ids_unique_and_sets_known():
 
 
 def test_expected_docs_exist_and_are_readable_by_the_asking_role():
-    for q in Q["questions"]:
+    for q in Q["questions"] + H["questions"]:
         p = principal_for_roles(Q["roles"][q["role"]], ROLES)
         for path in q.get("docs") or []:
             assert path in TRUTH, (q["id"], path)
@@ -68,6 +72,7 @@ def test_grader():
         q, [_section("It depends [1].", ["Commercial/Rate Card 2026.md"])], route, ceo, TRUTH, 5
     )
     assert not missing.correct and missing.notes == ["missing facts"]
+    assert ok.facts == 1.0 and missing.facts == 0.0
     # the same citation for a user who may not read it is a leak
     leak = grade(
         q, [_section("7,500 [1]", ["Commercial/Rate Card 2026.md"])], route, staff, TRUTH, 5

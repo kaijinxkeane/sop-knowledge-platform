@@ -64,6 +64,9 @@ class Graded:
     answer: str
     notes: list[str] = field(default_factory=list)
     run: int = 0
+    facts: float | None = None  # share of expected fact groups covered (detail)
+    words: int = 0
+    groups: int = 0  # number of expected fact groups
 
 
 def grade(q: dict, sections, route, principal, truth, total_ms: int) -> Graded:
@@ -78,11 +81,15 @@ def grade(q: dict, sections, route, principal, truth, total_ms: int) -> Graded:
     for bad in q.get("must_not_include") or []:
         if bad.lower() in low:
             leak.append(f"contains {bad!r}")
+    coverage = None
     if q.get("no_answer"):
         correct = not answered and not leak
         citation_ok = not cited
     else:
-        facts = all(any(alt.lower() in low for alt in group) for group in q.get("include") or [])
+        groups = q.get("include") or []
+        hit = [any(alt.lower() in low for alt in group) for group in groups]
+        facts = all(hit)
+        coverage = sum(hit) / len(groups) if groups else None
         docs = set(q.get("docs") or [])
         citation_ok = bool(cited) and (not docs or any(c in docs for c in cited))
         correct = bool(answered) and facts and citation_ok and not leak
@@ -112,6 +119,9 @@ def grade(q: dict, sections, route, principal, truth, total_ms: int) -> Graded:
         models=sorted({s.model for s in sections if s.model}),
         answer=text,
         notes=notes,
+        facts=coverage if answered or coverage is None else 0.0,
+        words=len(text.split()),
+        groups=len(q.get("include") or []),
     )
 
 
@@ -175,6 +185,8 @@ def summarise(results: list[Graded]) -> dict:
     firsts = sorted(x.first_token_ms for x in results if x.first_token_ms is not None)
     totals = sorted(x.total_ms for x in results)
     items = per_item_correct(results)
+    cov = [x.facts for x in results if x.facts is not None]
+    multi = [x.facts for x in results if x.facts is not None and x.groups >= 3]
     return {
         "questions": len({x.id for x in results}),
         "runs": max((x.run for x in results), default=0) + 1,
@@ -185,6 +197,11 @@ def summarise(results: list[Graded]) -> dict:
         "answerable_but_said_no_answer": r([not x.answered for x in answerable]),
         "answered_but_missing_facts": r(["missing facts" in x.notes for x in answered]),
         "citation_valid_when_answered": r([x.citation_ok for x in answered]),
+        "fact_coverage_mean": round(statistics.mean(cov), 3) if cov else None,
+        "fact_coverage_multi_part": round(statistics.mean(multi), 3) if multi else None,
+        "words_median_when_answered": statistics.median([x.words for x in answered])
+        if answered
+        else None,
         "routing_ok": r([x.route_ok for x in results]),
         "route_reasons": {
             k: sum(x.route_reason == k for x in results)

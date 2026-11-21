@@ -227,7 +227,11 @@ def cmd_compare_evals(a: str, b: str) -> None:
 
 
 async def cmd_eval_answers(
-    model: str | None, only: str | None, out: str | None, repeats: int = 1
+    model: str | None,
+    only: str | None,
+    out: str | None,
+    repeats: int = 1,
+    questions: str = "questions.yaml",
 ) -> None:
     import dataclasses
     import json
@@ -259,7 +263,7 @@ async def cmd_eval_answers(
         )
 
     results = await run_eval(
-        questions_file=cfg / "eval" / "questions.yaml",
+        questions_file=cfg / "eval" / questions,
         roles_config=yaml.safe_load((cfg / "roles.yaml").read_text()),
         truth={**truth["notes"], **truth["attachments"]},
         sessions=get_sessionmaker(),
@@ -337,6 +341,7 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("eval-answers")
     p.add_argument("--model", default=None)
     p.add_argument("--repeats", type=int, default=1)
+    p.add_argument("--questions", default="questions.yaml", help="file in config/eval/")
     p.add_argument("--only", default=None)
     p.add_argument("--out", default=None)
     p = sub.add_parser("accept-invite")
@@ -368,7 +373,9 @@ def main(argv: list[str] | None = None) -> None:
             elif args.cmd == "compare-evals":
                 cmd_compare_evals(args.a, args.b)
             elif args.cmd == "eval-answers":
-                await cmd_eval_answers(args.model, args.only, args.out, args.repeats)
+                await cmd_eval_answers(
+                    args.model, args.only, args.out, args.repeats, args.questions
+                )
             elif args.cmd == "seed-demo":
                 await cmd_seed_demo()
         finally:

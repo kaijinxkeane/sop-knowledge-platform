@@ -217,3 +217,31 @@ async def test_routing_falls_back_without_a_model():
     assert (r.spaces, r.reason) == (("hr",), "fallback")
     r = await route("q", [hit("finance", dist=0.3)], ["core", "it"], PROFILES, gw)
     assert r.reason == "fallback" and set(r.spaces) == {"core", "it"}
+
+
+@pytest.mark.parametrize(
+    ("parts", "want"),
+    [
+        (["Book it [S", "1]."], "Book it [1]."),
+        (["A [S1, S3] and [s2]", "."], "A [1, 3] and [2]."),
+        (["Step [", "S", "12", "]"], "Step [12]"),
+        (["plain [1] stays"], "plain [1] stays"),
+        (
+            ["an open [bracket that never closes, long enough"],
+            "an open [bracket that never closes, long enough",
+        ),
+        (["ends with [S"], "ends with [S"),
+    ],
+)
+def test_citation_rewriter_handles_split_tokens(parts, want):
+    from app.agents.department import CiteRewriter
+
+    rw = CiteRewriter()
+    out = "".join(rw.feed(p) for p in parts) + rw.flush()
+    assert out == want
+
+
+def test_sources_use_s_ids():
+    from app.agents.department import user_prompt
+
+    assert '<source id="S1"' in user_prompt("q", [hit()])
