@@ -143,3 +143,56 @@ def test_model_casing_is_normalised_but_never_applied_looser():
 @pytest.mark.parametrize("reply", ["not json", "[]", "{}", "{broken"])
 def test_unreadable_reply_is_not_a_passed_name_check(reply):
     assert parse_reply(reply, model="m", known_spaces=SPACES).valid is False
+
+
+def _doc_with_examples():
+    from app.classify.model import Example
+
+    return ClassifyInput(
+        "Inbox/x.md",
+        "Coffee order",
+        "note",
+        "Order coffee for the training day two days ahead.",
+        examples=(
+            Example("Rate Card 2026", "Signature floor price 7,500.", "core", "restricted"),
+            Example("Room setup", "Chairs in a U-shape.", "core", "public"),
+        ),
+    )
+
+
+def test_examples_are_shown_as_data_before_the_document():
+    up = user_prompt(_doc_with_examples())
+    assert up.index("<examples>") < up.index("<document")
+    assert 'space="core" sensitivity="restricted"' in up
+
+
+def test_example_text_never_reaches_the_reviewer():
+    from app.classify.model import SAFE_RATIONALE, keep_to_document
+
+    doc = _doc_with_examples()
+    p = Proposal(
+        space="core",
+        sensitivity=P,
+        confidence=0.9,
+        rationale="Like the Rate Card 2026 note, which lists the Signature floor price 7,500.",
+        evidence=("Order coffee for the training day", "Signature floor price 7,500."),
+    )
+    kept = keep_to_document(p, doc)
+    assert kept.evidence == ("Order coffee for the training day",)
+    assert kept.rationale == SAFE_RATIONALE
+    own = Proposal(
+        space="core",
+        sensitivity=P,
+        confidence=0.9,
+        rationale="Logistics for a training day that any staff member may do.",
+    )
+    assert keep_to_document(own, doc).rationale == own.rationale
+
+
+def test_pick_examples_is_leave_one_out():
+    from app.classify.evaluate import Item, pick_examples
+
+    items = [Item(str(i), "case", f"{i}.md", f"t{i}", "note", "x", "core", P) for i in range(6)]
+    vecs = {str(i): [1.0, i / 10] for i in range(6)}
+    ex = pick_examples(items[0], items, vecs, k=3)
+    assert len(ex) == 3 and "t0" not in {e.title for e in ex}

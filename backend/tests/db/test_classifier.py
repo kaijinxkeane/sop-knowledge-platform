@@ -289,3 +289,23 @@ async def test_moving_a_placed_note_is_not_shown_to_the_target_space(
     assert moved["proposed"]["space"] == "hr"
     r = await client.post(f"/api/v1/classifications/{moved['id']}/approve", headers=ceo)
     assert r.status_code == 403  # the CEO can't place things in HR
+
+
+async def test_examples_come_only_from_notes_people_labelled(classified, sessions):
+    from app.classify.service import similar_labelled
+
+    async with sessions() as s:
+        inbox = (
+            (await s.execute(select(Document).where(Document.vault_path.like("Inbox/%"))))
+            .scalars()
+            .all()
+        )
+        by_title = {d.title: d for d in (await s.execute(select(Document))).scalars()}
+        seen = 0
+        for doc in inbox:
+            for e in await similar_labelled(s, doc.id):
+                src = by_title[e.title]
+                assert src.id != doc.id
+                assert src.label_source in ("frontmatter", "folder_rule", "approved_ai")
+                seen += 1
+    assert seen > 0

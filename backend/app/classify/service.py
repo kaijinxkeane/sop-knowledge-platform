@@ -13,11 +13,11 @@ import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from sqlalchemy import exists, func, or_, select
+from sqlalchemy import exists, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app import audit
-from app.classify.model import Classifier, ClassifyInput
+from app.classify.model import EXAMPLE_CHARS, MAX_EXAMPLES, Classifier, ClassifyInput, Example
 from app.classify.names import staff_index, unresolved_names
 from app.classify.rules import (
     NAME_FLAGS,
@@ -116,14 +116,55 @@ async def pending_documents(s: AsyncSession, limit: int) -> list[Document]:
     return list((await s.execute(q)).scalars())
 
 
+HUMAN_SOURCES = ("frontmatter", "folder_rule", "approved_ai")  # labels a person decided
+EXAMPLE_DISTANCE = 0.6  # farther than this, a "similar" note is not similar
+
+
+async def similar_labelled(s: AsyncSession, doc_id, k: int = MAX_EXAMPLES) -> list[Example]:
+    """The k notes most like this one (mean chunk embedding) whose labels people decided."""
+    rows = (
+        await s.execute(
+            text("""
+            WITH q AS (SELECT avg(embedding) AS v FROM chunks
+                       WHERE document_id = :id AND embedding IS NOT NULL)
+            SELECT c.document_id, min(c.embedding <=> q.v) AS dist
+            FROM chunks c JOIN documents d ON d.id = c.document_id, q
+            WHERE q.v IS NOT NULL AND c.embedding IS NOT NULL AND c.document_id <> :id
+              AND d.label_source = ANY(:sources)
+            GROUP BY c.document_id HAVING min(c.embedding <=> q.v) <= :maxd
+            ORDER BY dist LIMIT :k"""),
+            {"id": doc_id, "sources": list(HUMAN_SOURCES), "maxd": EXAMPLE_DISTANCE, "k": k},
+        )
+    ).all()
+    out = []
+    for doc_id_, _ in rows:
+        doc = await s.get(Document, doc_id_)
+        owner = await s.scalar(
+            select(DocumentAccess).where(
+                DocumentAccess.document_id == doc_id_, DocumentAccess.role == "owner"
+            )
+        )
+        first = await s.scalar(
+            select(Chunk.text).where(Chunk.document_id == doc_id_).order_by(Chunk.ord).limit(1)
+        )
+        if doc is None or owner is None:
+            continue
+        out.append(
+            Example(doc.title, (first or "")[:EXAMPLE_CHARS], owner.space, owner.sensitivity)
+        )
+    return out
+
+
 class ClassifierService:
     def __init__(
         self,
         sessions: async_sessionmaker,
         classifier: Classifier,
         config: VaultConfig | None = None,
+        use_examples: bool = True,
     ):
         self.sessions, self.classifier = sessions, classifier
+        self.use_examples = use_examples
         self.config = config or vault_config()
 
     async def run_pending(self, limit: int = 20) -> ClassifyReport:
@@ -156,8 +197,17 @@ class ClassifierService:
                     )
                 ).scalars()
             )
+            examples = (
+                tuple(await similar_labelled(s, doc_id))
+                if doc.label_source not in RULE_SOURCES and self.use_examples
+                else ()
+            )
             item = ClassifyInput(
-                vault_path=doc.vault_path, title=doc.title, kind=doc.kind, text=text
+                vault_path=doc.vault_path,
+                title=doc.title,
+                kind=doc.kind,
+                text=text,
+                examples=examples,
             )
             version = doc.content_hash
         proposal = await self.classifier(item)  # outside any transaction (slow)

@@ -24,6 +24,8 @@ one-way rule; it must be 0 whatever the model does.
 
 from __future__ import annotations
 
+import math
+import random
 import time
 from collections import Counter
 from dataclasses import dataclass, field
@@ -31,7 +33,7 @@ from pathlib import PurePosixPath
 
 import yaml
 
-from app.classify.model import Classifier, ClassifyInput
+from app.classify.model import EXAMPLE_CHARS, MAX_EXAMPLES, Classifier, ClassifyInput, Example
 from app.classify.rules import CONFIDENCE_THRESHOLD, decide
 from app.eval.stats import rate
 from app.policy.engine import Sensitivity
@@ -70,6 +72,7 @@ class EvalResult:
     model: str
     blind: bool
     repeats: int
+    example_pool: int | None = None
     items: list[Item] = field(default_factory=list)
     trials: list[Trial] = field(default_factory=list)
 
@@ -96,6 +99,7 @@ class EvalResult:
         return {
             "model": self.model,
             "blind": self.blind,
+            "example_pool": self.example_pool,
             "items": len(self.items),
             "runs_per_item": self.repeats,
             "trials": n,
@@ -183,6 +187,31 @@ def outcome(p, item: Item) -> str:
     return "exact"
 
 
+def _cos(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b, strict=True))
+    norm = math.sqrt(sum(x * x for x in a)) * math.sqrt(sum(y * y for y in b))
+    return 1 - dot / norm if norm else 1.0
+
+
+def pick_examples(
+    item: Item,
+    pool: list[Item],
+    vectors: dict[str, list[float]],
+    k: int = MAX_EXAMPLES,
+    max_distance: float = 0.6,
+) -> tuple[Example, ...]:
+    """Leave-one-out: the k pool items most like `item` (never itself), as human examples."""
+    near = sorted(
+        ((_cos(vectors[item.id], vectors[o.id]), o.id, o) for o in pool if o.id != item.id),
+        key=lambda t: (t[0], t[1]),
+    )
+    return tuple(
+        Example(o.title, o.text[:EXAMPLE_CHARS], o.space, o.sensitivity.label)
+        for d, _, o in near[:k]
+        if d <= max_distance
+    )
+
+
 async def evaluate(
     classify: Classifier,
     items: list[Item],
@@ -192,15 +221,29 @@ async def evaluate(
     repeats: int = 1,
     blind: bool = True,
     progress=None,
+    example_pool: int | None = None,
+    embed=None,
+    seed: int = 7,
 ) -> EvalResult:
-    result = EvalResult(model=model, blind=blind, repeats=repeats, items=list(items))
+    """`example_pool`: simulate N notes already labelled by people (a random,
+    fixed subset of the items, never the item itself); None = no examples."""
+    result = EvalResult(
+        model=model, blind=blind, repeats=repeats, items=list(items), example_pool=example_pool
+    )
+    vectors: dict[str, list[float]] = {}
+    pool: list[Item] = []
+    if example_pool:
+        vecs = await embed([f"{i.title}\n\n{i.text[:2000]}" for i in items])
+        vectors = {i.id: v for i, v in zip(items, vecs, strict=True)}
+        pool = random.Random(seed).sample(items, min(example_pool, len(items)))
     for run in range(repeats):
         for item in items:
+            examples = pick_examples(item, pool, vectors) if pool else ()
             shown = f"Inbox/{PurePosixPath(item.path).name}" if blind else item.path
             want = f"{item.space}/{item.sensitivity.label}"
             started = time.monotonic()
             try:
-                p = await classify(ClassifyInput(shown, item.title, item.kind, item.text))
+                p = await classify(ClassifyInput(shown, item.title, item.kind, item.text, examples))
                 if not p.valid:
                     raise ValueError("unreadable reply")
             except Exception:  # noqa: BLE001 - counted, never fatal

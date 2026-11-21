@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from app.classify.rules import Proposal
 from app.models.gateway import ModelGateway
@@ -23,12 +23,27 @@ from app.spaces import SpaceProfile
 MAX_CHARS = 8000  # ~2k tokens: enough to label a note, cheap on a 4B model
 
 
+MAX_EXAMPLES = 4
+EXAMPLE_CHARS = 400
+
+
+@dataclass(frozen=True)
+class Example:
+    """A similar note whose labels a person decided (folder rule, frontmatter or approval)."""
+
+    title: str
+    excerpt: str
+    space: str
+    sensitivity: str
+
+
 @dataclass(frozen=True)
 class ClassifyInput:
     vault_path: str
     title: str
     kind: str
     text: str
+    examples: tuple[Example, ...] = ()
 
 
 Classifier = Callable[[ClassifyInput], Awaitable[Proposal]]
@@ -59,6 +74,11 @@ names: every person's name and every organisation or company name that appears
 in the text (clients, partners, staff). Not product names, programme names,
 method names or document titles.
 
+You may also get <examples>: similar notes from this company with the labels
+people gave them. Follow how this company labels similar notes, but judge the
+<document> on its own content. Quote evidence only from the <document>, never
+from the examples.
+
 Reply with JSON only:
 {{"space": "<one of {space_names} or unsure>",
  "sensitivity": "public|internal|restricted",
@@ -77,10 +97,47 @@ def system_prompt(spaces: dict[str, SpaceProfile]) -> str:
 def user_prompt(doc: ClassifyInput) -> str:
     body = doc.text[:MAX_CHARS]
     cut = " (truncated)" if len(doc.text) > MAX_CHARS else ""
+    head = ""
+    if doc.examples:
+        rows = [
+            f"<example space={json.dumps(e.space)} sensitivity={json.dumps(e.sensitivity)}>\n"
+            f"Title: {e.title}\n{e.excerpt[:EXAMPLE_CHARS]}\n</example>"
+            for e in doc.examples[:MAX_EXAMPLES]
+        ]
+        head = "<examples>\n" + "\n".join(rows) + "\n</examples>\n\n"
     return (
-        f"<document path={json.dumps(doc.vault_path)} kind={doc.kind}>\n"
+        head + f"<document path={json.dumps(doc.vault_path)} kind={doc.kind}>\n"
         f"Title: {doc.title}\n\n{body}{cut}\n</document>"
     )
+
+
+def _norm(t: str) -> str:
+    return re.sub(r"\s+", " ", t).strip().lower()
+
+
+def _shingles(t: str, n: int = 5) -> set[str]:
+    w = re.findall(r"\w+", t.lower())
+    return {" ".join(w[i : i + n]) for i in range(len(w) - n + 1)}
+
+
+SAFE_RATIONALE = "Labelled like similar notes people have already labelled."
+
+
+def keep_to_document(p: Proposal, doc: ClassifyInput) -> Proposal:
+    """Reviewers of this note see its evidence and rationale, so neither may carry
+    text from the examples (which can be notes the reviewer may not read)."""
+    if not doc.examples:
+        return p
+    text = _norm(doc.text + " " + doc.title)
+    evidence = tuple(q for q in p.evidence if _norm(q) and _norm(q) in text)
+    from_examples = set().union(*(_shingles(e.title + " " + e.excerpt) for e in doc.examples))
+    own = _shingles(doc.title + " " + doc.text)
+    rationale = p.rationale
+    if (_shingles(rationale) & from_examples) - own or any(
+        _norm(e.title) in _norm(rationale) and _norm(e.title) not in text for e in doc.examples
+    ):
+        rationale = SAFE_RATIONALE
+    return replace(p, evidence=evidence, rationale=rationale)
 
 
 def parse_reply(text: str, *, model: str, known_spaces: set[str]) -> Proposal:
@@ -144,9 +201,19 @@ def gateway_classifier(
             scope=ContentScope.unclassified(),
             json_mode=True,
         )
-        return parse_reply(result.text, model=result.model, known_spaces=known)
+        return keep_to_document(
+            parse_reply(result.text, model=result.model, known_spaces=known), doc
+        )
 
     return classify
 
 
-__all__ = ["ClassifyInput", "Classifier", "gateway_classifier", "parse_reply", "Sensitivity"]
+__all__ = [
+    "ClassifyInput",
+    "Classifier",
+    "Example",
+    "gateway_classifier",
+    "keep_to_document",
+    "parse_reply",
+    "Sensitivity",
+]

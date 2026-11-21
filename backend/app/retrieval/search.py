@@ -47,6 +47,8 @@ class Hit:
     distance: float | None = None  # cosine distance, when matched semantically
     text: str = ""  # the full passage, for answering
     version: str | None = None  # git commit of the indexed version
+    chunk_id: uuid.UUID | None = None
+    ord: int | None = None  # position of the passage in its document
 
 
 def _filters(space, programme, stage, doc_type, kind) -> tuple[str, dict]:
@@ -135,7 +137,7 @@ async def search(
         for r in (
             await session.execute(
                 text("""
-        SELECT c.id, c.document_id, c.heading, c.part, c.part_number, c.text,
+        SELECT c.id, c.document_id, c.ord, c.heading, c.part, c.part_number, c.text,
                ts_headline('english', c.text, plainto_tsquery('english', :q),
                            'MaxWords=40, MinWords=15, MaxFragments=2') AS snippet
         FROM chunks c WHERE c.id = ANY(:ids)"""),
@@ -183,8 +185,91 @@ async def search(
                 distance=distances.get(cid),
                 text=row.text,
                 version=doc.current_commit,
+                chunk_id=row.id,
+                ord=row.ord,
             )
         )
         if len(hits) >= limit:
             break
     return hits
+
+
+EXPAND_DOC_CHARS = 4000  # a document this short is passed whole
+CONTEXT_BUDGET = 8000  # characters of passages per department agent
+
+
+async def expand(
+    session: AsyncSession,
+    hits: list[Hit],
+    *,
+    doc_chars: int = EXPAND_DOC_CHARS,
+    budget: int = CONTEXT_BUDGET,
+) -> list[Hit]:
+    """Small-to-big: turn passage hits into answerable context.
+
+    A matched document short enough is passed whole, in its own order (so
+    "the full agenda" sees every section); a longer one gets each matched
+    passage plus its neighbours. Documents keep their rank order and stop at
+    `budget`. Only documents already in `hits` are read, inside the same
+    RLS-scoped session, so this can never widen what the user can see.
+    """
+    if not hits:
+        return hits
+    by_doc: dict[uuid.UUID, list[Hit]] = {}
+    for h in hits:
+        by_doc.setdefault(h.document_id, []).append(h)
+    rows = (
+        await session.execute(
+            text("""
+            SELECT id, document_id, ord, heading, part, part_number, text FROM chunks
+            WHERE document_id = ANY(:ids) ORDER BY document_id, ord"""),
+            {"ids": list(by_doc)},
+        )
+    ).all()
+    chunks: dict[uuid.UUID, list] = {}
+    for r in rows:
+        chunks.setdefault(r.document_id, []).append(r)
+
+    out: list[Hit] = []
+    used = 0
+    for doc_id, doc_hits in by_doc.items():
+        best, all_rows = doc_hits[0], chunks.get(doc_id, [])
+        if sum(len(r.text) for r in all_rows) <= doc_chars:
+            keep = all_rows
+        else:
+            near = {h.ord + d for h in doc_hits if h.ord is not None for d in (-1, 0, 1)}
+            keep = [r for r in all_rows if r.ord in near]
+        size = sum(len(r.text) for r in keep)
+        if out and used + size > budget:
+            # no room for the whole set: fall back to the matched passages only
+            keep = [r for r in all_rows if r.id in {h.chunk_id for h in doc_hits}]
+            size = sum(len(r.text) for r in keep)
+            if used + size > budget:
+                continue
+        used += size
+        for r in keep:
+            match = next((h for h in doc_hits if h.chunk_id == r.id), None)
+            out.append(
+                Hit(
+                    document_id=doc_id,
+                    title=best.title,
+                    vault_path=best.vault_path,
+                    doc_type=best.doc_type,
+                    kind=best.kind,
+                    programme=best.programme,
+                    stage=best.stage,
+                    heading=r.heading,
+                    part=r.part,
+                    part_number=r.part_number,
+                    snippet=match.snippet if match else "",
+                    score=best.score,
+                    matched=match.matched if match else ["context"],
+                    space=best.space,
+                    distance=match.distance if match else None,
+                    text=r.text,
+                    version=best.version,
+                    chunk_id=r.id,
+                    ord=r.ord,
+                )
+            )
+    return out

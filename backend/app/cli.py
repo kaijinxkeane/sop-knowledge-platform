@@ -8,6 +8,7 @@
     python -m app.cli eval-classifier [--model TAG] Phase 2b eval on demo-vault/ (local model)
     python -m app.cli eval-answers [--model TAG]    Phase 3 answering eval (dev stack, demo vault)
     python -m app.cli compare-evals A.json B.json   paired comparison of two eval runs (--out)
+    python -m app.cli eval-retrieval [--questions F] do the passages contain the answer?
 
 Development only (refused unless SOP_ENV=development; fictional data):
     python -m app.cli seed-demo                     demo users + demo document labels
@@ -155,7 +156,12 @@ async def cmd_classify(limit: int, model: str | None = None) -> None:
 
 
 async def cmd_eval_classifier(
-    model: str | None, tier: str, repeats: int, blind: bool, out: str | None
+    model: str | None,
+    tier: str,
+    repeats: int,
+    blind: bool,
+    out: str | None,
+    example_pool: int | None = None,
 ) -> None:
     import dataclasses
     import json
@@ -164,6 +170,7 @@ async def cmd_eval_classifier(
     from app.classify.model import gateway_classifier
     from app.config import REPO_ROOT
     from app.models.gateway import build_gateway
+    from app.retrieval.embed import embed_documents
     from app.spaces import space_profiles
 
     gateway = build_gateway()
@@ -194,6 +201,8 @@ async def cmd_eval_classifier(
         repeats=repeats,
         blind=blind,
         progress=progress,
+        example_pool=example_pool,
+        embed=embed_documents,
     )
     print(json.dumps(result.summary(), indent=2))
     if out:
@@ -289,6 +298,32 @@ async def cmd_eval_answers(
         )
 
 
+async def cmd_eval_retrieval(questions: str, only: str | None) -> None:
+    import json
+
+    import yaml
+
+    from app.eval.retrieval import run_retrieval_eval, summarise_retrieval
+    from app.models.gateway import build_gateway
+    from app.retrieval.embed import embed_query
+    from app.spaces import space_profiles
+
+    cfg = get_settings().config_dir
+    rows = await run_retrieval_eval(
+        questions_file=cfg / "eval" / questions,
+        roles_config=yaml.safe_load((cfg / "roles.yaml").read_text()),
+        sessions=get_sessionmaker(),
+        gateway=build_gateway(),
+        embed_query=embed_query,
+        profiles=space_profiles(),
+        only=set(only.split(",")) if only else None,
+    )
+    for r in rows:
+        if not r.all_facts or not r.doc_hit:
+            print(f"  {r.id:4} recall {r.fact_recall:.0%} doc_hit={r.doc_hit} missing={r.missing}")
+    print(json.dumps(summarise_retrieval(rows), indent=2))
+
+
 async def cmd_seed_demo() -> None:
     _require_dev()
     async with get_sessionmaker()() as s:
@@ -334,7 +369,11 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--tier", default="classifier")
     p.add_argument("--repeats", type=int, default=1)
     p.add_argument("--show-folders", action="store_true", help="not blind: show real paths")
+    p.add_argument("--example-pool", type=int, default=None, help="N human-labelled notes")
     p.add_argument("--out", default=None)
+    p = sub.add_parser("eval-retrieval")
+    p.add_argument("--questions", default="questions.yaml")
+    p.add_argument("--only", default=None)
     p = sub.add_parser("compare-evals")
     p.add_argument("a")
     p.add_argument("b")
@@ -368,8 +407,15 @@ def main(argv: list[str] | None = None) -> None:
                 await cmd_classify(args.limit, args.model)
             elif args.cmd == "eval-classifier":
                 await cmd_eval_classifier(
-                    args.model, args.tier, args.repeats, not args.show_folders, args.out
+                    args.model,
+                    args.tier,
+                    args.repeats,
+                    not args.show_folders,
+                    args.out,
+                    args.example_pool,
                 )
+            elif args.cmd == "eval-retrieval":
+                await cmd_eval_retrieval(args.questions, args.only)
             elif args.cmd == "compare-evals":
                 cmd_compare_evals(args.a, args.b)
             elif args.cmd == "eval-answers":

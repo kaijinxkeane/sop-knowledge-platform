@@ -1,7 +1,8 @@
 """The one-way rule (plan §4.1), as pure functions so it can be tested exhaustively.
 
-The AI may make a note *more* restricted by itself, never less: anything
-looser, a different space or sharing with another space waits for a person.
+On a labelled note the AI may make it *more* restricted by itself, never less:
+anything looser, a different space or sharing waits for a person. An unplaced
+note gets no access from the AI at all until a person places it.
 """
 
 from __future__ import annotations

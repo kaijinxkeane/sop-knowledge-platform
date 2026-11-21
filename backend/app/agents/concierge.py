@@ -27,7 +27,7 @@ from app.db.scoped import apply_reader_scope
 from app.models.gateway import ModelGateway
 from app.models.types import ContentScope
 from app.policy.engine import Principal
-from app.retrieval.search import Hit, search
+from app.retrieval.search import Hit, expand, search
 from app.spaces import SpaceProfile
 
 ROUTE_HITS = 12
@@ -48,8 +48,11 @@ async def retrieve(
         hits = await search(s, principal, question, query_vector=vector, limit=ROUTE_HITS)
         chosen = await route(question, hits, readable, profiles, gateway)
         per_space = {
-            sp: await search(
-                s, principal, question, query_vector=vector, space=sp, limit=SPACE_HITS
+            sp: await expand(
+                s,
+                await search(
+                    s, principal, question, query_vector=vector, space=sp, limit=SPACE_HITS
+                ),
             )
             for sp in chosen.spaces
         }
