@@ -30,11 +30,11 @@ from app.api.deps import (
     get_session_factory,
 )
 from app.db.models import Document, DocumentAccess, Space
-from app.db.scoped import apply_reader_scope
-from app.policy.engine import Sensitivity, document_visible, resolve_sensitivity
+from app.db.scoped import apply_reader_scope, visible
+from app.policy.engine import Sensitivity
 from app.vault.git import GitVault, VaultPathError
 from app.vault.indexer import Indexer
-from app.vault.labels import Labels, resolve_labels, vault_config
+from app.vault.labels import labels_from_rows, resolve_labels, vault_config
 from app.vault.parse import ATTACHMENT_EXT, parse_note
 from app.vault.writes import WriteDenied, check_write
 
@@ -85,17 +85,7 @@ def safe_name(title: str) -> str:
     return name[:120]
 
 
-def _labels_in_force(rows: list[DocumentAccess]) -> Labels:
-    owner = next((r for r in rows if r.role == "owner"), None)
-    if owner is None:
-        return Labels(space=None, sensitivity=Sensitivity.RESTRICTED)
-    return Labels(
-        space=owner.space,
-        sensitivity=resolve_sensitivity(owner.sensitivity),
-        shared_with=[
-            (r.space, resolve_sensitivity(r.sensitivity)) for r in rows if r.role == "shared"
-        ],
-    )
+_labels_in_force = labels_from_rows
 
 
 async def _spaces(session: AsyncSession) -> set[str]:
@@ -111,8 +101,7 @@ async def _visible_note(
     doc = await session.get(Document, note_id)
     if doc is None or (kind and doc.kind != kind):
         raise NOT_FOUND
-    rows = list(doc.access)
-    if not document_visible(me.principal, [(r.space, r.sensitivity) for r in rows]):
+    if not visible(me.principal, doc):
         raise NOT_FOUND
     await session.commit()  # back to the normal role for writes
     # Re-read the full access rows (not only the ones visible to this user).

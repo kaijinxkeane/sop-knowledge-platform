@@ -88,3 +88,22 @@ def test_reserved_space_name_rejected(tmp_path):
     )
     with pytest.raises(ValueError, match="reserved"):
         load_gateway_config(d, {})
+
+
+def test_cloud_answering_falls_back_to_a_local_tier():
+    cfg = load_gateway_config(CONFIG_DIR, {"OLLAMA_BASE_URL": "http://localhost:11434"})
+    for name in ("answer", "reasoning"):
+        fb = cfg.tier(cfg.tier(name).fallback_tier)
+        assert fb.location == "local" and fb.fallback_tier is None
+
+
+@pytest.mark.parametrize("fb", ["missing", "cloud2"])
+def test_fallback_must_exist_and_be_local(tmp_path, fb):
+    d = _write(
+        tmp_path,
+        "tiers:\n"
+        f"  x: {{provider: anthropic, model: m, fallback_tier: {fb}}}\n"
+        "  cloud2: {provider: anthropic, model: m}\n",
+    )
+    with pytest.raises(ValueError, match="fallback_tier"):
+        load_gateway_config(d, {})

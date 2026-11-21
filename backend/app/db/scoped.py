@@ -29,3 +29,16 @@ async def apply_reader_scope(session: AsyncSession, principal: Principal) -> Non
         ),
         {"scopes": json.dumps(scopes), "uid": str(principal.user_id), "review": json.dumps(review)},
     )
+
+
+def visible(principal: Principal, doc) -> bool:
+    """Policy-engine check for a loaded Document (the second check, after RLS)."""
+    from app.policy.engine import can_view_document
+
+    return can_view_document(
+        principal,
+        [(a.space, a.sensitivity) for a in doc.access],
+        safeguards=doc.safeguards or (),
+        status=doc.status,
+        author_id=doc.author_id,
+    )

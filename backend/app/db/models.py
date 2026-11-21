@@ -16,6 +16,7 @@ from sqlalchemy import (
     CheckConstraint,
     Computed,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -175,6 +176,10 @@ class Document(Base):
     safeguards: Mapped[list[str]] = mapped_column(ARRAY(String(64)), default=list)
     current_commit: Mapped[str | None] = mapped_column(String(64))
     indexed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Name detector (plan §4.1): the content hash last checked for names, and the
+    # names found that are neither staff nor confirmed safe.
+    name_check_hash: Mapped[str | None] = mapped_column(String(64))
+    name_hits: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
 
     access: Mapped[list[DocumentAccess]] = relationship(
         cascade="all, delete-orphan", lazy="selectin"
@@ -285,3 +290,112 @@ class VaultState(Base):
     __tablename__ = "vault_state"
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     value: Mapped[str] = mapped_column(Text)
+
+
+class ClassificationProposal(Base):
+    """What the AI Classifier suggested for one version of a document (plan §4.1).
+
+    Holds the model's reasoning and the passages it relied on, so it is read
+    only through the review API (never granted to sop_reader)."""
+
+    __tablename__ = "classification_proposals"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), index=True
+    )
+    content_hash: Mapped[str] = mapped_column(String(64))
+    proposed_space: Mapped[str | None] = mapped_column(String(64))  # None = unsure
+    proposed_sensitivity: Mapped[str] = mapped_column(String(16))
+    proposed_shared_with: Mapped[list] = mapped_column(JSONB, default=list)
+    confidence: Mapped[float] = mapped_column(Float)
+    rationale: Mapped[str] = mapped_column(Text, default="")
+    evidence: Mapped[list] = mapped_column(JSONB, default=list)
+    names: Mapped[list] = mapped_column(JSONB, default=list)
+    model: Mapped[str] = mapped_column(String(128))
+    # pending | auto_applied | approved | rejected | superseded | recorded
+    status: Mapped[str] = mapped_column(String(16), index=True)
+    # what the one-way rule did: auto_tighten | queued | quarantined | unchanged
+    decision: Mapped[str] = mapped_column(String(16))
+    group_key: Mapped[str] = mapped_column(Text, default="")
+    reviewed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = _created()
+
+
+class KnownName(Base):
+    """Names a reviewer has looked at: `safe` names stop flagging notes, `client`
+    names are the client list that builds up over time (plan §4.1)."""
+
+    __tablename__ = "known_names"
+    name: Mapped[str] = mapped_column(Text, primary_key=True)  # lower-cased
+    kind: Mapped[str] = mapped_column(String(16))  # safe | client
+    added_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    added_at: Mapped[datetime] = _created()
+
+
+class Conversation(Base):
+    """A user's chat thread. Private to that user (no API reads anyone else's)."""
+
+    __tablename__ = "conversations"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    title: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = _created()
+    updated_at: Mapped[datetime] = _created()
+
+
+class ChatMessage(Base):
+    __tablename__ = "messages"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), index=True
+    )
+    role: Mapped[str] = mapped_column(String(16))  # user | assistant
+    content: Mapped[str] = mapped_column(Text, default="")
+    # assistant only: [{space, text, no_answer, confidence, model, tier, ...}]
+    sections: Mapped[list] = mapped_column(JSONB, default=list)
+    route: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = _created()
+
+
+class MessageCitation(Base):
+    __tablename__ = "message_citations"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    message_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("messages.id", ondelete="CASCADE"), index=True
+    )
+    space: Mapped[str] = mapped_column(String(64))
+    n: Mapped[int] = mapped_column(Integer)
+    document_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("documents.id", ondelete="SET NULL"), index=True
+    )
+    git_commit: Mapped[str | None] = mapped_column(String(64))
+    part: Mapped[str | None] = mapped_column(String(8))
+    part_number: Mapped[int | None] = mapped_column(Integer)
+
+
+class MessageFeedback(Base):
+    __tablename__ = "message_feedback"
+    message_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("messages.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    helpful: Mapped[bool] = mapped_column(Boolean)
+    comment: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = _created()
+
+
+class GapEvent(Base):
+    """A question a space couldn't answer well (plan §7). Holds no question text:
+    it links to the message, and reports only ever show counts."""
+
+    __tablename__ = "gap_events"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    space: Mapped[str] = mapped_column(String(64), index=True)
+    message_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("messages.id", ondelete="CASCADE"), index=True
+    )
+    reason: Mapped[str] = mapped_column(String(16))  # no_answer | low_confidence | not_helpful
+    created_at: Mapped[datetime] = _created()

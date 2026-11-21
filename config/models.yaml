@@ -16,8 +16,9 @@ tiers:
     provider: openai_compat
     location: local
     base_url: ${OLLAMA_BASE_URL}/v1
-    model: qwen3:4b
+    model: qwen3:4b-instruct
     max_tokens: 256
+    think: false
 
   # Default answering tier (most questions).
   answer:
@@ -25,6 +26,8 @@ tiers:
     model: claude-haiku-5-5
     effort: medium
     max_tokens: 8000
+    # No API key yet, or Claude unreachable: answer locally instead of failing.
+    fallback_tier: answer-local
 
   # Escalation for questions that need real reasoning.
   reasoning:
@@ -33,15 +36,17 @@ tiers:
     effort: medium
     max_tokens: 16000
     fallbacks: default
+    fallback_tier: answer-local
 
   # Reads every note to propose access labels -> local from day one.
   classifier:
     provider: openai_compat
     location: local
     base_url: ${OLLAMA_BASE_URL}/v1
-    # qwen3:4b vs qwen3:8b decided by the Phase 2b Classifier eval.
-    model: qwen3:4b
+    # Blind eval, 120 items x 3 runs: 8b 76.4% vs 4b-instruct 63.3% (McNemar p=0.002).
+    model: qwen3:8b
     max_tokens: 1024
+    think: false
 
   # Background writing nobody waits for: Librarian reports, review summaries,
   # handover completeness checks. Local, so this data never leaves the server.
@@ -52,6 +57,17 @@ tiers:
     base_url: ${OLLAMA_BASE_URL}/v1
     model: qwen3:8b
     max_tokens: 2048
+    think: false
+
+  # Local answering: the fallback for answer/reasoning, and the first local
+  # candidate in the answering eval (config/eval/answer-candidates.yaml).
+  answer-local:
+    provider: openai_compat
+    location: local
+    base_url: ${OLLAMA_BASE_URL}/v1
+    model: qwen3:8b
+    max_tokens: 2048
+    think: false
 
   # Search index embeddings (multilingual, long context, 1024-dim) -> always local.
   # Queries need an instruction prefix; documents are embedded as-is.

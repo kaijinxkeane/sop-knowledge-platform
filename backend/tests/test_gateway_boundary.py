@@ -4,14 +4,22 @@ import pytest
 
 from app.models.config import GatewayConfig, SpaceConfig, TierConfig
 from app.models.gateway import ModelGateway
-from app.models.types import ChatResult, ContentScope, DataBoundaryError, Message, Usage
+from app.models.types import (
+    ChatResult,
+    ContentScope,
+    DataBoundaryError,
+    Message,
+    ProviderConfigError,
+    StreamEnd,
+    Usage,
+)
 
 
 class RecordingAdapter:
     def __init__(self):
         self.calls = []
 
-    async def chat(self, tier, *, system, messages, max_tokens):
+    async def chat(self, tier, *, system, messages, max_tokens, json_mode=False):
         self.calls.append((tier.name, system, messages, max_tokens))
         return ChatResult("ok", tier.name, tier.provider, tier.model, "end_turn", Usage(1, 1), 5)
 
@@ -86,3 +94,66 @@ async def test_embed_is_boundary_checked_and_local(gateway):
     assert len(vectors) == 2
     with pytest.raises(DataBoundaryError):
         await gateway.embed(["a"], scope=ContentScope.of("core"), tier_name="cloud")
+
+
+# --- fallback and streaming ---------------------------------------------------------
+
+
+class _NoKey:
+    async def chat(self, tier, **kw):
+        raise ProviderConfigError("no key")
+
+    async def stream(self, tier, **kw):
+        raise ProviderConfigError("no key")
+        yield  # pragma: no cover
+
+
+class _Local:
+    def __init__(self):
+        self.calls = []
+
+    async def chat(self, tier, **kw):
+        self.calls.append(tier.name)
+        return ChatResult("ok", tier.name, "openai_compat", tier.model, "stop", Usage(), 1)
+
+    async def stream(self, tier, **kw):
+        self.calls.append(tier.name)
+        yield "hel"
+        yield "lo"
+        yield StreamEnd(tier.name, "openai_compat", tier.model, "stop", Usage(), 1)
+
+
+def _fallback_gateway(local_only=False):
+    cfg = GatewayConfig(
+        tiers={
+            "cloud": TierConfig(
+                "cloud", "anthropic", "claude-haiku-5-5", "cloud", fallback_tier="local"
+            ),
+            "local": TierConfig(
+                "local", "openai_compat", "qwen3:8b", "local", base_url="http://x/v1"
+            ),
+        },
+        spaces={"core": SpaceConfig("core", "Core", local_only=local_only)},
+    )
+    local = _Local()
+    return ModelGateway(cfg, adapters={"anthropic": _NoKey(), "openai_compat": local}), local
+
+
+async def test_missing_key_falls_back_to_local():
+    gw, local = _fallback_gateway()
+    result = await gw.chat("cloud", messages=MSG, scope=ContentScope.of("core"))
+    assert result.tier == "local" and local.calls == ["local"]
+
+
+async def test_stream_falls_back_and_reports_it():
+    gw, _ = _fallback_gateway()
+    items = [i async for i in gw.stream("cloud", messages=MSG, scope=ContentScope.of("core"))]
+    assert "".join(i for i in items if isinstance(i, str)) == "hello"
+    assert items[-1].fallback_from == "cloud" and items[-1].tier == "local"
+
+
+async def test_boundary_is_checked_before_any_fallback():
+    gw, local = _fallback_gateway(local_only=True)
+    with pytest.raises(DataBoundaryError):
+        await gw.chat("cloud", messages=MSG, scope=ContentScope.of("core"))
+    assert local.calls == []  # refused outright, not silently rerouted

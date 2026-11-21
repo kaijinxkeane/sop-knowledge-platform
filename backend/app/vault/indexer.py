@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from sqlalchemy import delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.classify.service import refresh_name_flags
 from app.db.models import (
     AttachmentPart,
     Chunk,
@@ -30,7 +31,6 @@ from app.db.models import (
     User,
     VaultState,
 )
-from app.policy.engine import Sensitivity
 from app.retrieval.embed import Embedder
 from app.vault.git import GitVault
 from app.vault.labels import Labels, VaultConfig, resolve_labels, vault_config
@@ -201,6 +201,13 @@ class Indexer:
         self._apply_metadata(doc, parsed, labels, digest)
         await s.flush()
         await self._apply_access(s, doc, labels)
+        await s.flush()
+        rows = list(
+            (
+                await s.execute(select(DocumentAccess).where(DocumentAccess.document_id == doc.id))
+            ).scalars()
+        )
+        refresh_name_flags(doc, rows, self.config)  # new version -> names_pending
 
         commit = self.git.last_commit(rel)
         if commit is not None:
@@ -247,9 +254,9 @@ class Indexer:
                         document_id=doc.id, space=space, role=role, sensitivity=sens, source=source
                     )
                 )
-        elif labels.safeguards:
-            for r in preserved:  # safeguards only ever tighten
-                r.sensitivity = Sensitivity.RESTRICTED.label
+        # Human/AI decisions in `preserved` are kept as they are: safeguards in
+        # documents.safeguards floor them to `restricted` at read time
+        # (policy engine + RLS), and lift again once they are cleared.
 
     async def _record_version(self, s: AsyncSession, doc: Document, commit, digest: str) -> None:
         exists = await s.scalar(

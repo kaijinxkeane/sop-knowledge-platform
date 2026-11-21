@@ -4,6 +4,10 @@
     python -m app.cli create-admin EMAIL "NAME"     first admin; prints a one-time invite token
     python -m app.cli accept-invite TOKEN           set a password for an invite (prompts)
     python -m app.cli index [--full] [--no-embed]   (re)index the vault now
+    python -m app.cli classify [--limit N]          run the Classifier on pending notes
+    python -m app.cli eval-classifier [--model TAG] Phase 2b eval on demo-vault/ (local model)
+    python -m app.cli eval-answers [--model TAG]    Phase 3 answering eval (dev stack, demo vault)
+    python -m app.cli compare-evals A.json B.json   paired comparison of two eval runs (--out)
 
 Development only (refused unless SOP_ENV=development; fictional data):
     python -m app.cli seed-demo                     demo users + demo document labels
@@ -19,6 +23,7 @@ import getpass
 import hashlib
 import sys
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pyotp
 from sqlalchemy import select
@@ -125,6 +130,161 @@ async def cmd_index(full: bool, no_embed: bool) -> None:
     print(report.summary())
 
 
+async def cmd_classify(limit: int, model: str | None = None) -> None:
+    import dataclasses
+
+    from app.classify.model import gateway_classifier
+    from app.classify.service import ClassifierService
+    from app.models.gateway import build_gateway
+    from app.spaces import space_profiles
+
+    gateway = build_gateway()
+    if model:
+        gateway.config.tiers["classifier"] = dataclasses.replace(
+            gateway.config.tier("classifier"), model=model
+        )
+    service = ClassifierService(get_sessionmaker(), gateway_classifier(gateway, space_profiles()))
+    total = {}
+    while True:
+        report = (await service.run_pending(limit=limit)).summary()
+        for k, v in report.items():
+            total[k] = total.get(k, 0) + v
+        if not report["classified"]:
+            break
+    print(total)
+
+
+async def cmd_eval_classifier(
+    model: str | None, tier: str, repeats: int, blind: bool, out: str | None
+) -> None:
+    import dataclasses
+    import json
+
+    from app.classify.evaluate import evaluate, load_items
+    from app.classify.model import gateway_classifier
+    from app.config import REPO_ROOT
+    from app.models.gateway import build_gateway
+    from app.spaces import space_profiles
+
+    gateway = build_gateway()
+    if model:
+        cfg = gateway.config.tier(tier)
+        gateway.config.tiers[tier] = dataclasses.replace(cfg, model=model)
+    used = gateway.config.tier(tier)
+    if used.location != "local":
+        sys.exit("the classifier eval runs on local tiers only")
+    spaces = space_profiles()
+    items = load_items(
+        REPO_ROOT / "demo-vault",
+        REPO_ROOT / "demo-vault-labels.yaml",
+        get_settings().config_dir / "eval" / "classifier-cases.yaml",
+    )
+
+    def progress(t):
+        if t.outcome != "exact":
+            print(
+                f"  run {t.run + 1} {t.outcome:15} {t.item}: got {t.got}, want {t.want}", flush=True
+            )
+
+    result = await evaluate(
+        gateway_classifier(gateway, spaces, tier),
+        items,
+        model=used.model,
+        known_spaces=set(spaces),
+        repeats=repeats,
+        blind=blind,
+        progress=progress,
+    )
+    print(json.dumps(result.summary(), indent=2))
+    if out:
+        Path(out).write_text(  # noqa: ASYNC240 - CLI only
+            json.dumps(
+                {
+                    "kind": "classifier",
+                    "summary": result.summary(),
+                    "per_item_correct": result.per_item_correct(),
+                    "trials": [dataclasses.asdict(t) for t in result.trials],
+                },
+                indent=2,
+            )
+        )
+
+
+def cmd_compare_evals(a: str, b: str) -> None:
+    import json
+
+    from app.eval.stats import paired
+
+    ra, rb = (json.loads(Path(x).read_text()) for x in (a, b))
+    if ra["kind"] != rb["kind"]:
+        sys.exit("both files must come from the same eval")
+
+    def name(r):
+        return r["summary"].get("model") or ",".join(r["summary"].get("models") or [])
+
+    print(f"A = {name(ra)}   B = {name(rb)}")
+    print(json.dumps(paired(ra["per_item_correct"], rb["per_item_correct"]), indent=2))
+
+
+async def cmd_eval_answers(
+    model: str | None, only: str | None, out: str | None, repeats: int = 1
+) -> None:
+    import dataclasses
+    import json
+
+    import yaml
+
+    from app.config import REPO_ROOT
+    from app.eval.answers import per_item_correct, run_eval, summarise
+    from app.models.gateway import build_gateway
+    from app.retrieval.embed import embed_query
+    from app.spaces import space_profiles
+
+    gateway = build_gateway()
+    tiers = gateway.config.tiers
+    if model:  # measure one local candidate on its own: no Claude, no escalation
+        local = dataclasses.replace(tiers["answer-local"], model=model)
+        tiers["answer-local"] = local
+        tiers["answer"] = dataclasses.replace(local, name="answer")
+        tiers.pop("reasoning", None)
+    cfg = get_settings().config_dir
+    truth = yaml.safe_load((REPO_ROOT / "demo-vault-labels.yaml").read_text())
+
+    def progress(g):
+        mark = "ok " if g.correct else "BAD"
+        print(
+            f"{mark} {g.id:4} {g.set:11} route={','.join(g.routed) or '-'}({g.route_reason})"
+            f" {g.total_ms / 1000:5.1f}s {'; '.join(g.notes + g.leak)}",
+            flush=True,
+        )
+
+    results = await run_eval(
+        questions_file=cfg / "eval" / "questions.yaml",
+        roles_config=yaml.safe_load((cfg / "roles.yaml").read_text()),
+        truth={**truth["notes"], **truth["attachments"]},
+        sessions=get_sessionmaker(),
+        gateway=gateway,
+        embed_query=embed_query,
+        profiles=space_profiles(),
+        only=set(only.split(",")) if only else None,
+        repeats=repeats,
+        progress=progress,
+    )
+    print(json.dumps(summarise(results), indent=2))
+    if out:
+        Path(out).write_text(  # noqa: ASYNC240 - CLI only
+            json.dumps(
+                {
+                    "kind": "answers",
+                    "summary": summarise(results),
+                    "per_item_correct": per_item_correct(results),
+                    "trials": [dataclasses.asdict(r) for r in results],
+                },
+                indent=2,
+            )
+        )
+
+
 async def cmd_seed_demo() -> None:
     _require_dev()
     async with get_sessionmaker()() as s:
@@ -162,6 +322,23 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("index")
     p.add_argument("--full", action="store_true")
     p.add_argument("--no-embed", action="store_true")
+    p = sub.add_parser("classify")
+    p.add_argument("--limit", type=int, default=20)
+    p.add_argument("--model", default=None)
+    p = sub.add_parser("eval-classifier")
+    p.add_argument("--model", default=None)
+    p.add_argument("--tier", default="classifier")
+    p.add_argument("--repeats", type=int, default=1)
+    p.add_argument("--show-folders", action="store_true", help="not blind: show real paths")
+    p.add_argument("--out", default=None)
+    p = sub.add_parser("compare-evals")
+    p.add_argument("a")
+    p.add_argument("b")
+    p = sub.add_parser("eval-answers")
+    p.add_argument("--model", default=None)
+    p.add_argument("--repeats", type=int, default=1)
+    p.add_argument("--only", default=None)
+    p.add_argument("--out", default=None)
     p = sub.add_parser("accept-invite")
     p.add_argument("token")
     sub.add_parser("seed-demo")
@@ -182,6 +359,16 @@ def main(argv: list[str] | None = None) -> None:
                 await cmd_accept_invite(args.token)
             elif args.cmd == "index":
                 await cmd_index(args.full, args.no_embed)
+            elif args.cmd == "classify":
+                await cmd_classify(args.limit, args.model)
+            elif args.cmd == "eval-classifier":
+                await cmd_eval_classifier(
+                    args.model, args.tier, args.repeats, not args.show_folders, args.out
+                )
+            elif args.cmd == "compare-evals":
+                cmd_compare_evals(args.a, args.b)
+            elif args.cmd == "eval-answers":
+                await cmd_eval_answers(args.model, args.only, args.out, args.repeats)
             elif args.cmd == "seed-demo":
                 await cmd_seed_demo()
         finally:

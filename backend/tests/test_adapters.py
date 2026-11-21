@@ -160,3 +160,34 @@ async def test_local_unreachable():
     adapter = OpenAICompatAdapter(transport=_transport(handler))
     with pytest.raises(ProviderUnavailableError):
         await adapter.chat(LOCAL, system=None, messages=MSGS, max_tokens=5)
+
+
+# --- local streaming: thinking blocks are stripped ------------------------------------
+
+from app.models.adapters.openai_compat import _ThinkStripper  # noqa: E402
+from app.models.config import TierConfig as _Tier  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "chunks,expected",
+    [
+        (["<thi", "nk>\nhmm\n</th", "ink>\n\nHello", " there"], "Hello there"),
+        (["Hello", " there"], "Hello there"),
+        (["  <", "b>bold</b>"], "  <b>bold</b>"),
+        (["<think>never closed"], ""),
+    ],
+)
+def test_think_stripper(chunks, expected):
+    s = _ThinkStripper()
+    assert "".join(s.feed(c) for c in chunks) + s.flush() == expected
+
+
+def test_no_think_and_json_mode_payload():
+    tier = _Tier("t", "openai_compat", "qwen3:4b", "local", base_url="http://x/v1", think=False)
+    from app.models.types import Message as _M
+
+    body = OpenAICompatAdapter.payload(
+        tier, system="sys", messages=[_M("user", "hi")], max_tokens=10, json_mode=True
+    )
+    assert body["reasoning_effort"] == "none" and body["messages"][-1]["content"] == "hi"
+    assert body["response_format"] == {"type": "json_object"}

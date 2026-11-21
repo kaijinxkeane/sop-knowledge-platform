@@ -120,3 +120,12 @@ def get_query_embedder():
     from app.retrieval.embed import embed_query
 
     return embed_query
+
+
+ask_limiter = RateLimiter(limit=30, window_seconds=300)  # per signed-in user
+
+
+def get_gateway():
+    from app.retrieval.embed import _gateway
+
+    return _gateway()

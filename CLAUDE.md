@@ -72,6 +72,9 @@ backend/                 — FastAPI app (uv project, Python 3.12)
   app/db/                — SQLAlchemy models, Alembic migrations (incl. RLS), scoped reader
   app/vault/             — parsers (md/pptx/pdf/docx), rule labels + safeguards, git layer, indexer, write rules
   app/retrieval/         — local embeddings, hybrid search (RLS + policy engine, distance cutoff)
+  app/classify/          — local Classifier, one-way rule, name detector, review service, eval
+  app/agents/            — Concierge routing, department agents (answer contract), orchestration
+  app/eval/              — answering eval runner (config/eval/questions.yaml)
   app/workers/           — arq worker: index git changes every minute, nightly unattributed check
   wiki_core/             — loads scripts/llm-wiki in place (single copy of the helpers)
   tests/
@@ -102,6 +105,12 @@ static files), agents, retrieval and Caddy/Headscale in `deploy/`.
 - Every app save is a git commit in the user's name (`GitVault.commit` with `user_id`) and
   goes through `check_write`: widening access or publishing needs `approve`.
 - Labels fail closed: unassigned files get no access rows; safeguards only tighten.
+- The AI never applies a looser label and gives unplaced notes no access at all
+  (`classify.rules.decide`); proposals (they quote the note) are shown only to the
+  author or to people who can already read the note. Safeguards are a read-time
+  floor in both `sop_doc_visible()` and `policy.engine.can_view_document` (keep them in sync).
+- Agents get passages retrieved under RLS before any model call; they have no DB access.
+  Routing never uses a cloud tier.
   `tests/test_vault_labels.py` must keep zero over-exposure on the demo vault.
 - Never commit secrets (`.env`, API keys, `.claude/settings.local.json`).
 - Every model call goes through `ModelGateway` with an explicit `ContentScope`;

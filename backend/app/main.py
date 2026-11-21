@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app import __version__
-from app.api import admin, auth, documents, health, me, notes, search
+from app.api import admin, auth, chat, classifications, documents, health, me, notes, search
 from app.api.access_log import AccessLogMiddleware
 from app.config import get_settings
 from app.logging import configure_logging
@@ -30,7 +30,7 @@ def create_app() -> FastAPI:
         redoc_url=None,
         lifespan=lifespan,
     )
-    for module in (health, auth, me, documents, notes, search, admin):
+    for module in (health, auth, me, chat, documents, notes, search, classifications, admin):
         app.include_router(module.router, prefix="/api/v1")
     app.add_middleware(AccessLogMiddleware)
     return app

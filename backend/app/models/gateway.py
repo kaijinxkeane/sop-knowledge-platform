@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import AsyncIterator
+from dataclasses import replace
 
 from app.models.adapters.anthropic_adapter import AnthropicAdapter
 from app.models.adapters.base import ChatAdapter, EmbedAdapter
@@ -21,8 +23,11 @@ from app.models.types import (
     ChatResult,
     ContentScope,
     DataBoundaryError,
+    GatewayError,
     Message,
     ProviderConfigError,
+    ProviderUnavailableError,
+    StreamEnd,
 )
 
 log = logging.getLogger("sop.gateway")
@@ -60,6 +65,14 @@ class ModelGateway:
                 f"tier {tier.name!r} is a cloud model; refusing to send {', '.join(restricted)}"
             )
 
+    def is_configured(self, tier_name: str) -> bool:
+        """False if the tier's provider can't be used at all (e.g. no API key)."""
+        tier = self.config.tiers.get(tier_name)
+        if tier is None:
+            return False
+        adapter = self._adapters.get(tier.provider)
+        return adapter is not None and bool(getattr(adapter, "configured", True))
+
     def _adapter(self, tier: TierConfig) -> object:
         try:
             return self._adapters[tier.provider]
@@ -68,23 +81,27 @@ class ModelGateway:
                 f"no adapter registered for provider {tier.provider!r}"
             ) from None
 
-    async def chat(
-        self,
-        tier_name: str,
-        *,
-        messages: list[Message],
-        scope: ContentScope,
-        system: str | None = None,
-        max_tokens: int | None = None,
-    ) -> ChatResult:
-        tier = self.config.tier(tier_name)
-        self.check_boundary(tier, scope)
-        adapter = self._adapter(tier)
-        result = await adapter.chat(  # type: ignore[attr-defined]
-            tier, system=system, messages=messages, max_tokens=max_tokens or tier.max_tokens
+    def _fallback(self, tier: TierConfig, exc: Exception) -> TierConfig | None:
+        """The local tier to use when `tier`'s provider is unavailable or not set up."""
+        if not tier.fallback_tier or not isinstance(
+            exc, (ProviderConfigError, ProviderUnavailableError)
+        ):
+            return None
+        log.warning(
+            "model_fallback",
+            extra={
+                "fields": {
+                    "tier": tier.name,
+                    "fallback": tier.fallback_tier,
+                    "error": type(exc).__name__,
+                }
+            },
         )
+        return self.config.tier(tier.fallback_tier)
+
+    def _log(self, event: str, tier: TierConfig, scope: ContentScope, result, **extra) -> None:
         log.info(
-            "model_call",
+            event,
             extra={
                 "fields": {
                     "tier": tier.name,
@@ -98,10 +115,88 @@ class ModelGateway:
                     "latency_ms": result.latency_ms,
                     "stop_reason": result.stop_reason,
                     "request_id": result.request_id,
+                    **extra,
                 }
             },
         )
+
+    async def chat(
+        self,
+        tier_name: str,
+        *,
+        messages: list[Message],
+        scope: ContentScope,
+        system: str | None = None,
+        max_tokens: int | None = None,
+        json_mode: bool = False,
+    ) -> ChatResult:
+        tier = self.config.tier(tier_name)
+        self.check_boundary(tier, scope)
+        try:
+            result = await self._adapter(tier).chat(  # type: ignore[attr-defined]
+                tier,
+                system=system,
+                messages=messages,
+                max_tokens=max_tokens or tier.max_tokens,
+                json_mode=json_mode,
+            )
+        except GatewayError as exc:
+            fallback = self._fallback(tier, exc)
+            if fallback is None:
+                raise
+            self.check_boundary(fallback, scope)
+            tier = fallback
+            result = await self._adapter(tier).chat(  # type: ignore[attr-defined]
+                tier,
+                system=system,
+                messages=messages,
+                max_tokens=min(max_tokens or tier.max_tokens, tier.max_tokens),
+                json_mode=json_mode,
+            )
+        self._log("model_call", tier, scope, result)
         return result
+
+    async def stream(
+        self,
+        tier_name: str,
+        *,
+        messages: list[Message],
+        scope: ContentScope,
+        system: str | None = None,
+        max_tokens: int | None = None,
+    ) -> AsyncIterator[str | StreamEnd]:
+        """Yield text deltas, then a StreamEnd. Falls back to the tier's local
+        fallback only if the provider fails before the first token."""
+        tier = self.config.tier(tier_name)
+        self.check_boundary(tier, scope)
+        fallback_from = None
+        started = False
+        try:
+            async for item in self._adapter(tier).stream(  # type: ignore[attr-defined]
+                tier, system=system, messages=messages, max_tokens=max_tokens or tier.max_tokens
+            ):
+                if isinstance(item, StreamEnd):
+                    self._log("model_call", tier, scope, item, stream=True)
+                    yield item
+                    return
+                started = True
+                yield item
+        except GatewayError as exc:
+            fallback = None if started else self._fallback(tier, exc)
+            if fallback is None:
+                raise
+            self.check_boundary(fallback, scope)
+            fallback_from, tier = tier.name, fallback
+        async for item in self._adapter(tier).stream(  # type: ignore[attr-defined]
+            tier,
+            system=system,
+            messages=messages,
+            max_tokens=min(max_tokens or tier.max_tokens, tier.max_tokens),
+        ):
+            if isinstance(item, StreamEnd):
+                item = replace(item, fallback_from=fallback_from)
+                self._log("model_call", tier, scope, item, stream=True)
+            yield item
 
     async def embed(
         self, texts: list[str], *, scope: ContentScope, tier_name: str = "embedding"

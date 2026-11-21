@@ -12,22 +12,17 @@
 
 from __future__ import annotations
 
-import hashlib
-import math
-import re
-import shutil
-import subprocess
-
 import pytest
 import yaml
 from sqlalchemy import func, select
 
 from app.api import deps
+from app.classify.service import ClassifierService
 from app.db.models import Chunk, Document, DocumentVersion
 from app.policy.engine import Sensitivity
-from app.vault.git import GitVault
 from app.vault.indexer import Indexer, commit_stray_changes
 from tests.conftest import REPO_ROOT
+from tests.db.conftest import _git, broken, fake_embed, no_names
 
 TRUTH = yaml.safe_load((REPO_ROOT / "demo-vault-labels.yaml").read_text())
 ALL_TRUTH = {**TRUTH["notes"], **TRUTH["attachments"]}
@@ -53,51 +48,6 @@ QUERIES = [
     "brand pillars",
 ]
 DECK = "Training Content/Attachments/Brand Foundations.pptx"
-
-
-async def fake_embed(texts: list[str]) -> list[list[float]]:
-    """Deterministic bag-of-words vectors, so semantic ranking is testable offline."""
-    out = []
-    for t in texts:
-        v = [0.0] * 1024
-        for w in re.findall(r"[a-z]+", t.lower()):
-            v[int(hashlib.md5(w.encode()).hexdigest(), 16) % 1024] += 1.0
-        n = math.sqrt(sum(x * x for x in v)) or 1.0
-        out.append([x / n for x in v])
-    return out
-
-
-async def fake_query(q: str) -> list[float]:
-    return (await fake_embed([q]))[0]
-
-
-async def broken(*_):
-    raise ConnectionError("ollama down")
-
-
-def _git(root, *args):
-    subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True)
-
-
-@pytest.fixture
-def vault(tmp_path):
-    root = tmp_path / "vault"
-    shutil.copytree(REPO_ROOT / "demo-vault", root)
-    _git(root, "init", "-q", "-b", "main")
-    _git(root, "add", "-A")
-    _git(root, "-c", "user.name=Seed", "-c", "user.email=seed@example.com", "commit", "-qm", "seed")
-    return GitVault(root)
-
-
-@pytest.fixture
-async def indexed(vault, sessions, client):
-    report = await Indexer(vault, sessions, fake_embed).sync()
-    app = client._transport.app
-    app.dependency_overrides[deps.get_git] = lambda: vault
-    app.dependency_overrides[deps.get_session_factory] = lambda: sessions
-    app.dependency_overrides[deps.get_embedder] = lambda: fake_embed
-    app.dependency_overrides[deps.get_query_embedder] = lambda: fake_query
-    return report
 
 
 def allowed(path: str, scopes: dict) -> bool:
@@ -165,6 +115,7 @@ async def test_files_and_parts_are_404_when_hidden(indexed, client, make_user, s
 async def test_keyword_search_when_embeddings_are_down(vault, sessions, client, make_user, sign_in):
     report = await Indexer(vault, sessions, broken).sync()
     assert report.embed_failures > 0
+    await ClassifierService(sessions, no_names).run_pending(limit=100)
     app = client._transport.app
     app.dependency_overrides[deps.get_query_embedder] = lambda: broken
     h = await sign_in(await make_user(roles=ROLE_SETS["core staff"][0]))

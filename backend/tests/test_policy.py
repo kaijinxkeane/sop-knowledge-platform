@@ -117,3 +117,33 @@ def test_default_roles_config_is_valid_and_matches_the_plan():
     assert all(g["space"] is None for g in roles["platform-admin"]["grants"])
     # employees only ever reach public material
     assert {g["max_sensitivity"] for g in roles["employee"]["grants"]} == {"public"}
+
+
+def test_resolved_levels_pass_through_but_plain_ints_do_not():
+    from app.policy.engine import Sensitivity, resolve_sensitivity
+
+    assert resolve_sensitivity(Sensitivity.PUBLIC) is Sensitivity.PUBLIC
+    assert resolve_sensitivity(0) is Sensitivity.RESTRICTED
+
+
+def test_document_visibility_rules():
+    import uuid
+
+    from app.policy.engine import GrantRule, Principal, Sensitivity, can_view_document
+
+    me = Principal(
+        uuid.uuid4(), frozenset(), (GrantRule("core", Sensitivity.INTERNAL, frozenset({"ask"})),)
+    )
+    lead = Principal(
+        uuid.uuid4(),
+        frozenset(),
+        (GrantRule("core", Sensitivity.RESTRICTED, frozenset({"ask", "review"})),),
+    )
+    rows = [("core", "internal")]
+    assert can_view_document(me, rows)
+    assert not can_view_document(me, rows, safeguards=["names_pending"])  # floor
+    assert can_view_document(lead, rows, safeguards=["names_pending"])
+    assert not can_view_document(me, rows, status="draft")
+    assert can_view_document(lead, rows, status="draft")
+    assert can_view_document(me, [], author_id=me.user_id)  # authors see their own
+    assert not can_view_document(me, [("core", "Public")])  # still fail-closed

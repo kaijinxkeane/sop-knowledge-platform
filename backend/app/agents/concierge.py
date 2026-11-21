@@ -1,0 +1,135 @@
+"""The Concierge: one question in, one section per department out (plan §5).
+
+Request flow:
+1. the policy engine gives the user's readable spaces (never the client/LLM)
+2. one hybrid search under RLS across those spaces decides routing
+3. each chosen space is searched again (its own top passages), still under RLS
+4. department agents answer in parallel; their tokens are streamed as events
+5. no model merges answers: each department keeps its own section
+
+The data-boundary scope of each agent call covers every space that owns or
+shares a passage, so a local-only space's text can't reach a cloud tier
+even when the user reads it through a shared space.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from collections.abc import AsyncIterator, Awaitable, Callable
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import async_sessionmaker
+
+from app.agents.department import Section, answer
+from app.agents.router import Route, route
+from app.db.models import DocumentAccess
+from app.db.scoped import apply_reader_scope
+from app.models.gateway import ModelGateway
+from app.models.types import ContentScope
+from app.policy.engine import Principal
+from app.retrieval.search import Hit, search
+from app.spaces import SpaceProfile
+
+ROUTE_HITS = 12
+SPACE_HITS = 6
+
+
+async def retrieve(
+    sessions: async_sessionmaker,
+    principal: Principal,
+    question: str,
+    vector: list[float] | None,
+    profiles: dict[str, SpaceProfile],
+    gateway: ModelGateway | None,
+) -> tuple[Route, dict[str, list[Hit]]]:
+    readable = sorted(principal.scopes())
+    async with sessions() as s:
+        await apply_reader_scope(s, principal)
+        hits = await search(s, principal, question, query_vector=vector, limit=ROUTE_HITS)
+        chosen = await route(question, hits, readable, profiles, gateway)
+        per_space = {
+            sp: await search(
+                s, principal, question, query_vector=vector, space=sp, limit=SPACE_HITS
+            )
+            for sp in chosen.spaces
+        }
+        await s.rollback()
+    return chosen, per_space
+
+
+async def boundary_scope(sessions: async_sessionmaker, space: str, hits: list[Hit]) -> ContentScope:
+    """Every space attached to these passages' documents (not limited by RLS)."""
+    if not hits:
+        return ContentScope.of(space)
+    async with sessions() as s:
+        spaces = set(
+            (
+                await s.execute(
+                    select(DocumentAccess.space).where(
+                        DocumentAccess.document_id.in_({h.document_id for h in hits})
+                    )
+                )
+            ).scalars()
+        )
+    return ContentScope.of(space, *spaces)
+
+
+async def ask(
+    *,
+    principal: Principal,
+    question: str,
+    sessions: async_sessionmaker,
+    gateway: ModelGateway,
+    embed_query: Callable[[str], Awaitable[list[float]]],
+    profiles: dict[str, SpaceProfile],
+) -> AsyncIterator[dict]:
+    """Yield events: routing, agent_dispatched, token, section_done, done."""
+    try:
+        vector = await embed_query(question)
+    except Exception:  # noqa: BLE001 - keyword search still works
+        vector = None
+    chosen, per_space = await retrieve(sessions, principal, question, vector, profiles, gateway)
+    yield {
+        "type": "routing",
+        "spaces": list(chosen.spaces),
+        "reason": chosen.reason,
+        "semantic": vector is not None,
+    }
+    if not chosen.spaces:
+        yield {"type": "done", "sections": [], "route": chosen}
+        return
+
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def run(space: str) -> None:
+        try:
+            scope = await boundary_scope(sessions, space, per_space[space])
+            async for event in answer(gateway, profiles[space], question, per_space[space], scope):
+                await queue.put(event)
+        except Exception as exc:  # noqa: BLE001 - one department failing doesn't stop others
+            sec = Section(space=space, no_answer=True, confidence="low")
+            await queue.put({"type": "section_done", "section": sec, "error": type(exc).__name__})
+
+    for space in chosen.spaces:
+        yield {"type": "agent_dispatched", "space": space}
+    tasks = [asyncio.create_task(run(sp)) for sp in chosen.spaces]
+    sections: dict[str, Section] = {}
+    errors: dict[str, str] = {}
+    try:
+        while len(sections) < len(tasks):
+            event = await queue.get()
+            if event["type"] == "section_done":
+                sec = event["section"]
+                sections[sec.space] = sec
+                if event.get("error"):
+                    errors[sec.space] = event["error"]
+            yield event
+    finally:
+        for t in tasks:
+            t.cancel()
+    yield {
+        "type": "done",
+        "sections": [sections[s] for s in chosen.spaces],
+        "route": chosen,
+        "errors": errors,
+    }

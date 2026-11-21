@@ -19,8 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, current_user, get_db, get_git
 from app.db.models import AttachmentPart, Document, DocumentAccess, DocumentVersion
-from app.db.scoped import apply_reader_scope
-from app.policy.engine import document_visible, resolve_sensitivity
+from app.db.scoped import apply_reader_scope, visible
+from app.policy.engine import effective_access
 from app.vault.git import GitVault
 
 router = APIRouter(prefix="/documents", tags=["knowledge"])
@@ -61,9 +61,9 @@ class VersionOut(BaseModel):
 
 
 def _out(doc: Document, me: CurrentUser) -> DocumentOut | None:
-    rows = [(a.space, a.sensitivity) for a in doc.access]
-    if not document_visible(me.principal, rows):
+    if not visible(me.principal, doc):
         return None
+    rows = effective_access([(a.space, a.sensitivity) for a in doc.access], doc.safeguards or ())
     return DocumentOut(
         id=str(doc.id),
         title=doc.title,
@@ -75,9 +75,7 @@ def _out(doc: Document, me: CurrentUser) -> DocumentOut | None:
         stage=doc.stage,
         owner=doc.owner,
         access=[
-            AccessOut(space=s, sensitivity=resolve_sensitivity(v).label)
-            for s, v in rows
-            if me.principal.can_read(s, v)
+            AccessOut(space=s, sensitivity=v.label) for s, v in rows if me.principal.can_read(s, v)
         ],
     )
 

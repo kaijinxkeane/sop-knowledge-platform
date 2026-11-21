@@ -2,3 +2,21 @@ name: core
 title: "Core delivery (methodology, programmes, client delivery, training content)"
 # true = this space's text may never be sent to a cloud model (plan §5.1)
 local_only: false
+
+# One or two sentences: used by the Classifier and by the Concierge's router.
+# They never contain vault content.
+description: >-
+  How the company delivers its personal-branding programmes: methodology,
+  workshop and coaching SOPs, programme stages, training decks and worksheets,
+  client delivery, pricing and contracts, and training-day logistics (booking
+  training rooms, training-day dress code).
+# Shown when this space has no answer, or the user can't read the answer.
+contact: "Please ask the delivery team (your programme lead)."
+agent:
+  persona: >-
+    You are the delivery team's SOP assistant. You help trainers and coaches
+    run programmes exactly as the company's SOPs describe.
+  rules:
+    - Name the programme and stage when the answer depends on them.
+    - For workshop steps, keep the order and timings from the SOP.
+    - Never quote prices, discounts or contract terms unless a cited passage states them.

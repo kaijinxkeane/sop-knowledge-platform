@@ -25,3 +25,19 @@ folder_rules:
 
 # Deterministic safeguards: any match forces `restricted`, whatever else says.
 flagged_terms: ["rate card", "floor price", "pricing", "discount"]
+
+# Name detector (plan §4.1): in these spaces a note stays `restricted` until
+# the local model has checked it for people's or organisations' names, and
+# while any name remains that is not staff (from the user list), not listed
+# below, and not confirmed safe by a reviewer.
+name_check_spaces: [core]
+known_names:   # the company's own names, programme and method names: never flagged
+  - Signature Personal Brand Programme
+  - Executive Presence
+  - Brand Pillars
+  - Brand Foundations
+  - Story Method
+
+# Notes the Classifier can't place go to their author (app creator, or the
+# first commit's author), otherwise to the leads (`approve`) of this space.
+unplaced_reviewers: core

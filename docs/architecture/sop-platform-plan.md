@@ -1230,6 +1230,62 @@ Phase 2 *backend* done (2026-11-21), except OCR:
 
 Still to do in Phase 2: local OCR for images, and the Library/editor UI.
 
+Phase 2b *backend* done (2026-11-21):
+- **Classifier** (`app/classify/`): one local model call per document version.
+  It proposes space and sensitivity, quotes evidence and lists names; the note
+  text is passed as data.
+- **One-way rule** (`rules.decide`): on a note that already has labels, the AI
+  may only tighten them; anything looser, a different space or sharing waits
+  in the review queue. An *unplaced* note gets no access from the AI at all,
+  not even `restricted`: the blind eval showed the model picking the wrong
+  space, which would have shown the note to that space's leads. It stays
+  visible to its author only. An exhaustive test checks both rules.
+- **Name detector**: names from the same local call, minus staff (from the user
+  list), the company's own names (`vault.yaml`) and names a reviewer marked
+  safe. Names the model reports that aren't in the text are ignored. In
+  `name_check_spaces` (core) every new version stays `restricted` until it is
+  checked, and an unreadable model reply never counts as checked.
+- **Safeguards are a floor applied at read time**, in RLS and in the policy
+  engine: the labels people approved are kept and come back when a safeguard
+  clears.
+- **Review queue** (`/classifications/...`): grouped, with approve (optionally
+  edited), reject, bulk approve, name review and an accuracy report. Who
+  approves follows §4.1. A proposal quotes the note, so it is shown only to
+  the author or to someone who can already read the note and reviews its
+  current or proposed space; never to the proposed space alone. Unplaced
+  notes go to their author (or, if unknown, the `core` lead), who *places*
+  them: approving labels they lack the rights for applies `restricted` in
+  that space and forwards the rest to that space's reviewers.
+- **Eval** (`python -m app.cli eval-classifier --repeats 3 --out x.json`, then
+  `compare-evals a.json b.json`): the 32 demo-vault files plus 88 fictional
+  cases (`config/eval/classifier-cases.yaml`), shown blind as `Inbox/<name>`
+  with labels stripped, with 95% confidence intervals and a paired McNemar
+  test. Blind, 3 runs: `qwen3:8b` 76.4% (CI 71.7-80.5%), `qwen3:4b-instruct`
+  63.3% (CI 58.2-68.1%), p = 0.002. Both are below the 85% bar, which is why
+  the AI only suggests for unplaced notes. (An earlier 32-file run that showed
+  real folder paths scored 94%; the folder names gave the answer away.)
+- **Local models and thinking**: `qwen3:4b` on Ollama is now the 2507
+  *Thinking* build, which can't switch thinking off. The `router` and
+  `classifier` tiers therefore use `qwen3:4b-instruct`. Thinking is switched
+  off with `reasoning_effort: none`, because Ollama 0.34 ignores `/no_think`.
+
+Phase 3 *backend* done (2026-11-21):
+- **Concierge** (`app/agents/`): permissions, then search, then the local
+  router only when unclear. Department agents follow the answer contract
+  (sources only, [n] citations, `NO_ANSWER`, a confidence line, escalation to
+  `reasoning` only when Claude is available).
+- **Data boundary**: each agent call's scope covers every space attached to
+  its passages, including shared-in ones.
+- **Chat API** (`/conversations`, SSE events, feedback): conversations are
+  private to their owner, and gap events and audit events hold ids only.
+- **Local fallback**: `answer` and `reasoning` fall back to the local
+  `answer-local` tier (`qwen3:8b`) when Claude has no key or is down.
+- **Answering eval**: `python -m app.cli eval-answers [--model TAG]` runs 62
+  questions in `config/eval/questions.yaml` (answering, reasoning, abstention,
+  adversarial), graded deterministically.
+- **Still to do in Phase 3**: the Ask UI, answer reuse (cost lever 5), gap
+  topics (Phase 5) and a larger question set (about 50 per space).
+
 Phases 0–5 (backend and frontend together) are built and tested on a MacBook (Apple Silicon) using Docker
 Compose. Ollama runs natively on the Mac for the local embeddings, because
 Docker can't use the Mac GPU. Only `demo-vault/` is used.

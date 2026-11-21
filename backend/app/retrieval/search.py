@@ -20,7 +20,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Document
-from app.policy.engine import Principal, document_visible
+from app.db.scoped import visible
+from app.policy.engine import Principal
 
 RRF_K = 60
 CANDIDATES = 40
@@ -42,6 +43,10 @@ class Hit:
     snippet: str
     score: float
     matched: list[str]
+    space: str | None = None  # owning space (for routing and answer sections)
+    distance: float | None = None  # cosine distance, when matched semantically
+    text: str = ""  # the full passage, for answering
+    version: str | None = None  # git commit of the indexed version
 
 
 def _filters(space, programme, stage, doc_type, kind) -> tuple[str, dict]:
@@ -88,6 +93,7 @@ async def search(
         "AS tsquery)"
     )
     ranks: dict[uuid.UUID, dict[str, int]] = {}
+    distances: dict[uuid.UUID, float] = {}
 
     keyword = await session.execute(
         text(f"""
@@ -106,14 +112,16 @@ async def search(
         vec = "[" + ",".join(f"{x:.6f}" for x in query_vector) + "]"
         semantic = await session.execute(
             text(f"""
-            SELECT c.id FROM chunks c JOIN documents d ON d.id = c.document_id
+            SELECT c.id, c.embedding <=> CAST(:vec AS vector) AS dist
+            FROM chunks c JOIN documents d ON d.id = c.document_id
             WHERE c.embedding IS NOT NULL
               AND c.embedding <=> CAST(:vec AS vector) <= :maxd {extra}
             ORDER BY c.embedding <=> CAST(:vec AS vector) LIMIT :n"""),
             params | {"vec": vec, "maxd": max_distance},
         )
-        for rank, (cid,) in enumerate(semantic.all()):
+        for rank, (cid, dist) in enumerate(semantic.all()):
             ranks.setdefault(cid, {})["semantic"] = rank
+            distances[cid] = float(dist)
 
     if not ranks:
         return []
@@ -127,7 +135,7 @@ async def search(
         for r in (
             await session.execute(
                 text("""
-        SELECT c.id, c.document_id, c.heading, c.part, c.part_number,
+        SELECT c.id, c.document_id, c.heading, c.part, c.part_number, c.text,
                ts_headline('english', c.text, plainto_tsquery('english', :q),
                            'MaxWords=40, MinWords=15, MaxFragments=2') AS snippet
         FROM chunks c WHERE c.id = ANY(:ids)"""),
@@ -148,7 +156,7 @@ async def search(
             continue
         docs[doc.id] = doc
         # Second, independent check (the policy engine), on top of RLS.
-        if not document_visible(principal, [(a.space, a.sensitivity) for a in doc.access]):
+        if not visible(principal, doc):
             continue
         if per_doc.get(doc.id, 0) >= 2:  # at most two passages per document
             continue
@@ -168,6 +176,13 @@ async def search(
                 snippet=row.snippet,
                 score=round(score, 5),
                 matched=matched,
+                # owner space, or the shared space the user reads it through
+                space=next(
+                    (a.space for a in sorted(doc.access, key=lambda a: a.role != "owner")), None
+                ),
+                distance=distances.get(cid),
+                text=row.text,
+                version=doc.current_commit,
             )
         )
         if len(hits) >= limit:

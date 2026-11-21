@@ -39,9 +39,11 @@ def resolve_sensitivity(raw: object) -> Sensitivity:
     `None`, empty, misspelled ("pubic"), differently cased ("Public") or
     non-string values all resolve to RESTRICTED, never to something looser.
     """
+    if isinstance(raw, Sensitivity):  # already resolved
+        return raw
     if isinstance(raw, str):
         return _BY_LABEL.get(raw.strip(), Sensitivity.RESTRICTED)
-    return Sensitivity.RESTRICTED
+    return Sensitivity.RESTRICTED  # including plain ints: 0 is not "public"
 
 
 @dataclass(frozen=True)
@@ -128,3 +130,42 @@ def document_visible(principal: Principal, access: Iterable[tuple[str, object]])
     reach it only through the classification queue (Phase 2b).
     """
     return any(principal.can_read(space, sens) for space, sens in access)
+
+
+UNPUBLISHED = frozenset({"draft", "in_review"})
+
+
+def effective_access(
+    access: Iterable[tuple[str, object]], safeguards: Iterable[str] = ()
+) -> list[tuple[str, Sensitivity]]:
+    """The labels in force, with the safeguard floor applied: any safeguard hit
+    (personal data, flagged terms, unchecked or unconfirmed names) makes every
+    row `restricted` until it is cleared. Invalid labels resolve to restricted."""
+    floor = Sensitivity.RESTRICTED if any(True for _ in safeguards) else Sensitivity.PUBLIC
+    return [(space, max(resolve_sensitivity(sens), floor)) for space, sens in access]
+
+
+def can_view_document(
+    principal: Principal,
+    access: Iterable[tuple[str, object]],
+    *,
+    safeguards: Iterable[str] = (),
+    status: str | None = None,
+    author_id: object | None = None,
+) -> bool:
+    """Python twin of the database's sop_doc_visible() (both must agree):
+
+    - the author of a note made in the app always sees it
+    - otherwise some access row must be readable after the safeguard floor
+    - drafts and notes in review also need `review` on one of those spaces
+    """
+    if author_id is not None and author_id == principal.user_id:
+        return True
+    rows = [
+        (s, lvl) for s, lvl in effective_access(access, safeguards) if principal.can_read(s, lvl)
+    ]
+    if not rows:
+        return False
+    if status in UNPUBLISHED:
+        return any(principal.can("review", s) for s, _ in rows)
+    return True

@@ -1,0 +1,122 @@
+# Extra Classifier eval cases (plan §4.1, Phase 2b). FICTIONAL data only.
+#
+# Each case is a short unsorted note with its correct labels. Together with the
+# demo vault (demo-vault-labels.yaml) this gives the eval enough items to
+# compare models. Every item is shown to the model as if it sat in Inbox/,
+# because in production the Classifier only labels notes that no folder rule
+# or frontmatter covers.
+#
+# Labelling policy (same as the prompt):
+#   public      any member of staff, incl. new hires in any department, needs it
+#   internal    how one department does its work
+#   restricted  client details, prices/discounts, contract terms, proprietary
+#               methods, salaries, personal or disciplinary matters, security secrets
+
+cases:
+  # --- core / public --------------------------------------------------------------
+  - {id: cp01, space: core, sensitivity: public, title: "Parking at the training venue", text: "Visitors and staff can park in the basement car park on training days. Take a ticket and ask reception to validate it before you leave."}
+  - {id: cp02, space: core, sensitivity: public, title: "Training day timings", text: "Training days start at 9:00 and finish by 17:00. Doors open at 8:30 for setup. Lunch is served at 12:30."}
+  - {id: cp03, space: core, sensitivity: public, title: "Using the projector in the Large Room", text: "Turn the projector on with the wall panel, choose HDMI 1, and wait 30 seconds. Turn it off at the panel when you leave."}
+  - {id: cp04, space: core, sensitivity: public, title: "Refreshments for training rooms", text: "Order coffee and snacks for a training day through the shared catering form at least two working days ahead."}
+  - {id: cp05, space: core, sensitivity: public, title: "Photography consent at events", text: "Before taking photos at any training day, check that everyone pictured has signed the photo consent form at registration."}
+  - {id: cp06, space: core, sensitivity: public, title: "Room setup checklist", text: "Chairs in a U-shape, flip chart with fresh paper, markers that work, water on every table, and the room thermostat at 23 degrees."}
+  - {id: cp07, space: core, sensitivity: public, title: "Lost property at the training rooms", text: "Items left in the training rooms go in the lost property box at reception. Unclaimed items are donated after 30 days."}
+  - {id: cp08, space: core, sensitivity: public, title: "Our programmes at a glance", text: "We run two programmes: the Signature Personal Brand Programme (12 weeks, one-to-one) and the Executive Presence Workshop (one full day, groups of 6 to 10). Ask the delivery team if a friend or contact is interested."}
+
+  # --- core / internal ------------------------------------------------------------
+  - {id: ci01, space: core, sensitivity: internal, title: "Running the closing circle", text: "At the end of each workshop, ask each participant to name one thing they will try this week. Go round the circle once; no discussion. The lead trainer closes with the next session date."}
+  - {id: ci02, space: core, sensitivity: internal, title: "Co-facilitation roles", text: "The lead trainer runs the agenda and timing. The assistant tracks time cards, captures whiteboard notes and handles room logistics. Swap roles only with the lead's agreement."}
+  - {id: ci03, space: core, sensitivity: internal, title: "Handling a quiet participant", text: "If a participant has not spoken by the first break, pair them with a confident partner for the next exercise and ask them a direct but easy question afterwards."}
+  - {id: ci04, space: core, sensitivity: internal, title: "LinkedIn headline exercise", text: "Give participants 10 minutes to write three headline options using the 'who I help, how, and why it matters' pattern. Partners pick the clearest one."}
+  - {id: ci05, space: core, sensitivity: internal, title: "Session notes template", text: "After each coaching call write: date, skill coached, two agreed actions, and anything to raise with the lead trainer. Save in the client tracker the same day."}
+  - {id: ci06, space: core, sensitivity: internal, title: "Rescheduling a coaching call", text: "Offer two alternative slots within the same week. If the client declines both, log it in the tracker and move the call to the next fortnight."}
+  - {id: ci07, space: core, sensitivity: internal, title: "Preparing the workshop pack", text: "Print one participant workbook per person, the agenda on A3 for the wall, and spare value cards. Check the pack against the list two days before."}
+  - {id: ci08, space: core, sensitivity: internal, title: "Trainer shadowing guide", text: "New trainers shadow two full workshops, then co-facilitate one segment, then lead with the lead trainer observing. Record each step in the trainer development log."}
+  - {id: ci09, space: core, sensitivity: internal, title: "Content review checklist", text: "Before a client's post goes live: it uses their own phrases, follows the moment-tension-lesson-invitation shape, has no confidential employer details, and the client has approved it."}
+  - {id: ci10, space: core, sensitivity: internal, title: "Feedback after a workshop", text: "Send the feedback survey link within 24 hours. Share results with the lead trainer in the Monday delivery meeting."}
+  - {id: ci11, space: core, sensitivity: internal, title: "Video recording practice", text: "Use one phone on a tripod at eye level, natural light from the side, and keep takes under two minutes. Delete practice recordings at the end of the day unless the participant asks to keep them."}
+  - {id: ci12, space: core, sensitivity: internal, title: "Ideas for new icebreakers", text: "Draft ideas: 'two truths and a brand', 'headline in six words', 'the compliment you remember'. Try one in the next Discovery Workshop and report back."}
+
+  # --- core / restricted ----------------------------------------------------------
+  - {id: cr01, space: core, sensitivity: restricted, title: "Discount request from a corporate client", text: "Harbourline Logistics asked for 15% off a block of four Executive Presence Workshops. Our floor is 1,600 per executive; anything lower needs the CEO's written approval."}
+  - {id: cr02, space: core, sensitivity: restricted, title: "Client complaint follow-up", text: "Priya Raman complained that her Brand Blueprint arrived late. Offer one extra coaching session free of charge and call her before Friday."}
+  - {id: cr03, space: core, sensitivity: restricted, title: "Proposal pricing notes", text: "For the Westbrook Bank proposal: list price 8,800 per executive, volume price 7,900 for ten or more, payment 50% upfront."}
+  - {id: cr04, space: core, sensitivity: restricted, title: "Proprietary reputation scoring model", text: "Our internal reputation score weights self-view 20%, colleague view 50% and track record 30%. Do not share the weights outside the company."}
+  - {id: cr05, space: core, sensitivity: restricted, title: "Contract renewal terms", text: "Renewals keep the original price for one year if signed within 30 days of the programme ending. Late renewals move to the current rate card."}
+  - {id: cr06, space: core, sensitivity: restricted, title: "Notes from call with Marcus Lee", text: "Marcus is preparing for a CEO interview at a competitor and does not want his current employer to know. Keep his sessions off the shared calendar."}
+  - {id: cr07, space: core, sensitivity: restricted, title: "Partner referral fees", text: "Referral partners receive 10% of the first programme fee for each client they introduce. Pay within 30 days of the client's first payment."}
+  - {id: cr08, space: core, sensitivity: restricted, title: "Client list for the alumni event", text: "Invite: Aisha Bello (Northwind), Tom Hargreaves (Alder & Co), Mei Chen (Westbrook Bank), Daniel Ortiz (Harbourline Logistics)."}
+  - {id: cr09, space: core, sensitivity: restricted, title: "Signature method: the five-lens audit", text: "Our proprietary five-lens audit scores a client's online presence on clarity, consistency, credibility, connection and cadence, each 1-10. A total under 30 triggers the full programme."}
+  - {id: cr10, space: core, sensitivity: restricted, title: "Late payment from a client", text: "Alder & Co has not paid the second 50% instalment, due before the Strategy session. Pause bookings until finance confirms payment."}
+  - {id: cr11, space: core, sensitivity: restricted, title: "Pricing for the new group programme", text: "Draft pricing: 2,400 per person for groups of 6, 2,100 for groups of 10. Not yet approved; do not quote to clients."}
+  - {id: cr12, space: core, sensitivity: restricted, title: "Testimonial permissions", text: "Mei Chen agreed to a named testimonial on the website. Daniel Ortiz agreed to an anonymous quote only. Check this list before publishing any client words."}
+
+  # --- it / public ----------------------------------------------------------------
+  - {id: ip01, space: it, sensitivity: public, title: "Guest wifi", text: "Visitors use the 'Guest' wifi network. The password is on the card at reception and changes every Monday. Staff devices use the staff network."}
+  - {id: ip02, space: it, sensitivity: public, title: "How to report a phishing email", text: "Do not click links or open attachments. Use the 'Report phishing' button in your mail app, then delete the email."}
+  - {id: ip03, space: it, sensitivity: public, title: "Printing from your laptop", text: "Add the 'Office Printer' from your system settings. Print jobs are held until you tap your staff card on the printer."}
+  - {id: ip04, space: it, sensitivity: public, title: "Joining a video call in the meeting room", text: "Press 'Join' on the room tablet; it shows the next meeting in the room calendar. Use the ceiling microphone, not your laptop's."}
+  - {id: ip05, space: it, sensitivity: public, title: "Software updates", text: "Install updates within seven days of being prompted. Restart your laptop at least once a week so updates can finish."}
+  - {id: ip06, space: it, sensitivity: public, title: "Charging cables and adapters", text: "Spare USB-C cables and HDMI adapters are in the IT drawer by the kitchen. Sign them out on the sheet and return them the same week."}
+  - {id: ip07, space: it, sensitivity: public, title: "Locking your screen", text: "Lock your screen whenever you leave your desk: Control-Command-Q on Mac, Windows key + L on Windows."}
+  - {id: ip08, space: it, sensitivity: public, title: "Requesting new software", text: "Ask for new software in the IT channel with the name, why you need it, and whether it will hold client data. IT replies within two working days."}
+
+  # --- it / internal --------------------------------------------------------------
+  - {id: ii01, space: it, sensitivity: internal, title: "Laptop rebuild procedure", text: "Back up the user's files to the encrypted drive, wipe the laptop, reinstall from the standard image, re-enrol it in device management, then restore files."}
+  - {id: ii02, space: it, sensitivity: internal, title: "Weekly backup check", text: "Every Monday IT checks that last week's server backup completed and test-restores one random folder. Log the result in the IT ops sheet."}
+  - {id: ii03, space: it, sensitivity: internal, title: "Offboarding a leaver's accounts", text: "On the leaver's last day IT disables their accounts at 17:00, transfers shared files to their manager, and collects the laptop for wiping."}
+  - {id: ii04, space: it, sensitivity: internal, title: "Patching the office server", text: "Apply security patches on the first Saturday of the month, after the backup has run. Announce the 30-minute downtime in the IT channel the day before."}
+  - {id: ii05, space: it, sensitivity: internal, title: "Enrolling a new laptop in device management", text: "Open the device management console, create the device record, send the enrolment link to the new starter, and confirm disk encryption reports as on."}
+  - {id: ii06, space: it, sensitivity: internal, title: "Replacing the meeting room tablet", text: "Order the same model, reset it to kiosk mode, connect it to the room calendar account, and test a join from a staff laptop."}
+  - {id: ii07, space: it, sensitivity: internal, title: "IT supplier contacts process", text: "When a supplier is needed, IT raises a ticket with the supplier portal and records the ticket number in the IT ops sheet. Escalate after two working days."}
+  - {id: ii08, space: it, sensitivity: internal, title: "Rotating the guest wifi password", text: "Every Monday the IT lead generates a new guest password in the router console and prints new reception cards."}
+
+  # --- it / restricted ------------------------------------------------------------
+  - {id: ir01, space: it, sensitivity: restricted, title: "Where the admin recovery keys are kept", text: "Disk-encryption recovery keys are escrowed in the device management console. The break-glass admin account is stored in the sealed envelope in the office safe."}
+  - {id: ir02, space: it, sensitivity: restricted, title: "Security incident 2026-09: lost laptop", text: "Sam's laptop was left in a taxi on 12 September. Remote wipe confirmed at 21:40. No client data was on the device. Reported to the CEO."}
+  - {id: ir03, space: it, sensitivity: restricted, title: "Firewall rules", text: "Inbound: only the VPN port is open. Admin console reachable from the IT lead's device only. Rule changes need the IT lead and CEO."}
+  - {id: ir04, space: it, sensitivity: restricted, title: "Server admin access list", text: "Admin access to the office server: IT lead (full), CEO (emergency only). Reviewed every quarter."}
+  - {id: ir05, space: it, sensitivity: restricted, title: "Phishing incident with a staff member", text: "On 3 October a trainer entered their password on a fake login page. Password reset, sessions revoked, two-factor re-enrolled. Follow-up training booked."}
+  - {id: ir06, space: it, sensitivity: restricted, title: "VPN configuration secrets", text: "The VPN pre-shared key and the server's private keys are held only in the IT lead's password manager vault. Rotate them yearly."}
+  - {id: ir07, space: it, sensitivity: restricted, title: "Vulnerability scan results", text: "October scan: the office NAS runs an outdated firmware with a known remote exploit. Patch scheduled for Saturday; until then it is offline."}
+  - {id: ir08, space: it, sensitivity: restricted, title: "Monitoring a staff account", text: "HR asked IT to preserve the mailbox of an employee under investigation. Mailbox placed on hold on 14 October; access only with HR and CEO approval."}
+
+  # --- hr / public ----------------------------------------------------------------
+  - {id: hp01, space: hr, sensitivity: public, title: "Public holidays", text: "The office closes on public holidays. If a client session falls on one, it moves to the next working day unless the client agrees otherwise."}
+  - {id: hp02, space: hr, sensitivity: public, title: "Code of conduct", text: "Treat colleagues and clients with respect, keep client information confidential, and raise concerns with your manager or HR."}
+  - {id: hp03, space: hr, sensitivity: public, title: "Working from home", text: "Staff may work from home up to two days a week when they have no client sessions. Tell your manager the day before."}
+  - {id: hp04, space: hr, sensitivity: public, title: "Claiming mileage", text: "Mileage for client visits is claimable at the standard rate. Add the start and end addresses to your expense claim."}
+  - {id: hp05, space: hr, sensitivity: public, title: "Updating your personal details", text: "Change your address, bank account or emergency contact yourself in the HR system. HR does not accept changes by email."}
+  - {id: hp06, space: hr, sensitivity: public, title: "Training budget for staff", text: "Every member of staff has a yearly learning budget. Ask your manager first, then submit the course details to HR."}
+  - {id: hp07, space: hr, sensitivity: public, title: "Raising a concern", text: "If something at work worries you, talk to your manager, HR, or any director. You can also use the anonymous concern form on the intranet."}
+  - {id: hp08, space: hr, sensitivity: public, title: "Probation period", text: "New staff have a three-month probation period with check-ins at 30, 60 and 90 days."}
+
+  # --- hr / internal --------------------------------------------------------------
+  - {id: hi01, space: hr, sensitivity: internal, title: "Interview process for trainers", text: "Screen call (20 minutes), then a 15-minute teach-back of any topic, then a panel interview with the lead trainer and HR. Score each stage on the standard form."}
+  - {id: hi02, space: hr, sensitivity: internal, title: "Preparing a new starter's first day", text: "HR sends the welcome email a week before, books the laptop collection with IT, and schedules the 30-day check-in."}
+  - {id: hi03, space: hr, sensitivity: internal, title: "Payroll calendar process", text: "HR sends the payroll changes file to the payroll provider by the 20th of each month and checks the payslip summary before approving payment."}
+  - {id: hi04, space: hr, sensitivity: internal, title: "Writing a job advert", text: "Use the job advert template, list no more than six requirements, include the working pattern, and have the hiring manager approve the text."}
+  - {id: hi05, space: hr, sensitivity: internal, title: "Running the annual engagement survey", text: "Open the survey for two weeks in March, send two reminders, and share only team-level results with managers (minimum five responses per team)."}
+  - {id: hi06, space: hr, sensitivity: internal, title: "Filing employee documents", text: "Contracts and signed policies go in the employee's folder in the HR system. Paper copies are scanned and shredded within a week."}
+  - {id: hi07, space: hr, sensitivity: internal, title: "Exit interview checklist", text: "Book the exit interview in the leaver's last week, use the standard questions, and summarise themes (not names) for the quarterly HR report."}
+  - {id: hi08, space: hr, sensitivity: internal, title: "Reference requests", text: "HR confirms dates of employment and job title only. Any other reference needs the employee's written consent."}
+
+  # --- hr / restricted ------------------------------------------------------------
+  - {id: hr01, space: hr, sensitivity: restricted, title: "Salary bands 2026", text: "Trainer: 52,000-64,000. Senior trainer: 64,000-78,000. Lead trainer: 78,000-92,000. Bands are reviewed every January."}
+  - {id: hr02, space: hr, sensitivity: restricted, title: "Performance concern: assistant trainer", text: "Jordan's manager reports repeated late arrivals to client sessions. Informal conversation held on 2 October; review in 30 days."}
+  - {id: hr03, space: hr, sensitivity: restricted, title: "Medical adjustments for a staff member", text: "A trainer has asked for no sessions before 10:00 for three months for medical reasons. Approved; do not share the reason with the team."}
+  - {id: hr04, space: hr, sensitivity: restricted, title: "Grievance received", text: "A grievance was raised against a lead trainer on 9 October. HR will interview both parties separately within five working days."}
+  - {id: hr05, space: hr, sensitivity: restricted, title: "Bonus decisions 2026", text: "Bonus pool is 6% of salaries. Proposed: Avery 8%, Sam 5%, Morgan 4%. Final approval by the CEO in December."}
+  - {id: hr06, space: hr, sensitivity: restricted, title: "Redundancy planning", text: "If the group programme does not launch by June, one assistant trainer role may be at risk. Consultation would start in July."}
+  - {id: hr07, space: hr, sensitivity: restricted, title: "Parental leave arrangement for Casey", text: "Casey starts parental leave on 1 February for six months. Cover by a contractor; keep the return date confidential until Casey announces it."}
+  - {id: hr08, space: hr, sensitivity: restricted, title: "Final written warning", text: "Following the disciplinary hearing on 15 October, a final written warning was issued to a trainer for breaching client confidentiality."}
+
+  # --- harder cases: mixed signals -------------------------------------------------
+  - {id: hx01, space: core, sensitivity: internal, title: "Talking about price on discovery calls", text: "If a prospect asks about price on a discovery call, say that the programme is tailored and the delivery lead will send a proposal. Never quote a number yourself."}
+  - {id: hx02, space: core, sensitivity: restricted, title: "Workshop debrief: Northwind group", text: "Northwind's six executives found the on-camera segment hardest. Their HR director asked for individual summaries, which we declined per our interview policy."}
+  - {id: hx03, space: it, sensitivity: public, title: "Forgot your password?", text: "Use 'Forgot password' on the sign-in page. If you are locked out of the password manager itself, ask IT in person; never send passwords by chat."}
+  - {id: hx04, space: hr, sensitivity: internal, title: "How HR runs a disciplinary meeting", text: "Book a private room, invite a note-taker from HR, send the invitation letter five working days before, and use the meeting script in the HR folder."}
+  - {id: hx05, space: hr, sensitivity: public, title: "Leave for client-facing staff", text: "Trainers should check the delivery calendar before requesting leave and arrange cover for any booked client session."}
+  - {id: hx06, space: core, sensitivity: internal, title: "Using the rate card in proposals", text: "Proposals always start from the current rate card in the Commercial folder. Ask the CEO before offering anything below list price."}
+  - {id: hx07, space: it, sensitivity: internal, title: "Granting a contractor temporary access", text: "Create a time-limited account that expires on the contract end date, add it to the contractor group only, and record the expiry in the IT ops sheet."}
+  - {id: hx08, space: core, sensitivity: restricted, title: "Pilot results for the group programme", text: "Pilot with Alder & Co: 9 of 10 participants completed; average reputation score rose from 24 to 33 on our five-lens audit."}

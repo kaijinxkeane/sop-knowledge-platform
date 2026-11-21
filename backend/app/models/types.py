@@ -62,6 +62,20 @@ class ChatResult:
     request_id: str | None = None
 
 
+@dataclass(frozen=True)
+class StreamEnd:
+    """Last item of a chat stream: which model answered and what it used."""
+
+    tier: str
+    provider: str
+    model: str
+    stop_reason: str | None
+    usage: Usage
+    latency_ms: int
+    request_id: str | None = None
+    fallback_from: str | None = None
+
+
 class GatewayError(Exception):
     """Base class for gateway failures."""
 

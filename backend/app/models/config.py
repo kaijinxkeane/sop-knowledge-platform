@@ -30,6 +30,8 @@ class TierConfig:
     max_tokens: int = 4096
     fallbacks: str | None = None  # Anthropic server-side refusal fallback ("default")
     cache: bool = True
+    think: bool | None = None  # False: switch off a local model's thinking (Qwen3 /no_think)
+    fallback_tier: str | None = None  # used when this tier's provider is unavailable
 
 
 @dataclass(frozen=True)
@@ -93,6 +95,8 @@ def _tier_from_dict(name: str, raw: dict, env: dict[str, str]) -> TierConfig:
         max_tokens=int(raw.get("max_tokens", 4096)),
         fallbacks=raw.get("fallbacks"),
         cache=bool(raw.get("cache", True)),
+        think=None if raw.get("think") is None else bool(raw.get("think")),
+        fallback_tier=raw.get("fallback_tier"),
     )
 
 
@@ -104,6 +108,15 @@ def load_gateway_config(config_dir: Path, env: dict[str, str] | None = None) -> 
     if not raw_tiers:
         raise ValueError(f"{models_file}: no tiers defined")
     tiers = {name: _tier_from_dict(name, raw or {}, env) for name, raw in raw_tiers.items()}
+    for tier in tiers.values():
+        fb = tiers.get(tier.fallback_tier) if tier.fallback_tier else None
+        if tier.fallback_tier and fb is None:
+            raise ValueError(f"tier {tier.name!r}: unknown fallback_tier {tier.fallback_tier!r}")
+        if fb is not None and (fb.location != "local" or fb.fallback_tier):
+            # A fallback must be local (it can take any content) and final.
+            raise ValueError(
+                f"tier {tier.name!r}: fallback_tier must be a local tier without its own fallback"
+            )
 
     spaces: dict[str, SpaceConfig] = {}
     for path in sorted((config_dir / "spaces").glob("*.yaml")):

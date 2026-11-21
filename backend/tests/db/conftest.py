@@ -8,7 +8,11 @@ unless SOP_REQUIRE_DB=1 (CI), where they fail instead.
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import math
 import os
+import re
+import shutil
 import subprocess
 import sys
 import time
@@ -24,10 +28,16 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from app.api import deps
+from app.classify.rules import Proposal
+from app.classify.service import ClassifierService
 from app.db.models import User
 from app.identity import roles_by_name, sync_roles, sync_spaces
 from app.main import create_app
+from app.policy.engine import Sensitivity
 from app.security import passwords, totp
+from app.vault.git import GitVault
+from app.vault.indexer import Indexer
+from tests.conftest import REPO_ROOT
 
 TEST_URL = os.environ.get(
     "SOP_TEST_DATABASE_URL", "postgresql+asyncpg://sop:sop-dev-only@localhost:5433/sop_test"
@@ -35,7 +45,8 @@ TEST_URL = os.environ.get(
 PASSWORD = "a-long-test-password"
 TABLES = (
     "document_access, documents, notice_acknowledgements, refresh_tokens, "
-    "one_time_tokens, user_roles, grants, roles, users, spaces, audit_events, vault_state"
+    "one_time_tokens, user_roles, grants, roles, users, spaces, audit_events, vault_state, "
+    "known_names"
 )
 
 
@@ -167,3 +178,58 @@ def sign_in(client):
         return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
     return _sign_in
+
+
+# --- the demo vault as a git repo, indexed with fake (offline) models ------------
+
+
+async def fake_embed(texts: list[str]) -> list[list[float]]:
+    """Deterministic bag-of-words vectors, so semantic ranking is testable offline."""
+    out = []
+    for t in texts:
+        v = [0.0] * 1024
+        for w in re.findall(r"[a-z]+", t.lower()):
+            v[int(hashlib.md5(w.encode()).hexdigest(), 16) % 1024] += 1.0
+        n = math.sqrt(sum(x * x for x in v)) or 1.0
+        out.append([x / n for x in v])
+    return out
+
+
+async def fake_query(q: str) -> list[float]:
+    return (await fake_embed([q]))[0]
+
+
+async def broken(*_):
+    raise ConnectionError("ollama down")
+
+
+def _git(root, *args):
+    subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True)
+
+
+@pytest.fixture
+def vault(tmp_path):
+    root = tmp_path / "vault"
+    shutil.copytree(REPO_ROOT / "demo-vault", root)
+    _git(root, "init", "-q", "-b", "main")
+    _git(root, "add", "-A")
+    _git(root, "-c", "user.name=Seed", "-c", "user.email=seed@example.com", "commit", "-qm", "seed")
+    return GitVault(root)
+
+
+async def no_names(doc):
+    """Fake Classifier: finds no names and can't place anything."""
+    return Proposal(space=None, sensitivity=Sensitivity.RESTRICTED, model="fake")
+
+
+@pytest.fixture
+async def indexed(vault, sessions, client):
+    """The demo vault indexed, name-checked (fake model) and wired into the API."""
+    report = await Indexer(vault, sessions, fake_embed).sync()
+    await ClassifierService(sessions, no_names).run_pending(limit=100)
+    app = client._transport.app
+    app.dependency_overrides[deps.get_git] = lambda: vault
+    app.dependency_overrides[deps.get_session_factory] = lambda: sessions
+    app.dependency_overrides[deps.get_embedder] = lambda: fake_embed
+    app.dependency_overrides[deps.get_query_embedder] = lambda: fake_query
+    return report

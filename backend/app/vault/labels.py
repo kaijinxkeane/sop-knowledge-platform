@@ -42,6 +42,9 @@ class VaultConfig:
     attachments_folder: str
     folder_rules: tuple[FolderRule, ...]
     flagged_terms: tuple[str, ...]
+    name_check_spaces: tuple[str, ...] = ()
+    known_names: tuple[str, ...] = ()
+    unplaced_reviewers: str | None = None
 
     def is_ignored(self, path: str) -> bool:
         if any(seg.startswith(".") for seg in path.split("/")):
@@ -67,6 +70,9 @@ def load_vault_config(config_dir: Path | None = None) -> VaultConfig:
         attachments_folder=str(data.get("attachments_folder") or "Attachments").strip("/"),
         folder_rules=tuple(rules),
         flagged_terms=tuple(t.lower() for t in data.get("flagged_terms") or ()),
+        name_check_spaces=tuple(data.get("name_check_spaces") or ()),
+        known_names=tuple(str(n).strip().lower() for n in data.get("known_names") or ()),
+        unplaced_reviewers=data.get("unplaced_reviewers"),
     )
 
 
@@ -148,4 +154,18 @@ def resolve_labels(
         shared = [(s, Sensitivity.RESTRICTED) for s, _ in shared]
     return Labels(
         space=space, sensitivity=sensitivity, shared_with=shared, source=source, safeguards=hits
+    )
+
+
+def labels_from_rows(rows) -> Labels:
+    """The labels in force, from document_access rows (owner + shared)."""
+    owner = next((r for r in rows if r.role == "owner"), None)
+    if owner is None:
+        return Labels(space=None, sensitivity=Sensitivity.RESTRICTED)
+    return Labels(
+        space=owner.space,
+        sensitivity=resolve_sensitivity(owner.sensitivity),
+        shared_with=[
+            (r.space, resolve_sensitivity(r.sensitivity)) for r in rows if r.role == "shared"
+        ],
     )

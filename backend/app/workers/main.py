@@ -3,6 +3,8 @@
 - every minute: re-index files changed in git since the last run (app saves
   are indexed immediately; this catches Obsidian edits on the device), then
   fill in embeddings that failed earlier (e.g. Ollama was down)
+- every minute (at :30): run the local Classifier / name detector on new
+  versions (plan §4.1); notes stay restricted until it has run
 - nightly 02:05: commit stray, uncommitted changes as *unattributed*
 - every 15 minutes: heartbeat
 
@@ -44,6 +46,18 @@ async def index_sync(ctx: dict) -> dict:
     return (await indexer.sync()).summary()
 
 
+async def classify_pending(ctx: dict) -> dict:
+    from app.classify.model import gateway_classifier
+    from app.classify.service import ClassifierService
+    from app.retrieval.embed import _gateway
+    from app.spaces import space_profiles
+
+    service = ClassifierService(
+        get_sessionmaker(), gateway_classifier(_gateway(), space_profiles())
+    )
+    return (await service.run_pending()).summary()
+
+
 async def nightly_check(ctx: dict) -> int:
     indexer = _indexer()
     if not indexer.git.is_repo():
@@ -63,10 +77,11 @@ async def startup(ctx: dict) -> None:
 
 
 class WorkerSettings:
-    functions = [heartbeat, index_sync, nightly_check]
+    functions = [heartbeat, index_sync, classify_pending, nightly_check]
     cron_jobs = [
         cron(heartbeat, minute={0, 15, 30, 45}),
         cron(index_sync, second=0, run_at_startup=True, unique=True, timeout=600),
+        cron(classify_pending, second=30, unique=True, timeout=900),
         cron(nightly_check, hour=2, minute=5, unique=True, timeout=600),
     ]
     on_startup = startup

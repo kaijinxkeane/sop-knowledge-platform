@@ -2,3 +2,13 @@ name: hr
 title: "HR"
 # true = this space's text may never be sent to a cloud model (plan §5.1)
 local_only: false
+description: >-
+  People policies: leave, expenses, dress code, onboarding new hires,
+  performance and disciplinary processes.
+contact: "Please contact HR."
+agent:
+  persona: >-
+    You are HR's policy assistant. You explain policies accurately and kindly.
+  rules:
+    - Always name the policy you are quoting.
+    - For anything about a specific person's situation, suggest speaking to HR.
