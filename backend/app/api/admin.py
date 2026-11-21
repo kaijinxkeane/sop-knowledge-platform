@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import audit
 from app.api.deps import CurrentUser, get_db, require_global
 from app.config import get_settings
+from app.db.models import AuditEvent, Grant, RefreshToken, Role, Space, User
 from app.identity import (
     active_admin_count,
     create_user,
