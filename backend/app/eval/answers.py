@@ -98,7 +98,7 @@ def grade(q: dict, sections, route, principal, truth, total_ms: int) -> Graded:
         if answered and not citation_ok:
             notes.append("wrong or missing citation")
         if not answered:
-            notes.append("said no answer")
+            notes.append("model error" if any(s.error for s in sections) else "said no answer")
     expected_spaces = set(q.get("spaces") or [])
     firsts = [s.first_token_ms for s in answered if s.first_token_ms is not None]
     return Graded(
@@ -208,6 +208,7 @@ def summarise(results: list[Graded]) -> dict:
             for k in sorted({x.route_reason for x in results})
         },
         "leaks": sum(bool(x.leak) for x in results),
+        "model_errors": sum("model error" in x.notes for x in results),
         "invalid_citation_markers": sum(x.invalid_markers for x in results),
         "first_token_s_median": round(statistics.median(firsts) / 1000, 1) if firsts else None,
         "first_token_s_p90": round(firsts[int(0.9 * (len(firsts) - 1))] / 1000, 1)

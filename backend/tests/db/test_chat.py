@@ -158,3 +158,31 @@ async def test_conversations_are_private(model, client, make_user, sign_in):
     assert (
         await client.post(f"/api/v1/messages/{msg}/feedback", headers=a, json={"helpful": False})
     ).status_code == 204
+
+
+async def test_outage_is_not_a_gap(indexed, client, make_user, sign_in, sessions):
+    from app.models.types import ProviderUnavailableError
+
+    class Down(Recorder):
+        async def stream(self, tier, *, system, messages, max_tokens):
+            raise ProviderUnavailableError("down")
+            yield  # pragma: no cover
+
+    tiers = {
+        n: TierConfig(n, "openai_compat", "fake", "local", base_url="http://x/v1")
+        for n in ("answer", "reasoning", "answer-local", "router")
+    }
+    gw = ModelGateway(
+        GatewayConfig(tiers=tiers, spaces={s: SpaceConfig(s, s) for s in ("core", "it", "hr")}),
+        adapters={"openai_compat": Down()},
+    )
+    app = client._transport.app
+    app.dependency_overrides[deps.get_gateway] = lambda: gw
+    app.dependency_overrides[deps.get_query_embedder] = lambda: fake_query
+    deps.ask_limiter.reset()
+    h = await sign_in(await make_user(roles=CORE_STAFF))
+    _, events = await ask(client, h, "How long does the Discovery Workshop last?")
+    done = [d for k, d in events if k == "section_done"]
+    assert done and all(d["unavailable"] for d in done)
+    async with sessions() as s:
+        assert not (await s.execute(select(GapEvent))).scalars().all()

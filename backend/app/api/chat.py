@@ -5,7 +5,7 @@ Events on POST /conversations/{id}/messages (text/event-stream):
   agent_dispatched {space, title}
   token            {space, text}
   citation         {space, n, document_id, title, vault_path, heading, part, part_number}
-  section_done     {space, no_answer, confidence, model, escalated, contact?}
+  section_done     {space, no_answer, unavailable, confidence, model, escalated, contact?}
   done             {message_id, answered}
 Conversations are private to their owner. The audit log and the gap log get
 ids and outcomes only, never the question or the answer.
@@ -41,6 +41,7 @@ from app.spaces import space_profiles
 router = APIRouter(tags=["chat"])
 NOT_FOUND = HTTPException(status.HTTP_404_NOT_FOUND, "not found")
 NO_SPACES = "You don't have access to any knowledge areas yet. Please ask your manager."
+UNAVAILABLE = "The assistant is unavailable right now. Please try again in a few minutes."
 
 
 class ConversationIn(BaseModel):
@@ -141,6 +142,7 @@ def _section_record(sec: Section, contact: str) -> dict:
         "space": sec.space,
         "text": sec.text,
         "no_answer": sec.no_answer,
+        "unavailable": sec.error is not None,
         "confidence": sec.confidence,
         "citations": sec.citations,
         "contact": contact if sec.no_answer else None,
@@ -201,6 +203,7 @@ async def post_message(
                     {
                         "space": sec.space,
                         "no_answer": sec.no_answer,
+                        "unavailable": sec.error is not None,
                         "confidence": sec.confidence,
                         "model": sec.model,
                         "escalated": sec.escalated,
@@ -213,6 +216,8 @@ async def post_message(
         shown = answered or sections  # no-answer sections are hidden if another answered
         if not sections:
             content = NO_SPACES
+        elif not answered and any(s.error for s in sections):
+            content = UNAVAILABLE
         elif not answered:
             contacts = " ".join(dict.fromkeys(profiles[s.space].contact for s in sections))
             content = f"I couldn't find an SOP that covers this. {contacts}"
@@ -242,6 +247,8 @@ async def post_message(
                         )
                     )
             for sec in sections:
+                if sec.error:
+                    continue  # an outage is not a gap in the SOPs
                 if sec.no_answer and not answered:
                     s.add(GapEvent(space=sec.space, message_id=msg.id, reason="no_answer"))
                 elif not sec.no_answer and sec.confidence == "low":

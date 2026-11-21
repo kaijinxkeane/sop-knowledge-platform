@@ -97,6 +97,7 @@ class Section:
     output_tokens: int = 0
     first_token_ms: int | None = None
     total_ms: int = 0
+    error: str | None = None  # the model failed: unavailable, not "no SOP covers this"
 
 
 def system_prompt(profile: SpaceProfile) -> str:

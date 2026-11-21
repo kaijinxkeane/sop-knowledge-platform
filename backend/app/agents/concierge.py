@@ -110,7 +110,7 @@ async def ask(
             async for event in answer(gateway, profiles[space], question, per_space[space], scope):
                 await queue.put(event)
         except Exception as exc:  # noqa: BLE001 - one department failing doesn't stop others
-            sec = Section(space=space, no_answer=True, confidence="low")
+            sec = Section(space=space, no_answer=True, confidence="low", error=type(exc).__name__)
             await queue.put({"type": "section_done", "section": sec, "error": type(exc).__name__})
 
     for space in chosen.spaces:
