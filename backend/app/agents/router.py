@@ -19,6 +19,7 @@ import logging
 import re
 from dataclasses import dataclass
 
+from app.agents.untrusted import REMINDER, tag, with_rules
 from app.models.gateway import ModelGateway
 from app.models.types import ContentScope, Message
 from app.retrieval.search import Hit
@@ -75,8 +76,8 @@ async def route(
             listing = "\n".join(f"- {s}: {profiles[s].description}" for s in readable)
             result = await gateway.chat(
                 "router",
-                system=ROUTER_SYSTEM.format(spaces=listing),
-                messages=[Message("user", question)],
+                system=with_rules(ROUTER_SYSTEM.format(spaces=listing)),
+                messages=[Message("user", tag("question", question) + f"\n{REMINDER}")],
                 scope=ContentScope.none(),
                 json_mode=True,
             )

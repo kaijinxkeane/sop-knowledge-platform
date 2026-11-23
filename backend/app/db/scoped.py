@@ -20,19 +20,30 @@ async def apply_reader_scope(session: AsyncSession, principal: Principal) -> Non
         await session.begin()
     scopes = {space: level.label for space, level in principal.scopes().items()}
     review = sorted(s for s, acts in principal.space_actions().items() if "review" in acts)
+    partial = [
+        {
+            "space": p.space,
+            "rank": int(p.level),
+            "folders": list(p.folders),
+            "docs": list(p.documents),
+        }
+        for p in principal.partial
+    ]
     await session.execute(text("SET LOCAL ROLE sop_reader"))
     await session.execute(
         text(
             "SELECT set_config('sop.scopes', :scopes, true), "
             "set_config('sop.user_id', :uid, true), "
             "set_config('sop.review_spaces', :review, true), "
-            "set_config('sop.edit_spaces', :edit, true)"
+            "set_config('sop.edit_spaces', :edit, true), "
+            "set_config('sop.partial', :partial, true)"
         ),
         {
             "scopes": json.dumps(scopes),
             "uid": str(principal.user_id),
             "review": json.dumps(review),
             "edit": json.dumps(edit_spaces(principal)),
+            "partial": json.dumps(partial),
         },
     )
 
@@ -48,6 +59,8 @@ def visible(principal: Principal, doc) -> bool:
         status=doc.status,
         author_id=doc.author_id,
         readers=[r.user_id for r in doc.readers],
+        path=doc.vault_path,
+        doc_id=doc.id,
     )
 
 

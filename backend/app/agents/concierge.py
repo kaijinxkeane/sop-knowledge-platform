@@ -43,7 +43,8 @@ async def retrieve(
     profiles: dict[str, SpaceProfile],
     gateway: ModelGateway | None,
 ) -> tuple[Route, dict[str, list[Hit]]]:
-    readable = sorted(principal.scopes())
+    # spaces shared with a project only in part (selected folders/SOPs) count too
+    readable = sorted(set(principal.scopes()) | {p.space for p in principal.partial})
     async with sessions() as s:
         await apply_reader_scope(s, principal)
         # Answers use approved text only (plan §6): live chunks, not retired.

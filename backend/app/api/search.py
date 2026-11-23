@@ -55,6 +55,7 @@ async def search_endpoint(
     session: AsyncSession = Depends(get_db),
     embed_query=Depends(get_query_embedder),
 ) -> SearchOut:
+    q = q.replace("\x00", " ").strip()  # Postgres text can't hold NUL
     vector = None
     try:
         vector = await embed_query(q)

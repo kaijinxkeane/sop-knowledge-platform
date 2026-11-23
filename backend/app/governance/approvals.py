@@ -15,6 +15,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Chunk, Document, DocumentLink, SopApproval, VaultState
+from app.governance.access import on_approval
 from app.governance.versions import with_frontmatter
 from app.vault.git import GitVault
 from app.vault.labels import VaultConfig
@@ -66,6 +67,7 @@ async def approve(
     if doc.status != "retired":
         doc.status = "published"
     await promote(s, doc)
+    await on_approval(s, doc)
     # Embedded attachments are approved together with the note.
     embedded = (
         (
@@ -96,6 +98,7 @@ async def approve(
             )
             att.approved_hash, att.approved_commit = att.governed_hash, att.current_commit
             await promote(s, att)
+            await on_approval(s, att)
     await s.flush()
     return approval
 

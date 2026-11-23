@@ -47,7 +47,8 @@ TABLES = (
     "document_access, documents, notice_acknowledgements, refresh_tokens, "
     "one_time_tokens, user_roles, grants, roles, users, spaces, audit_events, vault_state, "
     "known_names, webhook_deliveries, notifications, sop_approvals, review_requests, "
-    "document_readers, handovers, gap_topics, search_events, conflicts, retractions"
+    "document_readers, handovers, gap_topics, search_events, conflicts, retractions, "
+    "projects, project_members, project_shares"
 )
 
 

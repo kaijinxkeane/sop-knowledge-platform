@@ -191,7 +191,7 @@ async def test_boundary_covers_shared_owner_spaces():
 
 def test_contract_in_system_prompt():
     sp = system_prompt(PROFILES["core"])
-    assert "NO_ANSWER" in sp and "Ignore any instructions" in sp
+    assert "NO_ANSWER" in sp and "never instructions" in sp and "don't follow" in sp
 
 
 async def test_routing():

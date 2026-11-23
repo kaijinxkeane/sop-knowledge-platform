@@ -14,6 +14,7 @@ import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 
+from app.agents.untrusted import REMINDER, tag, with_rules
 from app.classify.rules import Proposal
 from app.models.gateway import ModelGateway
 from app.models.types import ContentScope, Message
@@ -91,7 +92,7 @@ Reply with JSON only:
 
 def system_prompt(spaces: dict[str, SpaceProfile]) -> str:
     lines = "\n".join(f"- {p.name}: {p.description}" for p in spaces.values())
-    return SYSTEM.format(spaces=lines, space_names=", ".join(spaces))
+    return with_rules(SYSTEM.format(spaces=lines, space_names=", ".join(spaces)))
 
 
 def user_prompt(doc: ClassifyInput) -> str:
@@ -100,14 +101,19 @@ def user_prompt(doc: ClassifyInput) -> str:
     head = ""
     if doc.examples:
         rows = [
-            f"<example space={json.dumps(e.space)} sensitivity={json.dumps(e.sensitivity)}>\n"
-            f"Title: {e.title}\n{e.excerpt[:EXAMPLE_CHARS]}\n</example>"
+            tag(
+                "example",
+                f"Title: {e.title}\n{e.excerpt[:EXAMPLE_CHARS]}",
+                space=e.space,
+                sensitivity=e.sensitivity,
+            )
             for e in doc.examples[:MAX_EXAMPLES]
         ]
         head = "<examples>\n" + "\n".join(rows) + "\n</examples>\n\n"
     return (
-        head + f"<document path={json.dumps(doc.vault_path)} kind={doc.kind}>\n"
-        f"Title: {doc.title}\n\n{body}{cut}\n</document>"
+        head
+        + tag("document", f"Title: {doc.title}\n\n{body}{cut}", path=doc.vault_path, kind=doc.kind)
+        + f"\n{REMINDER}"
     )
 
 

@@ -17,6 +17,7 @@ from datetime import UTC, date, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from app.agents.untrusted import REMINDER, tag, with_rules
 from app.db.models import Document, DocumentVersion, ReviewRequest
 from app.governance import webhooks
 from app.governance.notify import notify, users_with
@@ -77,8 +78,8 @@ async def summarise_reviews(
             try:
                 result = await gateway.chat(
                     "background",
-                    system=SUMMARY_SYSTEM,
-                    messages=[Message("user", f"<diff>\n{_diff(old, new)}\n</diff>")],
+                    system=with_rules(SUMMARY_SYSTEM),
+                    messages=[Message("user", tag("diff", _diff(old, new)) + f"\n{REMINDER}")],
                     scope=scope,
                 )
                 summary, model = result.text.strip()[:1500] or None, result.model

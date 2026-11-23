@@ -49,11 +49,22 @@ class VaultConfig:
     reminder_days: int = 14
     write_back: bool = False
     handover_folder: str = "Handovers"
+    project_folder: str = "Projects"
+    project_max_days: int = 184  # 6 months before renewal
+    project_reminder_days: int = 14
     handover_roles: tuple[str, ...] = ()
     retention_months: int = 24
+    allowed_link_domains: tuple[str, ...] = ()  # links allowed in answers (output_guard)
 
     def is_handover(self, path: str) -> bool:
         return path.startswith(self.handover_folder + "/")
+
+    def project_space_for(self, path: str) -> str | None:
+        """`Projects/<slug>/...` belongs to the project space `p-<slug>`."""
+        parts = path.split("/")
+        if len(parts) >= 3 and parts[0] == self.project_folder and parts[1]:
+            return f"p-{parts[1].lower()}"[:64]
+        return None
 
     def is_ignored(self, path: str) -> bool:
         if any(seg.startswith(".") for seg in path.split("/")):
@@ -86,8 +97,14 @@ def load_vault_config(config_dir: Path | None = None) -> VaultConfig:
         reminder_days=int((data.get("governance") or {}).get("reminder_days") or 14),
         write_back=bool((data.get("governance") or {}).get("write_back", False)),
         handover_folder=str((data.get("handovers") or {}).get("folder") or "Handovers").strip("/"),
+        project_folder=str((data.get("projects") or {}).get("folder") or "Projects").strip("/"),
+        project_max_days=int((data.get("projects") or {}).get("max_days") or 184),
+        project_reminder_days=int((data.get("projects") or {}).get("reminder_days") or 14),
         handover_roles=tuple((data.get("handovers") or {}).get("always_visible_roles") or ()),
         retention_months=int(data.get("retention_months") or 24),
+        allowed_link_domains=tuple(
+            str(d) for d in (data.get("answers") or {}).get("allowed_link_domains") or ()
+        ),
     )
 
 
@@ -141,6 +158,25 @@ def resolve_labels(
             sensitivity=Sensitivity.RESTRICTED,
             source="handover",
             safeguards=safeguard_hits(text, config.flagged_terms),
+        )
+    project_space = config.project_space_for(path)
+    if project_space is not None:
+        # Project notes belong to their project space whatever the frontmatter
+        # says (no moving them into a department, no sharing out of them).
+        if project_space not in known_spaces:
+            return Labels(space=None, sensitivity=Sensitivity.RESTRICTED, source="default")
+        if frontmatter_error:
+            level = Sensitivity.RESTRICTED
+        elif "sensitivity" in frontmatter:
+            level = resolve_sensitivity(str(frontmatter.get("sensitivity") or "").strip().lower())
+        else:
+            level = Sensitivity.INTERNAL
+        hits = safeguard_hits(text, config.flagged_terms)
+        return Labels(
+            space=project_space,
+            sensitivity=Sensitivity.RESTRICTED if hits else level,
+            source="folder_rule",
+            safeguards=hits,
         )
     rule = config.rule_for(path)
     source = "default"

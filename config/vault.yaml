@@ -61,3 +61,16 @@ handovers:
 # Chat history, searches, gap events and notifications are deleted after this
 # many months (plan §11; confirmed with the auditor 2026-11-20).
 retention_months: 24
+
+# Project spaces (app/projects): notes under Projects/<slug>/ belong to the
+# project. Sharing from departments ends with the project (renew every 6 months).
+projects:
+  folder: Projects
+  max_days: 184
+  reminder_days: 14
+
+# Answers (app/agents/output_guard.py): links in answers are removed unless their
+# domain is listed here (images always are). Add the company's own domains, e.g.
+# [intranet.example.com]. Empty: no links in answers.
+answers:
+  allowed_link_domains: []

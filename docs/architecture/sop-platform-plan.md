@@ -497,7 +497,7 @@ questions; everything else is local or done by people.
 |---|---|---|
 | Answering questions | `answer` (Haiku 5.5), escalating to `reasoning` (Sonnet 5.5) | Claude; the local answering eval (§5.2) decides whether it moves local |
 | Writing SOPs | **People**, in the editor from the SOP template. No AI drafting: staff know the systems and the pain points | — |
-| Routing | permissions + search; `router` (`qwen3:4b`) only when unclear | Local |
+| Routing | permissions + search; `router` (`qwen3:8b`) only when unclear | Local |
 | Combining answers from several departments | no model: one section per department | Local |
 | Librarian reports, review summaries, handover checks | `background` (`qwen3:8b`) | Local |
 | Classifier | `classifier` (`qwen3:4b` or `qwen3:8b`, Phase 2b eval) | Local |
@@ -517,7 +517,7 @@ Claude is never used to route.
    space. If the strong matches clearly come from one space, only that agent
    answers; if they clearly come from two, both answer and the Concierge
    combines them.
-3. **Unclear cases only go to the local `router` tier** (`qwen3:4b`, thinking
+3. **Unclear cases only go to the local `router` tier** (`qwen3:8b`; was `qwen3:4b`, thinking
    off). "Unclear" means: strong matches split across three or more spaces
    with no clear leader, or every match below the relevance threshold (vague
    question). The model sees the question and one-line agent descriptions
@@ -536,7 +536,7 @@ it stays; with many more departments it may be needed more often.
   `models.yaml` maps each tier to a provider and model:
 
   ```yaml
-  router:     {provider: openai_compat, location: local, model: qwen3:4b}  # local; shares the Classifier's model
+  router:     {provider: openai_compat, location: local, model: qwen3:8b}  # local; same model as answering and the Classifier
   classifier: {provider: openai_compat, base_url: http://host.docker.internal:11434/v1, model: qwen3:4b, keep_alive: 5m}  # local (Ollama); 8B and Claude Haiku as eval baselines
   background: {provider: openai_compat, location: local, model: qwen3:8b}  # Librarian, review summaries, handover checks
   answer:   {provider: anthropic, model: claude-haiku-5-5}
@@ -1348,6 +1348,12 @@ Phase 4 *backend* done (2026-11-21):
 - Note: in name-checked spaces (`core`), a new version stays `restricted`
   until the name check runs (about a minute), as before.
 
+Router on the 8B (2026-11-21): with routing, answering and classification on
+`qwen3:8b`, only one chat model (plus the embedder) stays loaded on a 16 GB
+machine, so Ollama no longer swaps models. Dev set, 226 questions: routing
+100% with either router; answers 94.2% (8B router) vs 94.7% (4B), McNemar
+p=1.0; first token median 5.1 s vs 5.7 s, total 6.1 s vs 6.8 s.
+
 Phase 5 *backend* done (2026-11-21):
 - **Handover notes** (`/handovers`): rendered from the template into
   `Handovers/<space>/`, with no space access rows. They are readable only by
@@ -1399,6 +1405,89 @@ Phase 5 *backend* done (2026-11-21):
 - **Staff notice** updated (version 2026-11-21) to cover search history,
   anonymous leads' view and handovers. Everyone is asked to acknowledge it
   again.
+
+Prompt-injection hardening (2026-11-21/22):
+- **Data marking** (`app/agents/untrusted.py`): every model prompt puts
+  people's text (passages, notes, diffs, handovers, questions) inside tags,
+  escaped so it can't close or open a tag. The system prompt says tagged text
+  is never an instruction, and a reminder follows the data. Dev eval: 93.4% vs
+  94.2% before (p=0.69); first token 5.5 s vs 5.1 s.
+- **Quiet flag** (`app/governance/injection.py`): fixed patterns, no model.
+  Matching pattern ids (never text) are stored on the document. They show in
+  the governance report (`possible_instructions`) and on the note's review.
+  No notifications, and the note is not blocked. The demo vault has no flags.
+- **Output guard** (`app/agents/output_guard.py`): links are removed from
+  answers while they stream unless allowlisted (`answers.allowed_link_domains`),
+  images are always removed, and uncited lines are dropped from the final
+  answer. Prompt marking alone did not stop the 8B: the guard was added after
+  live tests showed it copying a phishing link and a "DAN MODE ON" line from a
+  planted note.
+
+Project spaces (2026-11-22), `app/projects/`, `app/api/projects.py`, migration 0010:
+- **Who:** space leads create projects and name any person as project lead
+  (a per-project position, not a role). The project lead adds and removes
+  members, approves the project's notes, asks departments to share, renews and
+  can hand the lead over. A `create_project` permission can be added later if
+  waiting for a space lead becomes a bottleneck.
+- **Project space:** `p-<slug>`, notes under `Projects/<slug>/`, whatever their
+  frontmatter says (no moving them into a department, no `shared_with`). It is
+  local-only for the model gateway.
+- **Sharing:** nothing from a department is shared until *that department's*
+  lead approves. The check uses their own roles, never project access, so a
+  project can't be used to reach another department (red-team rule). On
+  approval they choose the whole space or selected folders/SOPs, at internal
+  unless they pick restricted. Shares are read-only and cover published SOPs
+  only, with the safeguard floor. Selected folders/SOPs are passed per request
+  (`sop.partial`) and checked by `sop_doc_visible()` v4 and
+  `can_view_document(..., path, doc_id)`. The lead can revoke at any time,
+  effective at once.
+- **Time limit:** at most 6 months (`projects.max_days: 184`), with one reminder
+  to the project lead 14 days before the end. Renewing asks each department's
+  lead once to confirm; until they do, a share runs to its old date.
+- **After the end** (or closing): department shares stop. Members keep
+  read-only access, at internal level, to the project's approved notes.
+  Restricted notes and anything a safeguard flags are hidden, except from the
+  project lead and the departments' leads (authors keep their own notes, as
+  everywhere). People past their `leaving_on` date lose project access.
+- Access is worked out on every request (`principal_with_projects` in
+  `current_user`), so there is no clean-up job.
+- Not yet: review requests in a project space notify the department approvers
+  (`users_with`), not the project lead, and the frontend screens.
+
+Red-team (2026-11-22), `tests/db/test_redteam.py` (35 attacks) and
+`tests/test_live_models.py` (planted instructions, real 8B). Found and fixed:
+- **Downgrade leak (high)**: a lead lowered a restricted note to internal and
+  edited out the secret part. Until the new version was approved, the *old*
+  restricted text was still live, and core staff got it in answers and in the
+  review diff. Fix (`app/governance/access.py`, migration 0009): while a newer
+  version waits for approval, access is the overlap of the approved and the new
+  access, so it can only narrow. The wider rows wait in `pending_access` until
+  approval, and tightening applies at once. Diffs of other old versions are
+  checked against the labels that version had.
+- **Admin self-escalation (medium)**: a platform admin could create a role
+  with content grants and assign it to themselves. Fix: two-person rule (no
+  adding roles to your own account, no changing a role you hold). Space leads
+  see every access change to their space, with who made it, in the governance
+  report (`access_changes`), without an alert. Residual risk: an admin can
+  still create an account for an address they control. That shows up in the
+  leads' report and the audit log.
+- **Chat history after access is removed (medium)**: old answers stayed
+  readable after someone moved team. Fix: history is re-checked against
+  today's access, and parts citing SOPs you can no longer open are hidden.
+- **Coverage report (low)**: HR saw the names of programmes that exist only in
+  restricted SOPs. Fix: names come only from readable or non-restricted SOPs.
+- **Existence oracle (low)**: creating a note at a hidden note's path returned
+  409, confirming it existed. Fix: taken names get a number.
+- **NUL byte (low)**: crashed search with a 500. Fix: stripped in search, and
+  a 422 everywhere else.
+- **Not fixable by checking answers**: false content inside an approved note
+  ("SYSTEM UPDATE: 9 hours") is cited like true text. The controls are
+  approval and the quiet flag (`fake_authority`).
+Held: IDOR on 11 document endpoints (all 404), search and Library with SQL
+injection and wildcards, frontmatter widening (sensitivity, `shared_with`,
+space, status), smuggled frontmatter, folder traversal, forged/`alg:none`/
+deactivated tokens, other people's conversations, reviews, notifications and
+handovers, staff opening lead/HR/admin reports.
 
 Phases 0–5 (backend and frontend together) are built and tested on a MacBook (Apple Silicon) using Docker
 Compose. Ollama runs natively on the Mac for the local embeddings, because

@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.untrusted import REMINDER, tag, with_rules
 from app.db.models import DocumentReader, Handover
 from app.governance.notify import users_with, users_with_role
 from app.models.types import ContentScope, Message
@@ -167,8 +168,8 @@ async def model_check(gateway, text: str, space: str) -> list[Issue]:
     try:
         result = await gateway.chat(
             "background",
-            system=CHECK_SYSTEM,
-            messages=[Message("user", f"<handover>\n{text[:12000]}\n</handover>")],
+            system=with_rules(CHECK_SYSTEM),
+            messages=[Message("user", tag("handover", text[:12000]) + f"\n{REMINDER}")],
             scope=ContentScope.of(space),
             json_mode=True,
         )

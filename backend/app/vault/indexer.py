@@ -31,7 +31,9 @@ from app.db.models import (
     User,
     VaultState,
 )
+from app.governance.access import hold_until_approved
 from app.governance.approvals import apply_baseline, baseline_needed
+from app.governance.injection import scan as scan_instructions
 from app.governance.versions import governed_hash
 from app.retention.retract import is_retracted
 from app.retrieval.embed import Embedder
@@ -209,10 +211,12 @@ class Indexer:
             s.add(doc)
         self._apply_metadata(doc, parsed, labels, digest)
         doc.governed_hash = governed_hash(rel, data)
+        doc.injection_flags = scan_instructions(all_text) or None
         doc.status = derived_status(doc, parsed.frontmatter)
         await s.flush()
         await self._apply_access(s, doc, labels)
         await s.flush()
+        await hold_until_approved(s, doc)
         rows = list(
             (
                 await s.execute(select(DocumentAccess).where(DocumentAccess.document_id == doc.id))

@@ -41,12 +41,15 @@ from app.api.deps import (
     get_session_factory,
 )
 from app.db.models import (
+    AuditEvent,
     Document,
     DocumentAccess,
     DocumentVersion,
     Notification,
     ReviewRequest,
+    Role,
     SopApproval,
+    Space,
     User,
 )
 from app.db.scoped import apply_reader_scope, has_pending_change, sees_latest, visible
@@ -55,9 +58,11 @@ from app.governance.approvals import approve as approve_version
 from app.governance.approvals import write_back
 from app.governance.notify import notify, users_with
 from app.governance.versions import with_frontmatter
+from app.policy.engine import Sensitivity, can_view_document
 from app.vault.git import GitError, GitVault
 from app.vault.indexer import Indexer
-from app.vault.labels import vault_config
+from app.vault.labels import resolve_labels, vault_config
+from app.vault.parse import parse_note
 
 router = APIRouter(tags=["workflow"])
 NOT_FOUND = HTTPException(status.HTTP_404_NOT_FOUND, "not found")
@@ -81,6 +86,8 @@ class ReviewOut(BaseModel):
     comment: str
     decided_by: str | None
     decided_at: datetime | None
+    # instruction-like text found in the note (pattern ids only): worth a look
+    flags: list[str] = []
 
 
 class DecisionIn(BaseModel):
@@ -140,6 +147,43 @@ def _can_review(me: CurrentUser, doc: Document) -> bool:
     )
 
 
+async def _spaces(session: AsyncSession) -> set[str]:
+    return set((await session.execute(select(Space.name))).scalars())
+
+
+def _version_readable(me: CurrentUser, doc: Document, git: GitVault, commit: str, spaces) -> bool:
+    """May this user read that version, judged by the labels it had then?
+    The approved and latest versions follow the document's access (already
+    checked); for any other version the labels are re-read from its own
+    frontmatter and folder. Unknown labels fail closed: then only someone who
+    approves the owner space at `restricted` may read it."""
+    for known in (doc.approved_commit, doc.current_commit):
+        if known and known.startswith(commit):
+            return True
+    try:
+        text = git.show(doc.vault_path, commit).decode("utf-8", "replace")
+    except GitError:
+        return False
+    parsed = parse_note(doc.vault_path, text)
+    labels = resolve_labels(
+        doc.vault_path,
+        parsed.frontmatter,
+        text,
+        known_spaces=spaces,
+        config=vault_config(),
+        frontmatter_error=parsed.frontmatter_error,
+    )
+    rows = [(space, sens) for space, _, sens in labels.rows()]
+    if labels.space is None or not rows:
+        space = owner_space(doc)
+        return (
+            bool(space)
+            and me.principal.can("approve", space)
+            and me.principal.can_read(space, Sensitivity.RESTRICTED)
+        )
+    return can_view_document(me.principal, rows, safeguards=labels.safeguards)
+
+
 async def _change_authors(session: AsyncSession, doc: Document) -> set[uuid.UUID]:
     """People who wrote versions since the last approval (platform commits excluded)."""
     last = await session.scalar(
@@ -193,6 +237,7 @@ async def _review_out(
         comment=r.comment,
         decided_by=names.get(r.decided_by) if r.decided_by else None,
         decided_at=r.decided_at,
+        flags=doc.injection_flags or [],
     )
 
 
@@ -367,6 +412,9 @@ async def diff(
     )
     for c in (from_, to):
         if c is not None and (not _SHA.match(c) or not any(k.startswith(c) for k in known)):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "version not found")
+        if c is not None and not _version_readable(me, doc, git, c, await _spaces(session)):
+            # An older version may have been under narrower labels (red-team, 2026-11-22).
             raise HTTPException(status.HTTP_404_NOT_FOUND, "version not found")
     start = from_ or doc.approved_commit
     old = _read_version(git, doc.vault_path, start)
@@ -608,6 +656,11 @@ class GovernanceOut(BaseModel):
     published_outside_platform: list[GovernanceItem]
     self_approved: list[GovernanceItem]
     review_overdue: list[GovernanceItem]
+    # notes with instruction-like text ("note to the assistant", "ignore the
+    # rules"): shown here only, never pushed as an alert
+    possible_instructions: list[GovernanceItem] = []
+    # people given more than public access to these spaces, and who did it (quiet)
+    access_changes: list[dict] = []
 
 
 @router.get("/reports/governance", response_model=GovernanceOut)
@@ -703,8 +756,70 @@ async def governance_report(
             for d in in_scope.values()
             if d.review_due is not None and d.review_due < today and d.status != "retired"
         ],
+        possible_instructions=[
+            item(d, patterns=d.injection_flags)
+            for d in in_scope.values()
+            if d.injection_flags and d.status != "retired"
+        ],
     )
+    out.access_changes = await _access_changes(session, spaces, since)
     return out
+
+
+async def _access_changes(session: AsyncSession, spaces: list[str], since: datetime) -> list[dict]:
+    """Role assignments and new grants that open these spaces beyond `public`
+    (from the audit log). Lets leads see access changes, including any an
+    administrator made, without an alert."""
+    role_spaces: dict[str, set[str]] = {}
+    role_by_id: dict[str, str] = {}
+    for role in (await session.execute(select(Role))).scalars():
+        role_by_id[str(role.id)] = role.name
+        role_spaces[role.name] = {
+            g.space
+            for g in role.grants
+            if g.space in spaces and (g.max_sensitivity != "public" or set(g.actions) - {"ask"})
+        }
+    events = (
+        (
+            await session.execute(
+                select(AuditEvent)
+                .where(
+                    AuditEvent.action.in_(("user_updated", "user_created", "grant_added")),
+                    AuditEvent.ts >= since,
+                )
+                .order_by(AuditEvent.ts.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    names = await _names(
+        session,
+        [e.actor_id for e in events]
+        + [uuid.UUID(e.target_id) for e in events if e.target_type == "user" and e.target_id],
+    )
+    out = []
+    for e in events:
+        d = e.details or {}
+        if e.action == "grant_added":
+            if d.get("space") not in spaces:
+                continue
+            what = {"role": role_by_id.get(e.target_id or "", "deleted role"), "grant": d}
+        else:
+            added = d.get("roles_added") if e.action == "user_updated" else d.get("roles")
+            touched = sorted({sp for r in added or [] for sp in role_spaces.get(r, ())})
+            if not touched:
+                continue
+            what = {
+                "person": names.get(uuid.UUID(e.target_id), "unknown") if e.target_id else None,
+                "roles_added": added,
+                "spaces": touched,
+            }
+        out.append(
+            {"at": e.ts.isoformat(), "by": names.get(e.actor_id, "system"), "action": e.action}
+            | what
+        )
+    return out[:200]
 
 
 # --- notifications --------------------------------------------------------------------

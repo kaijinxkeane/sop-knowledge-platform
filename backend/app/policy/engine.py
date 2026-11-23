@@ -84,12 +84,30 @@ def validate_grant(
 
 
 @dataclass(frozen=True)
+class PartialShare:
+    """Part of a department's space shared with a project (selected folders or
+    SOPs), approved by that department's lead. Read-only, published SOPs only,
+    and never above `level` after the safeguard floor (app/projects)."""
+
+    space: str
+    level: Sensitivity
+    folders: tuple[str, ...] = ()  # vault path prefixes, ending in "/"
+    documents: tuple[str, ...] = ()  # document ids
+
+    def covers(self, path: str | None, doc_id: object | None) -> bool:
+        return (doc_id is not None and str(doc_id) in self.documents) or (
+            path is not None and any(path.startswith(f) for f in self.folders)
+        )
+
+
+@dataclass(frozen=True)
 class Principal:
     """The signed-in user as the policy engine sees them."""
 
     user_id: UUID
     roles: frozenset[str]
     grants: tuple[GrantRule, ...] = field(default_factory=tuple)
+    partial: tuple[PartialShare, ...] = field(default_factory=tuple)
 
     def scopes(self) -> dict[str, Sensitivity]:
         """allowed_scopes(user) -> {space: highest readable sensitivity} (plan §4)."""
@@ -153,6 +171,8 @@ def can_view_document(
     status: str | None = None,
     author_id: object | None = None,
     readers: Iterable[object] = (),
+    path: str | None = None,
+    doc_id: object | None = None,
 ) -> bool:
     """Python twin of the database's sop_doc_visible() (both must agree):
 
@@ -165,6 +185,11 @@ def can_view_document(
         return True
     if principal.user_id in set(readers):
         return True
+    if principal.partial and status not in UNPUBLISHED:
+        eff = effective_access(access, safeguards)
+        for p in principal.partial:
+            if p.covers(path, doc_id) and any(s == p.space and lvl <= p.level for s, lvl in eff):
+                return True
     rows = [
         (s, lvl) for s, lvl in effective_access(access, safeguards) if principal.can_read(s, lvl)
     ]

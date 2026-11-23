@@ -275,6 +275,11 @@ async def update_user(
         except ValueError as exc:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
         before = {r.name for r in user.roles}
+        if user.id == me.user.id and set(body.roles) - before:
+            # Two-person rule: managing users must not open content to yourself.
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN, "another administrator must add roles to your account"
+            )
         user.roles = new_roles
         after = set(body.roles)
         changed["roles_added"] = sorted(after - before)
@@ -441,6 +446,10 @@ async def add_grant(
     session: AsyncSession = Depends(get_db),
 ) -> RoleOut:
     role = await _load_role(session, role_id)
+    if role.name in me.principal.roles:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "another administrator must change a role you hold"
+        )
     grant = _grant(body, await _space_names(session))
     role.grants.append(grant)
     await session.flush()

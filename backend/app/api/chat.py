@@ -36,7 +36,15 @@ from app.api.deps import (
     get_query_embedder,
     get_session_factory,
 )
-from app.db.models import ChatMessage, Conversation, GapEvent, MessageCitation, MessageFeedback
+from app.db.models import (
+    ChatMessage,
+    Conversation,
+    Document,
+    GapEvent,
+    MessageCitation,
+    MessageFeedback,
+)
+from app.db.scoped import apply_reader_scope, visible
 from app.spaces import space_profiles
 
 router = APIRouter(tags=["chat"])
@@ -108,30 +116,98 @@ async def list_conversations(
     return [ConversationOut(id=str(c.id), title=c.title, updated_at=c.updated_at) for c in rows]
 
 
+HIDDEN_SECTION = "[Hidden: this part used an SOP you can no longer open.]"
+
+
 @router.get("/conversations/{conversation_id}/messages", response_model=list[MessageOut])
 async def list_messages(
     conversation_id: uuid.UUID,
     me: CurrentUser = Depends(current_user),
     session: AsyncSession = Depends(get_db),
 ) -> list[MessageOut]:
+    """Your history. Old answers are re-checked against what you can read
+    today: a part that cited an SOP you've since lost access to (moved team,
+    note made restricted, retracted) is hidden (red-team, 2026-11-22)."""
     await _own(session, me, conversation_id)
     rows = (
+        (
+            await session.execute(
+                select(ChatMessage)
+                .where(ChatMessage.conversation_id == conversation_id)
+                .order_by(ChatMessage.created_at)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    cited: dict[uuid.UUID, set[uuid.UUID]] = {}
+    for c in (
         await session.execute(
-            select(ChatMessage)
-            .where(ChatMessage.conversation_id == conversation_id)
-            .order_by(ChatMessage.created_at)
+            select(MessageCitation).where(MessageCitation.message_id.in_([m.id for m in rows]))
         )
-    ).scalars()
-    return [
-        MessageOut(
-            id=str(m.id),
-            role=m.role,
-            content=m.content,
-            sections=m.sections,
-            created_at=m.created_at,
+    ).scalars():
+        if c.document_id:
+            cited.setdefault(c.message_id, set()).add(c.document_id)
+
+    def section_docs(sec: dict) -> set[uuid.UUID]:
+        out = set()
+        for c in sec.get("citations") or []:
+            try:
+                out.add(uuid.UUID(str(c.get("document_id"))))
+            except (ValueError, TypeError, AttributeError):
+                continue
+        return out
+
+    docs_needed = set().union(*cited.values()) if cited else set()
+    for m in rows:
+        for sec in m.sections or []:
+            docs_needed |= section_docs(sec)
+    principal = me.principal
+    readable: set[uuid.UUID] = set()
+    if docs_needed:
+        await session.commit()
+        await apply_reader_scope(session, principal)
+        for d in docs_needed:
+            doc = await session.get(Document, d)
+            if doc is not None and visible(principal, doc):
+                readable.add(d)
+        await session.commit()
+
+    out = []
+    for m in rows:
+        content, sections = m.content, m.sections or []
+        if m.role == "assistant":
+            kept, hidden = [], False
+            for sec in sections:
+                if section_docs(sec) - readable:
+                    hidden = True
+                    kept.append(
+                        {
+                            "space": sec.get("space"),
+                            "text": HIDDEN_SECTION,
+                            "citations": [],
+                            "hidden": True,
+                        }
+                    )
+                else:
+                    kept.append(sec)
+            # citations recorded only in message_citations (older rows): all or nothing
+            if cited.get(m.id, set()) - readable and not hidden:
+                hidden = True
+                kept = [{"space": None, "text": HIDDEN_SECTION, "citations": [], "hidden": True}]
+            if hidden:
+                sections = kept
+                content = "\n\n".join(x["text"] for x in kept if x.get("text"))
+        out.append(
+            MessageOut(
+                id=str(m.id),
+                role=m.role,
+                content=content,
+                sections=sections,
+                created_at=m.created_at,
+            )
         )
-        for m in rows
-    ]
+    return out
 
 
 def _sse(event: str, data: dict) -> str:
@@ -174,7 +250,9 @@ async def post_message(
         conv.title = question[:80]
     await session.commit()
     principal, user_id, conv_id, question_id = me.principal, me.user.id, conv.id, user_msg.id
-    profiles = space_profiles()
+    from app.projects.service import project_profiles
+
+    profiles = space_profiles() | await project_profiles(session)
 
     async def events():
         sections: list[Section] = []

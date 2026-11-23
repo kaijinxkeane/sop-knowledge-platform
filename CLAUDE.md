@@ -76,6 +76,7 @@ backend/                 — FastAPI app (uv project, Python 3.12)
   app/agents/            — Concierge routing, department agents (answer contract), orchestration
   app/governance/        — version-bound approvals (live vs current chunks), reviews jobs, notifications, webhooks
   app/retention/         — handovers, gap topics + personal gaps, conflicts, retract, 24-month retention
+  app/projects/          — project spaces: per-request project access, lead-approved shares, expiry
   app/eval/              — answering + retrieval eval runners, stats (tune on questions.yaml, compare on questions-holdout.yaml)
   app/workers/           — arq worker: index git changes every minute, nightly unattributed check
   wiki_core/             — loads scripts/llm-wiki in place (single copy of the helpers)
@@ -120,6 +121,17 @@ static files), agents, retrieval and Caddy/Headscale in `deploy/`.
   them (visibility v3, RLS and policy engine). HR gap reports need >= 3 people;
   never name askers or show restricted titles to people who can't read them.
   `tests/test_vault_labels.py` must keep zero over-exposure on the demo vault.
+- Prompts mark people's text as data (`app/agents/untrusted.py`: `tag()`, `with_rules`);
+  never build prompt tags with f-strings. Answers pass the output guard
+  (`app/agents/output_guard.py`: no links/images unless allowlisted, no uncited lines).
+  Instruction-like notes get a quiet flag, never an alert (`app/governance/injection.py`).
+- Access follows approval (`app/governance/access.py`): while a newer version waits,
+  access can only narrow. Old versions are shown only under the labels they had.
+  Admins can't add roles to themselves (two-person rule). Red-team attacks live in
+  `tests/db/test_redteam.py`: add one for every new endpoint that returns content.
+- Project shares need the department lead's approval, checked on their own roles
+  (`principal_for`), never on project access. Partial shares are checked in both
+  `sop_doc_visible()` (v4) and `can_view_document(..., path=, doc_id=)`: keep them in sync.
 - Never commit secrets (`.env`, API keys, `.claude/settings.local.json`).
 - Every model call goes through `ModelGateway` with an explicit `ContentScope`;
   never call a provider SDK directly from agents.

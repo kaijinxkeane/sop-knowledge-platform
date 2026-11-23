@@ -148,6 +148,11 @@ async def create_note(
     if body.stage and body.stage not in config.stages:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "unknown stage")
     folder = (body.folder or f"Drafts/{body.space}").strip("/")
+    if body.space.startswith("p-"):
+        # Project notes live in the project's folder (or a subfolder of it).
+        home = f"{config.project_folder}/{body.space[2:]}"
+        if not (folder == home or folder.startswith(home + "/")):
+            folder = home
     rel = f"{folder}/{safe_name(body.title)}.md"
     try:
         full = git.safe_path(rel)
@@ -183,8 +188,12 @@ async def create_note(
         raise _deny(exc) from None
 
     with git.lock():
-        if full.exists():
-            raise HTTPException(status.HTTP_409_CONFLICT, "a note with this name already exists")
+        # Taken names get a number instead of an error: a 409 would confirm that
+        # a note you can't see exists at that path (red-team, 2026-11-22).
+        n = 2
+        while full.exists() or rel in git.uncommitted():
+            rel = f"{folder}/{safe_name(body.title)} ({n}).md"
+            full, n = git.safe_path(rel), n + 1
         full.parent.mkdir(parents=True, exist_ok=True)
         full.write_text(content, encoding="utf-8")
         sha = git.commit(

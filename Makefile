@@ -41,8 +41,8 @@ ps:
 test:
 	cd backend && uv run ruff check . && uv run ruff format --check . && uv run pytest -q
 
-smoke:
-	cd backend && uv run python -m app.models.smoke $(ARGS)
+smoke:  ## runs on the host, so Ollama is on localhost (not host.docker.internal)
+	cd backend && OLLAMA_BASE_URL=http://localhost:11434 uv run python -m app.models.smoke $(ARGS)
 
 smoke-docker:
 	$(COMPOSE) exec api python -m app.models.smoke $(ARGS)

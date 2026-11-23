@@ -449,7 +449,6 @@ async def coverage(
         .scalars()
         .all()
     )
-    programmes = sorted({d.programme for d in docs})
     ids = [d.id for d in docs]
     await session.commit()
     await apply_reader_scope(session, me.principal)
@@ -459,6 +458,15 @@ async def coverage(
         if (d := await session.get(Document, i)) is not None and visible(me.principal, d)
     }
     await session.commit()
+
+    # A programme named only in restricted SOPs is not revealed (red-team,
+    # 2026-11-22): names come from SOPs this viewer can read, or that are not
+    # restricted (the company's ordinary programmes).
+    def ordinary(d: Document) -> bool:
+        owner = next((a for a in d.access if a.role == "owner"), None)
+        return owner is not None and owner.sensitivity != "restricted" and not d.safeguards
+
+    programmes = sorted({d.programme for d in docs if d.id in readable or ordinary(d)})
     out = []
     for prog in programmes:
         for stage in config.stages:

@@ -123,6 +123,14 @@ async def apply_retention(ctx: dict) -> dict:
     return await run(get_sessionmaker(), vault_config().retention_months)
 
 
+async def project_reminders(ctx: dict) -> dict:
+    from app.projects.service import ending_reminders
+    from app.vault.labels import vault_config
+
+    async with get_sessionmaker()() as s, s.begin():
+        return {"reminded": await ending_reminders(s, vault_config().project_reminder_days)}
+
+
 async def startup(ctx: dict) -> None:
     configure_logging(get_settings().log_level)
     log.info("worker_started")
@@ -140,6 +148,7 @@ class WorkerSettings:
         group_gaps,
         detect_conflicts,
         apply_retention,
+        project_reminders,
     ]
     cron_jobs = [
         cron(heartbeat, minute={0, 15, 30, 45}),
@@ -152,6 +161,7 @@ class WorkerSettings:
         cron(group_gaps, hour=2, minute=30, unique=True, timeout=1800),
         cron(detect_conflicts, hour=3, minute=0, unique=True, timeout=1800),
         cron(apply_retention, hour=3, minute=30, unique=True, timeout=1800),
+        cron(project_reminders, hour=7, minute=10, unique=True, timeout=300),
     ]
     on_startup = startup
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)

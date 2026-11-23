@@ -24,6 +24,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.agents.untrusted import REMINDER, tag, with_rules
 from app.db.models import ChatMessage, Document, GapEvent, GapTopic, SearchEvent, User
 from app.identity import principal_for
 from app.models.types import ContentScope, Message
@@ -113,8 +114,13 @@ async def _label(gateway, questions: list[str]) -> str:
     try:
         result = await gateway.chat(
             "router",
-            system=LABEL_SYSTEM,
-            messages=[Message("user", "\n".join(f"- {q[:300]}" for q in questions[:5]))],
+            system=with_rules(LABEL_SYSTEM),
+            messages=[
+                Message(
+                    "user",
+                    "\n".join(tag("question", q[:300]) for q in questions[:5]) + f"\n{REMINDER}",
+                )
+            ],
             scope=ContentScope.none(),  # staff questions, no vault content
         )
         label = result.text.strip().strip('"').splitlines()[0][:120] if result.text else ""

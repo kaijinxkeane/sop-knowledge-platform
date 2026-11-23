@@ -163,3 +163,29 @@ def test_named_readers_and_unapproved_changes():
     assert can_see_unapproved(staff, rows)
     assert not can_see_unapproved(reader, rows)
     assert can_see_unapproved(reader, rows, author_id=reader.user_id)
+
+
+def test_partial_project_shares():
+    """Selected folders/SOPs of one department, read-only, safeguard floor applies."""
+    import dataclasses
+
+    from app.policy.engine import PartialShare, can_view_document
+
+    base = principal(*EMPLOYEE)
+    p = dataclasses.replace(
+        base,
+        partial=(PartialShare("hr", INT, folders=("HR/Onboarding/",), documents=("d1",)),),
+    )
+    hr_internal = [("hr", "internal")]
+    assert can_view_document(p, hr_internal, path="HR/Onboarding/a.md")
+    assert can_view_document(p, hr_internal, path="HR/Other.md", doc_id="d1")
+    assert not can_view_document(p, hr_internal, path="HR/Other.md", doc_id="d2")
+    assert not can_view_document(base, hr_internal, path="HR/Onboarding/a.md")
+    # above the shared level, or floored by a safeguard, or unpublished: no
+    assert not can_view_document(p, [("hr", "restricted")], path="HR/Onboarding/a.md")
+    assert not can_view_document(
+        p, hr_internal, path="HR/Onboarding/a.md", safeguards=["personal-data"]
+    )
+    assert not can_view_document(p, hr_internal, path="HR/Onboarding/a.md", status="draft")
+    # a folder named in HR's share never opens another department's document there
+    assert not can_view_document(p, [("core", "internal")], path="HR/Onboarding/a.md")

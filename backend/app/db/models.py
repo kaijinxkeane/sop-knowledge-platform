@@ -188,6 +188,12 @@ class Document(Base):
     approved_hash: Mapped[str | None] = mapped_column(String(64))
     approved_commit: Mapped[str | None] = mapped_column(String(64))
     review_due: Mapped[date | None] = mapped_column(Date)
+    # Access in force when the live version was approved, and the wider access a
+    # newer version asks for (applied on approval): [[space, role, sensitivity, source]]
+    approved_access: Mapped[list | None] = mapped_column(JSONB)
+    pending_access: Mapped[list | None] = mapped_column(JSONB)
+    # ids of instruction-like patterns in the text (app.governance.injection), never text
+    injection_flags: Mapped[list[str] | None] = mapped_column(JSONB)
 
     access: Mapped[list[DocumentAccess]] = relationship(
         cascade="all, delete-orphan", lazy="selectin"
@@ -632,4 +638,68 @@ class Retraction(Base):
     term_hash: Mapped[str | None] = mapped_column(String(64))
     created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     result: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = _created()
+
+
+class Project(Base):
+    """A cross-department project (plan §4, project spaces). Its own space
+    (`p-<slug>`, notes under `Projects/<slug>/`), a lead, members, and shares
+    of department spaces that each department's lead approves."""
+
+    __tablename__ = "projects"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    name: Mapped[str] = mapped_column(String(120))
+    space: Mapped[str] = mapped_column(ForeignKey("spaces.name"), unique=True)
+    folder: Mapped[str] = mapped_column(String(300))
+    lead_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    starts_on: Mapped[date] = mapped_column(Date)
+    ends_on: Mapped[date] = mapped_column(Date)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = _created()
+
+    members: Mapped[list[ProjectMember]] = relationship(
+        cascade="all, delete-orphan", lazy="selectin"
+    )
+    shares: Mapped[list[ProjectShare]] = relationship(cascade="all, delete-orphan", lazy="selectin")
+
+    def active(self, today: date) -> bool:
+        return self.closed_at is None and self.starts_on <= today <= self.ends_on
+
+
+class ProjectMember(Base):
+    __tablename__ = "project_members"
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    added_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    created_at: Mapped[datetime] = _created()
+
+
+class ProjectShare(Base):
+    """One department space shared with a project. Nothing is shared until that
+    space's lead approves; they choose the whole space or selected folders/SOPs
+    and the level (internal unless they pick restricted)."""
+
+    __tablename__ = "project_shares"
+    __table_args__ = (UniqueConstraint("project_id", "space", name="uq_project_share_space"),)
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    space: Mapped[str] = mapped_column(ForeignKey("spaces.name"))
+    status: Mapped[str] = mapped_column(String(16))  # requested|approved|declined|revoked
+    scope: Mapped[str | None] = mapped_column(String(16))  # space | selected
+    max_sensitivity: Mapped[str] = mapped_column(String(16), default="internal")
+    folders: Mapped[list] = mapped_column(JSONB, default=list)
+    documents: Mapped[list] = mapped_column(JSONB, default=list)
+    note: Mapped[str] = mapped_column(Text, default="")
+    requested_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    decided_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    approved_until: Mapped[date | None] = mapped_column(Date)
+    renewal_requested: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = _created()

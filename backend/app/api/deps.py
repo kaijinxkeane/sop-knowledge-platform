@@ -54,7 +54,11 @@ async def current_user(
     # Checked on every request: deactivation and role changes apply immediately.
     if user is None or not user.is_active or not user.totp_enabled:
         raise UNAUTHENTICATED
-    return CurrentUser(user=user, principal=principal_for(user))
+    from app.projects.service import principal_with_projects
+
+    # Project access is worked out per request too: it ends the day a project does.
+    principal = await principal_with_projects(session, user, principal_for(user))
+    return CurrentUser(user=user, principal=principal)
 
 
 def require_global(action: str):

@@ -11,12 +11,14 @@
 tiers:
   # Routing is permissions + search with no model (plan §5, Routing). This
   # tier is used only when search is unclear, and for nightly gap-topic labels.
-  # Local and shares the Classifier's model; never falls back to Claude.
+  # Local; never falls back to Claude. Uses the 8B like answering and the
+  # Classifier, so only one chat model stays loaded (eval 2026-11-21: routing
+  # 100% either way, answers 94.2% vs 94.7% with the 4B, p=1.0; faster overall).
   router:
     provider: openai_compat
     location: local
     base_url: ${OLLAMA_BASE_URL}/v1
-    model: qwen3:8b  # TRIAL: one resident chat model on 16 GB
+    model: qwen3:8b  # same model as answering: one resident chat model on 16 GB
     max_tokens: 256
     think: false
 

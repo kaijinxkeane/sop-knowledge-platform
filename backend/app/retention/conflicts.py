@@ -17,6 +17,7 @@ import re
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from app.agents.untrusted import REMINDER, tag, with_rules
 from app.db.models import Conflict, Document
 from app.models.types import ContentScope, Message
 
@@ -88,12 +89,14 @@ async def detect_conflicts(
         try:
             result = await gateway.chat(
                 "background",
-                system=SYSTEM,
+                system=with_rules(SYSTEM),
                 messages=[
                     Message(
                         "user",
-                        f"<sop title={json.dumps(title_a)}>\n{ta[:3000]}\n</sop>\n"
-                        f"<sop title={json.dumps(title_b)}>\n{tb[:3000]}\n</sop>",
+                        tag("sop", ta[:3000], title=title_a)
+                        + "\n"
+                        + tag("sop", tb[:3000], title=title_b)
+                        + f"\n{REMINDER}",
                     )
                 ],
                 scope=ContentScope.of(*spaces) if spaces else ContentScope.unclassified(),
