@@ -436,11 +436,53 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Conversations */
+        /**
+         * List Conversations
+         * @description Your conversations, newest first. `q` matches titles and your own
+         *     questions (never stored or logged).
+         */
         get: operations["list_conversations_api_v1_conversations_get"];
         put?: never;
         /** Create Conversation */
         post: operations["create_conversation_api_v1_conversations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Rename Conversation */
+        patch: operations["rename_conversation_api_v1_conversations__conversation_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/hide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hide Conversation
+         * @description Hide it from your view. It isn't deleted: the audit copy is kept until
+         *     the 24-month retention job, as the staff notice says.
+         */
+        post: operations["hide_conversation_api_v1_conversations__conversation_id__hide_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -909,6 +951,43 @@ export interface paths {
          *     name); the question shows up, anonymously, in that space's gap topics.
          */
         post: operations["request_sop_api_v1_me_gaps_request_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/recent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Recent
+         * @description SOPs approved in the last 30 days that you can read, newest first.
+         */
+        get: operations["recent_api_v1_me_recent_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/waiting": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Waiting */
+        get: operations["waiting_api_v1_me_waiting_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2029,6 +2108,15 @@ export interface components {
             /** Reason */
             reason?: ("wrong" | "outdated" | "missing_steps" | "unclear" | "other") | null;
         };
+        /** FollowUpOut */
+        FollowUpOut: {
+            /** Document Id */
+            document_id: string;
+            /** Heading */
+            heading: string;
+            /** Title */
+            title: string;
+        };
         /** GovernanceItem */
         GovernanceItem: {
             /**
@@ -2390,6 +2478,10 @@ export interface components {
         MessageIn: {
             /** Content */
             content: string;
+            /** Programme */
+            programme?: string | null;
+            /** Stage */
+            stage?: string | null;
         };
         /** MessageOut */
         MessageOut: {
@@ -2400,6 +2492,11 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Followups
+             * @default []
+             */
+            followups: components["schemas"]["FollowUpOut"][];
             /** Id */
             id: string;
             /** Role */
@@ -2680,12 +2777,37 @@ export interface components {
             /** User Id */
             user_id: string;
         };
+        /** RecentOut */
+        RecentOut: {
+            /**
+             * Approved At
+             * Format: date-time
+             */
+            approved_at: string;
+            /** Doc Type */
+            doc_type: string;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Programme */
+            programme: string | null;
+            /** Stage */
+            stage: string | null;
+            /** Title */
+            title: string;
+        };
         /** RelatedOut */
         RelatedOut: {
             /** Document Id */
             document_id: string;
             /** Space */
             space: string | null;
+            /** Title */
+            title: string;
+        };
+        /** RenameIn */
+        RenameIn: {
             /** Title */
             title: string;
         };
@@ -3111,6 +3233,15 @@ export interface components {
              * @default false
              */
             live: boolean;
+        };
+        /** WaitingOut */
+        WaitingOut: {
+            /** Drafts */
+            drafts: number;
+            /** Labels */
+            labels: number;
+            /** Reviews */
+            reviews: number;
         };
     };
     responses: never;
@@ -3961,6 +4092,7 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                q?: string | null;
             };
             header?: never;
             path?: never;
@@ -4009,6 +4141,70 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ConversationOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_conversation_api_v1_conversations__conversation_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hide_conversation_api_v1_conversations__conversation_id__hide_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -4902,6 +5098,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recent_api_v1_me_recent_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    waiting_api_v1_me_waiting_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaitingOut"];
                 };
             };
         };

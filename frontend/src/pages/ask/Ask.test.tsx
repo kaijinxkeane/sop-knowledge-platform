@@ -17,7 +17,7 @@ const CITE = {
   document_id: "d1",
   title: "Running the Discovery Workshop",
   vault_path: "Programmes/Discovery Workshop SOP.md",
-  heading: "Before the session",
+  heading: "Running the Discovery Workshop › Before the session",
   part: null,
   part_number: null,
   version: "abcdef1234",

@@ -7,7 +7,7 @@ Events on POST /conversations/{id}/messages (text/event-stream):
   citation         {space, n, document_id, title, vault_path, heading, part, part_number,
                     version, written_by, approved_by, approval, approved_on}
   section_done     {space, no_answer, unavailable, confidence, model, escalated, contact?}
-  done             {message_id, question_id, answered}
+  done             {message_id, question_id, answered, followups}
 Conversations are private to their owner. The audit log and the gap log get
 ids and outcomes only, never the question or the answer.
 """
@@ -22,12 +22,14 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app import audit
 from app.agents.concierge import ask
 from app.agents.department import Section
+from app.agents.followups import followups
+from app.api.bookmarks import _like as like_pattern
 from app.api.deps import (
     CurrentUser,
     ask_limiter,
@@ -58,6 +60,10 @@ class ConversationIn(BaseModel):
     title: str = Field(default="", max_length=120)
 
 
+class RenameIn(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+
+
 class ConversationOut(BaseModel):
     id: str
     title: str
@@ -66,6 +72,15 @@ class ConversationOut(BaseModel):
 
 class MessageIn(BaseModel):
     content: str = Field(min_length=2, max_length=2000)
+    # Optional filters (frontend spec §4); they only narrow what you can read.
+    programme: str | None = Field(default=None, max_length=200)
+    stage: str | None = Field(default=None, max_length=32)
+
+
+class FollowUpOut(BaseModel):
+    document_id: str
+    title: str
+    heading: str
 
 
 class MessageOut(BaseModel):
@@ -74,6 +89,8 @@ class MessageOut(BaseModel):
     content: str
     sections: list[dict]
     created_at: datetime
+    # latest answer only: other sections of the SOPs it cited, re-read under today's access
+    followups: list[FollowUpOut] = []
 
 
 FEEDBACK_REASONS = ("wrong", "outdated", "missing_steps", "unclear", "other")
@@ -87,8 +104,9 @@ class FeedbackIn(BaseModel):
 
 
 async def _own(session: AsyncSession, me: CurrentUser, conversation_id: uuid.UUID) -> Conversation:
+    """Your own conversation; someone else's or a hidden one is a 404."""
     conv = await session.get(Conversation, conversation_id)
-    if conv is None or conv.user_id != me.user.id:
+    if conv is None or conv.user_id != me.user.id or conv.hidden_at is not None:
         raise NOT_FOUND
     return conv
 
@@ -110,16 +128,62 @@ async def list_conversations(
     me: CurrentUser = Depends(current_user),
     session: AsyncSession = Depends(get_db),
     limit: int = Query(default=50, ge=1, le=200),
+    q: str | None = Query(default=None, max_length=100),
 ) -> list[ConversationOut]:
-    rows = (
-        await session.execute(
-            select(Conversation)
-            .where(Conversation.user_id == me.user.id)
-            .order_by(Conversation.updated_at.desc())
-            .limit(limit)
+    """Your conversations, newest first. `q` matches titles and your own
+    questions (never stored or logged)."""
+    query = select(Conversation).where(
+        Conversation.user_id == me.user.id, Conversation.hidden_at.is_(None)
+    )
+    if q and q.strip():
+        pattern = like_pattern(q.strip().lower())
+        query = query.where(
+            or_(
+                func.lower(Conversation.title).like(pattern, escape="\\"),
+                exists().where(
+                    ChatMessage.conversation_id == Conversation.id,
+                    ChatMessage.role == "user",
+                    func.lower(ChatMessage.content).like(pattern, escape="\\"),
+                ),
+            )
         )
+    rows = (
+        await session.execute(query.order_by(Conversation.updated_at.desc()).limit(limit))
     ).scalars()
     return [ConversationOut(id=str(c.id), title=c.title, updated_at=c.updated_at) for c in rows]
+
+
+@router.patch("/conversations/{conversation_id}", response_model=ConversationOut)
+async def rename_conversation(
+    conversation_id: uuid.UUID,
+    body: RenameIn,
+    me: CurrentUser = Depends(current_user),
+    session: AsyncSession = Depends(get_db),
+) -> ConversationOut:
+    conv = await _own(session, me, conversation_id)
+    conv.title = body.title.strip()[:120] or conv.title
+    await session.commit()
+    return ConversationOut(id=str(conv.id), title=conv.title, updated_at=conv.updated_at)
+
+
+@router.post("/conversations/{conversation_id}/hide", status_code=204)
+async def hide_conversation(
+    conversation_id: uuid.UUID,
+    me: CurrentUser = Depends(current_user),
+    session: AsyncSession = Depends(get_db),
+) -> None:
+    """Hide it from your view. It isn't deleted: the audit copy is kept until
+    the 24-month retention job, as the staff notice says."""
+    conv = await _own(session, me, conversation_id)
+    conv.hidden_at = datetime.now(UTC)
+    await audit.record(
+        session,
+        "conversation_hidden",
+        actor_id=me.user.id,
+        target_type="conversation",
+        target_id=conv.id,
+    )
+    await session.commit()
 
 
 HIDDEN_SECTION = "[Hidden: this part used an SOP you can no longer open.]"
@@ -180,10 +244,12 @@ async def list_messages(
         await session.commit()
 
     out = []
+    last_answer = next((m.id for m in reversed(rows) if m.role == "assistant"), None)
     for m in rows:
         content, sections = m.content, m.sections or []
+        hidden = False
         if m.role == "assistant":
-            kept, hidden = [], False
+            kept = []
             for sec in sections:
                 if section_docs(sec) - readable:
                     hidden = True
@@ -204,6 +270,18 @@ async def list_messages(
             if hidden:
                 sections = kept
                 content = "\n\n".join(x["text"] for x in kept if x.get("text"))
+        chips: list[dict] = []
+        if m.id == last_answer and not hidden:
+            cited_parts = [
+                (c.get("document_id"), c.get("heading"))
+                for sec in sections
+                for c in sec.get("citations") or []
+                if isinstance(c, dict)
+            ]
+            if cited_parts:
+                await session.commit()
+                chips = await followups(session, principal, cited_parts)
+                await session.commit()
         out.append(
             MessageOut(
                 id=str(m.id),
@@ -211,6 +289,7 @@ async def list_messages(
                 content=content,
                 sections=sections,
                 created_at=m.created_at,
+                followups=[FollowUpOut(**c) for c in chips],
             )
         )
     return out
@@ -258,6 +337,10 @@ async def post_message(
         conv.title = question[:80]
     await session.commit()
     principal, user_id, conv_id, question_id = me.principal, me.user.id, conv.id, user_msg.id
+    filters = {
+        "programme": (body.programme or "").strip() or None,
+        "stage": (body.stage or "").strip() or None,
+    }
     from app.projects.service import project_profiles
 
     profiles = space_profiles() | await project_profiles(session)
@@ -272,10 +355,14 @@ async def post_message(
             gateway=gateway,
             embed_query=embed_query,
             profiles=profiles,
+            programme=filters["programme"],
+            stage=filters["stage"],
         ):
             kind = ev["type"]
             if kind == "routing":
                 route = {"spaces": ev["spaces"], "reason": ev["reason"]}
+                if any(filters.values()):
+                    route["filters"] = {k: v for k, v in filters.items() if v}
                 yield _sse("routing", ev)
             elif kind == "agent_dispatched":
                 yield _sse(kind, {"space": ev["space"], "title": profiles[ev["space"]].title})
@@ -366,6 +453,12 @@ async def post_message(
                 },
             )
             await s.commit()
+        chips: list[dict] = []
+        cited_parts = [(c["document_id"], c["heading"]) for x in answered for c in x.citations]
+        if cited_parts:
+            async with sessions() as s:
+                chips = await followups(s, principal, cited_parts)
+                await s.rollback()
         # question_id: the key for "Request an SOP" (POST /me/gaps/request) after a no-answer.
         yield _sse(
             "done",
@@ -373,6 +466,7 @@ async def post_message(
                 "message_id": str(msg.id),
                 "question_id": str(question_id),
                 "answered": bool(answered),
+                "followups": chips,
             },
         )
 

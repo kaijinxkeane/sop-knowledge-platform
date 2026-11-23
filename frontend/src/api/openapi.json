@@ -980,6 +980,29 @@
         "title": "FeedbackIn",
         "type": "object"
       },
+      "FollowUpOut": {
+        "properties": {
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "heading": {
+            "title": "Heading",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id",
+          "title",
+          "heading"
+        ],
+        "title": "FollowUpOut",
+        "type": "object"
+      },
       "GovernanceItem": {
         "properties": {
           "detail": {
@@ -1998,6 +2021,30 @@
             "minLength": 2,
             "title": "Content",
             "type": "string"
+          },
+          "programme": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Programme"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
           }
         },
         "required": [
@@ -2016,6 +2063,14 @@
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "followups": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/FollowUpOut"
+            },
+            "title": "Followups",
+            "type": "array"
           },
           "id": {
             "title": "Id",
@@ -2868,6 +2923,64 @@
         "title": "ReceiverOut",
         "type": "object"
       },
+      "RecentOut": {
+        "properties": {
+          "approved_at": {
+            "format": "date-time",
+            "title": "Approved At",
+            "type": "string"
+          },
+          "doc_type": {
+            "title": "Doc Type",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "programme": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Programme"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "kind",
+          "doc_type",
+          "programme",
+          "stage",
+          "approved_at"
+        ],
+        "title": "RecentOut",
+        "type": "object"
+      },
       "RelatedOut": {
         "properties": {
           "document_id": {
@@ -2896,6 +3009,21 @@
           "space"
         ],
         "title": "RelatedOut",
+        "type": "object"
+      },
+      "RenameIn": {
+        "properties": {
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "RenameIn",
         "type": "object"
       },
       "RenewIn": {
@@ -4073,6 +4201,29 @@
           "committed_at"
         ],
         "title": "VersionOut",
+        "type": "object"
+      },
+      "WaitingOut": {
+        "properties": {
+          "drafts": {
+            "title": "Drafts",
+            "type": "integer"
+          },
+          "labels": {
+            "title": "Labels",
+            "type": "integer"
+          },
+          "reviews": {
+            "title": "Reviews",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "reviews",
+          "drafts",
+          "labels"
+        ],
+        "title": "WaitingOut",
         "type": "object"
       }
     },
@@ -5388,6 +5539,7 @@
     },
     "/api/v1/conversations": {
       "get": {
+        "description": "Your conversations, newest first. `q` matches titles and your own\nquestions (never stored or logged).",
         "operationId": "list_conversations_api_v1_conversations_get",
         "parameters": [
           {
@@ -5400,6 +5552,23 @@
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
             }
           }
         ],
@@ -5479,6 +5648,106 @@
           }
         ],
         "summary": "Create Conversation",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversation_id}": {
+      "patch": {
+        "operationId": "rename_conversation_api_v1_conversations__conversation_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rename Conversation",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversation_id}/hide": {
+      "post": {
+        "description": "Hide it from your view. It isn't deleted: the audit copy is kept until\nthe 24-month retention job, as the staff notice says.",
+        "operationId": "hide_conversation_api_v1_conversations__conversation_id__hide_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Hide Conversation",
         "tags": [
           "chat"
         ]
@@ -6919,6 +7188,87 @@
         "summary": "Request Sop",
         "tags": [
           "retention"
+        ]
+      }
+    },
+    "/api/v1/me/recent": {
+      "get": {
+        "description": "SOPs approved in the last 30 days that you can read, newest first.",
+        "operationId": "recent_api_v1_me_recent_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 6,
+              "maximum": 20,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RecentOut"
+                  },
+                  "title": "Response Recent Api V1 Me Recent Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Recent",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/me/waiting": {
+      "get": {
+        "operationId": "waiting_api_v1_me_waiting_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WaitingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Waiting",
+        "tags": [
+          "knowledge"
         ]
       }
     },

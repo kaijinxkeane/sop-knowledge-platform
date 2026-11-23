@@ -52,7 +52,8 @@ function NoteExcerpt({ id, heading }: { id: string; heading?: string | null }) {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!heading || !box.current) return;
-    const want = heading.split(" > ").pop()!.trim().toLowerCase();
+    // headings are stored as "Title › Section"; the panel looks for the section
+    const want = heading.split(/\s*[›>]\s*/).pop()!.trim().toLowerCase();
     const el = [...box.current.querySelectorAll("h1,h2,h3,h4,h5,h6")].find(
       (h) => h.textContent?.trim().toLowerCase() === want,
     );
@@ -96,6 +97,8 @@ export function CitationPanel({ citation: c, onClose }: { citation: Citation; on
         ) : (
           c.approval && <Badge variant="warning">{c.approval}</Badge>
         )}
+        {/* Only people who can see unapproved changes get pending_change. */}
+        {doc.data?.pending_change && <Badge variant="warning">{t("ask.pendingReview")}</Badge>}
       </div>
       {doc.isError ? (
         <p className="text-sm text-muted-foreground">{t("doc.loadFailed")}</p>

@@ -93,7 +93,7 @@ backend/                 — FastAPI app (uv project, Python 3.12)
   app/vault/             — parsers (md/pptx/pdf/docx/images), local OCR, rule labels + safeguards, git layer, indexer, write rules
   app/retrieval/         — local embeddings, hybrid search (RLS + policy engine, distance cutoff), small-to-big expansion of hits
   app/classify/          — local Classifier, one-way rule, name detector, review service, eval (few-shot examples: built, off by default)
-  app/agents/            — Concierge routing, department agents (answer contract), answer reuse, orchestration
+  app/agents/            — Concierge routing, department agents (answer contract), answer reuse, follow-up chips, orchestration
   app/governance/        — version-bound approvals (live vs current chunks), readable past versions, reviews jobs, notifications, webhooks
   app/retention/         — handovers, gap topics + personal gaps, conflicts, retract, 24-month retention
   app/projects/          — project spaces: per-request project access, lead-approved shares, expiry
@@ -107,7 +107,7 @@ frontend/                — React + TS (Vite), shadcn-style ui, TanStack Query,
   src/app/theme/         — all brand values (theme.css variables, brand.tsx name/logo)
   src/editor/            — Milkdown editor, Obsidian atoms, block preservation, 3-way merge, metadata form logic
   src/lib/obsidian.ts    — Obsidian markdown for the reader (links resolved only to readable docs)
-  src/i18n/, src/layout/, src/pages/ (library/, write/, admin/), src/components/ui/
+  src/i18n/, src/layout/, src/pages/ (ask/, home/, library/, write/, admin/), src/components/ui/
   deploy/Caddyfile       — serves dist/, proxies /api, security headers, no access log
 config/                  — models.yaml (tiers), spaces/*.yaml, roles.yaml, vault.yaml (folder rules), notice.md, eval/
 demo-vault/              — synthetic Obsidian vault (fictional data only) + demo-vault-labels.yaml
@@ -121,7 +121,9 @@ claude-plugin/           — inherited llm-wiki workflow specs, reused as agent 
 tests/                   — structural tests, fixtures (golden-wiki, defects), promptfoo evals
 ```
 
-Planned (see the roadmap): the Phase 1–5 screens, TLS and Headscale in Phase 6.
+Planned (see the status table in plan §12): the Review (2b, 4), Retain (5) and project
+screens; required reading, onboarding paths, PDF export and the cost dashboard;
+TLS, Headscale and Playwright in Phase 6.
 
 ## Security rules for platform code
 
@@ -161,6 +163,12 @@ Planned (see the roadmap): the Phase 1–5 screens, TLS and Headscale in Phase 6
   labels it had. Versions list, version text and review diffs all use it.
 - Bookmarks and Ctrl+K return titles only, re-checked against today's access;
   never store or log quick-search queries.
+- Hidden conversations (`hidden_at`) are 404 to their owner everywhere but are
+  never deleted early; the 24-month retention job removes them. Follow-up chips
+  (`app/agents/followups.py`) come only from cited SOPs re-read under the
+  asker's RLS scope (live text); never from a model or another user's data.
+  Home's `/me/recent` and `/me/waiting` return titles and counts only, each
+  document re-checked like the Library.
 - Answer reuse (`app/agents/reuse.py`) is keyed on the exact prompt built from the
   asker's own retrieval; never look answers up by question alone, and never store
   outage, fallback or guard-trimmed answers. Retract and "not helpful" remove rows.

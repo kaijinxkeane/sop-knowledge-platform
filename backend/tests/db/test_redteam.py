@@ -325,6 +325,8 @@ async def test_other_peoples_records_are_404(indexed, sessions, client, make_use
     for method, path, body in [
         ("GET", f"/conversations/{conv.id}/messages", None),
         ("POST", f"/conversations/{conv.id}/messages", {"content": "hello there"}),
+        ("PATCH", f"/conversations/{conv.id}", {"title": "renamed"}),
+        ("POST", f"/conversations/{conv.id}/hide", None),
         ("POST", f"/messages/{msg.id}/feedback", {"helpful": False, "comment": "x"}),
         ("POST", f"/notifications/{uuid.uuid4()}/read", None),
     ]:

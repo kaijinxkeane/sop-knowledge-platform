@@ -382,6 +382,8 @@ class Conversation(Base):
     title: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _created()
+    # Hidden by its owner: gone from their view; kept for audit until retention.
+    hidden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class ChatMessage(Base):

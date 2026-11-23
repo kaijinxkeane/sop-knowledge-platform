@@ -1089,8 +1089,10 @@ backend/                        # Python (FastAPI); everything server-side
     agents/     concierge, department, classifier, librarian + prompt templates
     models/     model gateway: anthropic + openai_compat adapters
     retrieval/  chunking, local embeddings, hybrid search
-    workers/    git change detection, parsing (PPTX/PDF/DOCX + OCR), slide rendering,
-                name detector, lint, retention and review-due jobs
+    vault/      parsers (MD/PPTX/PDF/DOCX + OCR), labels, git layer, indexer, renditions
+    classify/, governance/, retention/, projects/, eval/   domain services
+    workers/    arq jobs: git change detection, nightly checks, retention and review-due
+                (slide rendering to images: planned)
     db/         SQLAlchemy models, Alembic migrations, RLS policies
   wiki_core/    extracted deterministic llm-wiki helpers + Obsidian parser
   tests/        unit, RBAC-leak suite, agent evals
@@ -1098,10 +1100,11 @@ backend/                        # Python (FastAPI); everything server-side
 frontend/                       # React + TypeScript (Vite); built to static files
   src/
     app/        routing, layout, theme (single place for future branding)
-    features/   ask, library, write, review, retain, admin, account
+    pages/      ask, home, library, write, admin (+ review, retain: to do)
     editor/     Milkdown setup + Obsidian nodes (wikilinks, embeds, callouts, raw blocks)
     api/        generated typed client (from backend OpenAPI)
-  tests/        component tests, Playwright end-to-end, editor round-trip
+  (tests)       component tests next to their files (*.test.tsx), editor round-trip;
+                Playwright end-to-end: Phase 6
   package.json
 config/         vault.yaml, spaces/*.yaml, models.yaml, notice.md
 demo-vault/     synthetic one-vault training company: Programmes/<Programme>/<Stage>/, Methodology/,
@@ -1186,6 +1189,23 @@ repo on the company device, mounted at deploy time via `VAULT_PATH`.
 
 ## 12. Phased plan
 
+**Status at a glance (2026-11-24).** Details per phase follow below.
+
+| Phase | Backend | Frontend |
+|---|---|---|
+| 0. Foundations | Done | Done |
+| 1. Identity and RBAC | Done | Done (sign-in, two-factor, notice, Admin users/roles/grants) |
+| 2. Indexing and retrieval | Done, incl. local OCR | Done: Library, editor, upload, merge, versions (notes, decks, PDFs), bookmarks, Ctrl+K. To do: slide pictures, images in notes |
+| 2b. AI Classifier | Done | **To do:** Review → AI label suggestions, unplaced notes |
+| 3. Agents | Done | Done: Ask (streaming, citations panel, filters, follow-ups, no-answer actions, feedback, history) and Home |
+| 4. SOP governance | Done (approvals, reviews, notifications, governance report, webhooks). **To do:** required reading and sign-off, material-change flag, PDF/print export | **To do:** Review → SOP changes, notifications bell |
+| 5. Retention | Done (handovers, gaps, coverage, stale, bus factor, conflicts, retract, retention job). **To do:** onboarding paths, cost and usage endpoint | **To do:** Retain screens, onboarding paths, cost dashboard, audit log viewer, CEO/HR Home cards |
+| Project spaces | Done | **To do:** project screens |
+| 6. Company deployment | Not started | Playwright end-to-end suite and accessibility pass not started; nothing tried in a real browser yet |
+| 7. Local models | Model choice settled (`qwen3:8b`, held-out evals); improvement loop not started | — |
+
+Deferred: the 14B confirm stage for the nightly conflict check (see "Deferred work").
+
 **Progress:** Phase 0 *backend* done (2026-11-20): the gateway with its data
 boundary, the Docker stack, migrations, the demo vault, CI and a content-free
 logging policy. Phase 0 *frontend* done (2026-11-23): `frontend/` with Vite +
@@ -1219,7 +1239,7 @@ reset two-factor, unlock; no new roles for yourself) and roles and grants
 `/spaces` lists only spaces the caller can read. Admin screens and the markdown
 renderer load on demand; initial JS 127 KB gzipped.
 
-Phase 2 *backend* done (2026-11-21), except OCR:
+Phase 2 *backend* done (2026-11-21); local OCR followed on 2026-11-23 (below):
 - **Parsers** (`app/vault/parse.py`): Obsidian notes (frontmatter, wikilinks,
   embeds, tags, heading-path chunks), PPTX slide by slide with speaker notes,
   PDF pages with form-field labels, and DOCX.
@@ -1423,7 +1443,7 @@ Phase 3 *backend* done (2026-11-21):
   "not helpful" vote, and after `answers.reuse_days` (30, 0 = off). Outages,
   fallback-model answers and answers the output guard trimmed are never stored.
   Reused answers are marked `reused` in the stream, the message and the audit.
-- **Still to do in Phase 3**: the Ask UI.
+- The Ask UI followed on 2026-11-23 and 2026-11-24 (below).
 
 Phase 3 *UI*, slice 1 of 2 done (2026-11-23):
 - **Ask screen** (`/ask`, `frontend/src/pages/ask/`): answers stream in
@@ -1446,8 +1466,35 @@ Phase 3 *UI*, slice 1 of 2 done (2026-11-23):
 - Measured live (8B, M-series Mac, warm): first words after ~5–15 s, a short
   answer done in ~15 s.
 
-Still to do (Phase 3 slice 2): conversation search, rename and hide; follow-up
-chips; programme and stage filters; the remaining Home cards.
+Phase 3 *UI*, slice 2 of 2 done (2026-11-24):
+- **History**: `GET /conversations?q=` matches titles and your own questions
+  (wildcards literal, never logged); `PATCH /conversations/{id}` renames;
+  `POST /conversations/{id}/hide` hides (migration 0015, `hidden_at`). A hidden
+  conversation is a 404 everywhere (messages, asking, rename, quick search,
+  bookmarks) but stays in the database and audit until the 24-month job.
+- **Programme and stage filters** (`MessageIn.programme/stage`) narrow both the
+  routing search and each department's search; access still comes from RLS.
+  They carry over to the next question and from Home; stored in the message's
+  route record.
+- **Follow-up chips** (`app/agents/followups.py`), no model call: up to three
+  other sections of the SOPs the answer cited, nearest after the cited one,
+  read under the asker's RLS scope from live text only. Sent in `done` and
+  re-made on the latest answer in history (so lost access removes them).
+- **Citation panel**: "newer version pending review" for people who can see
+  unapproved changes (`pending_change`).
+- **Home cards** (only when they have something): Gaps from your searches
+  (Request / Draft / Expert), Waiting for you (`GET /me/waiting`: reviews you
+  can do, your unsubmitted drafts, AI label suggestions you can see), Recently
+  approved (`GET /me/recent`: approvals in 30 days, each document re-checked
+  under RLS and the policy engine), Bookmarks.
+
+Left for their own phases: Export PDF of an answer (Phase 4, with `/exports`);
+Required reading and Onboarding path cards (Phases 4 and 5, no backend yet);
+CEO and HR cards (unplaced notes, stale SOPs, coverage, cost, gap topics,
+onboarding completion) with the Retain screens (Phase 5). "Recently updated in
+your programmes" lists recent approvals you can read: there is no user →
+programme link yet. Speed targets in the spec (first words < 2 s) assume the
+cloud path; the local 8B measures ~5–15 s to first words.
 
 Phase 4 *backend* done (2026-11-21):
 - **Version-bound approvals** (`app/governance/`): an approval covers one
@@ -1651,7 +1698,7 @@ space, status), smuggled frontmatter, folder traversal, forged/`alg:none`/
 deactivated tokens, other people's conversations, reviews, notifications and
 handovers, staff opening lead/HR/admin reports.
 
-Phases 0–5 (backend and frontend together) are built and tested on a MacBook (Apple Silicon) using Docker
+Phases 0–5 (backend and frontend) are developed and tested on a MacBook (Apple Silicon) using Docker
 Compose. Ollama runs natively on the Mac for the local embeddings, because
 Docker can't use the Mac GPU. Only `demo-vault/` is used.
 

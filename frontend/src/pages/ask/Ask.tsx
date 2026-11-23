@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Send, Square } from "lucide-react";
+import { CornerDownRight, Send, Square } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router";
 import { messageOf, ServerError } from "@/api/errors";
@@ -8,14 +8,16 @@ import { t } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { Answer } from "./Answer";
 import { CitationPanel } from "./CitationPanel";
+import { ConversationList } from "./Conversations";
+import { FilterBar, filtersFrom } from "./FilterBar";
 import {
   createConversation,
   streamAnswer,
-  useConversations,
   useMessages,
   useSpaces,
   type Citation,
-  type Conversation,
+  type Filters,
+  type FollowUp,
   type Section,
   type StreamEvent,
 } from "./api";
@@ -28,54 +30,10 @@ type Live = {
   sections: Record<string, Section & { done?: boolean }>;
   questionId: string | null;
   messageId: string | null;
+  followups: FollowUp[];
   state: "working" | "done" | "stopped" | "failed";
   error?: string;
 };
-
-function dayGroup(iso: string): "today" | "yesterday" | "week" | "earlier" {
-  const d = new Date(iso);
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const days = (start.getTime() - new Date(d).setHours(0, 0, 0, 0)) / 86_400_000;
-  return days <= 0 ? "today" : days <= 1 ? "yesterday" : days <= 7 ? "week" : "earlier";
-}
-
-function ConversationList({ current, onNew }: { current: string | null; onNew: () => void }) {
-  const convs = useConversations();
-  const groups = new Map<string, Conversation[]>();
-  for (const c of convs.data ?? []) {
-    const g = dayGroup(c.updated_at);
-    groups.set(g, [...(groups.get(g) ?? []), c]);
-  }
-  return (
-    <nav aria-label={t("ask.conversations")} className="space-y-4 border-r p-3">
-      <Button variant="outline" size="sm" className="w-full" onClick={onNew}>
-        <Plus />
-        {t("ask.new")}
-      </Button>
-      {(["today", "yesterday", "week", "earlier"] as const).map((g) =>
-        groups.get(g)?.length ? (
-          <section key={g}>
-            <h2 className="px-2 text-[11px] font-medium uppercase text-muted-foreground">{t(`ask.group.${g}`)}</h2>
-            <ul className="mt-1 space-y-0.5">
-              {groups.get(g)!.map((c) => (
-                <li key={c.id}>
-                  <Link
-                    to={`/ask?conversation=${c.id}`}
-                    aria-current={c.id === current ? "page" : undefined}
-                    className={cn("block truncate rounded px-2 py-1 text-sm hover:bg-accent", c.id === current && "bg-accent font-medium")}
-                  >
-                    {c.title || t("bookmark.untitled")}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null,
-      )}
-    </nav>
-  );
-}
 
 function apply(live: Live, e: StreamEvent, titles: Record<string, string>): Live {
   const next: Live = { ...live, sections: { ...live.sections } };
@@ -117,6 +75,7 @@ function apply(live: Live, e: StreamEvent, titles: Record<string, string>): Live
       next.state = "done";
       next.messageId = e.data.message_id;
       next.questionId = e.data.question_id;
+      next.followups = e.data.followups ?? [];
       break;
   }
   return next;
@@ -142,6 +101,8 @@ export default function Ask() {
   const [live, setLive] = useState<Live | null>(null);
   const [draft, setDraft] = useState("");
   const [cited, setCited] = useState<Citation | null>(null);
+  // Filters carry over to the next question (and come from Home's filters).
+  const [filters, setFilters] = useState<Filters>(() => filtersFrom(params));
   const abort = useRef<AbortController | null>(null);
   const started = useRef<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
@@ -163,6 +124,7 @@ export default function Ask() {
       sections: {},
       questionId: null,
       messageId: null,
+      followups: [],
       state: "working",
     };
     setLive(current);
@@ -175,6 +137,7 @@ export default function Ask() {
       await streamAnswer(
         id,
         q,
+        filters,
         (e) => {
           current = apply(current, e, titles);
           setLive(current);
@@ -225,6 +188,14 @@ export default function Ask() {
   useEffect(() => bottom.current?.scrollIntoView?.({ block: "end" }), [messages.data, live]);
 
   const stored = messages.data ?? [];
+  const lastStored = stored.at(-1);
+  const chips: FollowUp[] = live
+    ? live.state === "done"
+      ? live.followups
+      : []
+    : lastStored?.role === "assistant"
+      ? (lastStored.followups ?? [])
+      : [];
   function submit(e: FormEvent) {
     e.preventDefault();
     void ask(draft);
@@ -302,9 +273,28 @@ export default function Ask() {
               )}
             </>
           )}
+          {chips.length > 0 && (
+            <ul aria-label={t("ask.followUps")} className="space-y-1">
+              {chips.map((c) => (
+                <li key={`${c.document_id}-${c.heading}`}>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-left text-xs hover:bg-accent"
+                    onClick={() => void ask(t("ask.followUpQ", { heading: c.heading, title: c.title }))}
+                  >
+                    <CornerDownRight className="size-3 shrink-0" />
+                    {t("ask.followUpChip", { heading: c.heading, title: c.title })}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
           <div ref={bottom} />
         </div>
-        <form onSubmit={submit} className="flex items-end gap-2 border-t p-4">
+        <div className="border-t px-4 pt-3">
+          <FilterBar value={filters} onChange={setFilters} />
+        </div>
+        <form onSubmit={submit} className="flex items-end gap-2 p-4 pt-2">
           <textarea
             aria-label={conversationId ? t("ask.followUp") : t("home.askPlaceholder")}
             placeholder={conversationId ? t("ask.followUp") : t("home.askPlaceholder")}

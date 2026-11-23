@@ -33,11 +33,23 @@ export type Section = {
   confidence?: string | null;
 };
 
-export const useConversations = () =>
+export type FollowUp = Schemas["FollowUpOut"];
+export type Filters = { programme: string | null; stage: string | null };
+
+/** Your conversations; `q` matches titles and your own questions. */
+export const useConversations = (q = "") =>
   useQuery({
-    queryKey: ["conversations"],
-    queryFn: () => unwrap(api.GET("/api/v1/conversations", { params: { query: { limit: 100 } } })),
+    queryKey: ["conversations", q],
+    queryFn: () =>
+      unwrap(api.GET("/api/v1/conversations", { params: { query: { limit: 100, ...(q ? { q } : {}) } } })),
+    placeholderData: (prev) => prev,
   });
+
+export const renameConversation = (id: string, title: string) =>
+  call(api.PATCH("/api/v1/conversations/{conversation_id}", { params: { path: { conversation_id: id } }, body: { title } }));
+
+export const hideConversation = (id: string) =>
+  call(api.POST("/api/v1/conversations/{conversation_id}/hide", { params: { path: { conversation_id: id } } }));
 
 export const useMessages = (id: string | null) =>
   useQuery({
@@ -80,7 +92,7 @@ export type StreamEvent =
       event: "section_done";
       data: { space: string; no_answer: boolean; unavailable: boolean; confidence?: string | null; contact?: string | null };
     }
-  | { event: "done"; data: { message_id: string; question_id: string; answered: boolean } };
+  | { event: "done"; data: { message_id: string; question_id: string; answered: boolean; followups?: FollowUp[] } };
 
 /** Split an SSE byte stream into events. */
 export function parseSse(buffer: string): { events: StreamEvent[]; rest: string } {
@@ -108,6 +120,7 @@ export function parseSse(buffer: string): { events: StreamEvent[]; rest: string 
 export async function streamAnswer(
   conversationId: string,
   question: string,
+  filters: Filters,
   onEvent: (e: StreamEvent) => void,
   signal: AbortSignal,
 ): Promise<void> {
@@ -115,7 +128,11 @@ export async function streamAnswer(
     new Request(`${window.location.origin}/api/v1/conversations/${encodeURIComponent(conversationId)}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-      body: JSON.stringify({ content: question }),
+      body: JSON.stringify({
+        content: question,
+        ...(filters.programme ? { programme: filters.programme } : {}),
+        ...(filters.stage ? { stage: filters.stage } : {}),
+      }),
       credentials: "same-origin",
       signal,
     }),

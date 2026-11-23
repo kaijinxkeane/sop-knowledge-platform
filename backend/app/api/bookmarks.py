@@ -82,7 +82,11 @@ async def _own_conversations(session: AsyncSession, me: CurrentUser, ids) -> dic
     if not ids:
         return {}
     rows = await session.execute(
-        select(Conversation).where(Conversation.id.in_(ids), Conversation.user_id == me.user.id)
+        select(Conversation).where(
+            Conversation.id.in_(ids),
+            Conversation.user_id == me.user.id,
+            Conversation.hidden_at.is_(None),
+        )
     )
     return {c.id: c for c in rows.scalars()}
 
@@ -220,6 +224,7 @@ async def quick_search(
             select(Conversation)
             .where(
                 Conversation.user_id == me.user.id,
+                Conversation.hidden_at.is_(None),
                 func.lower(Conversation.title).like(pattern, escape="\\"),
             )
             .order_by(Conversation.updated_at.desc())

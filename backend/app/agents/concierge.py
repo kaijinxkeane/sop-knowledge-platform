@@ -46,14 +46,25 @@ async def retrieve(
     vector: list[float] | None,
     profiles: dict[str, SpaceProfile],
     gateway: ModelGateway | None,
+    *,
+    programme: str | None = None,
+    stage: str | None = None,
 ) -> tuple[Route, dict[str, list[Hit]]]:
+    # Programme/stage filters narrow both searches; access still comes from RLS.
+    narrow = {"programme": programme, "stage": stage}
     # spaces shared with a project only in part (selected folders/SOPs) count too
     readable = sorted(set(principal.scopes()) | {p.space for p in principal.partial})
     async with sessions() as s:
         await apply_reader_scope(s, principal)
         # Answers use approved text only (plan §6): live chunks, not retired.
         hits = await search(
-            s, principal, question, query_vector=vector, limit=ROUTE_HITS, live_only=True
+            s,
+            principal,
+            question,
+            query_vector=vector,
+            limit=ROUTE_HITS,
+            live_only=True,
+            **narrow,
         )
         chosen = await route(question, hits, readable, profiles, gateway)
         per_space = {
@@ -67,6 +78,7 @@ async def retrieve(
                     space=sp,
                     limit=SPACE_HITS,
                     live_only=True,
+                    **narrow,
                 ),
                 live_only=True,
             )
@@ -122,13 +134,17 @@ async def ask(
     gateway: ModelGateway,
     embed_query: Callable[[str], Awaitable[list[float]]],
     profiles: dict[str, SpaceProfile],
+    programme: str | None = None,
+    stage: str | None = None,
 ) -> AsyncIterator[dict]:
     """Yield events: routing, agent_dispatched, token, section_done, done."""
     try:
         vector = await embed_query(question)
     except Exception:  # noqa: BLE001 - keyword search still works
         vector = None
-    chosen, per_space = await retrieve(sessions, principal, question, vector, profiles, gateway)
+    chosen, per_space = await retrieve(
+        sessions, principal, question, vector, profiles, gateway, programme=programme, stage=stage
+    )
     yield {
         "type": "routing",
         "spaces": list(chosen.spaces),
