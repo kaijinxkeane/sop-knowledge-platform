@@ -10,6 +10,7 @@ from app import __version__
 from app.api import (
     admin,
     auth,
+    bookmarks,
     chat,
     classifications,
     documents,
@@ -52,6 +53,7 @@ def create_app() -> FastAPI:
         me,
         chat,
         documents,
+        bookmarks,
         notes,
         reviews,
         handovers,

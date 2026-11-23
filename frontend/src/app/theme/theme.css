@@ -71,3 +71,75 @@
     @apply outline-2 outline-offset-2 outline-ring;
   }
 }
+
+/* Reading view typography (notes rendered from markdown). */
+@layer components {
+  .prose-sop {
+    @apply text-[15px] leading-7;
+  }
+  .prose-sop h1 {
+    @apply mt-6 mb-3 text-2xl font-semibold;
+  }
+  .prose-sop h2 {
+    @apply mt-6 mb-2 text-xl font-semibold;
+  }
+  .prose-sop h3 {
+    @apply mt-4 mb-2 text-lg font-semibold;
+  }
+  .prose-sop p,
+  .prose-sop ul,
+  .prose-sop ol,
+  .prose-sop blockquote,
+  .prose-sop pre {
+    @apply my-3;
+  }
+  .prose-sop ul {
+    @apply list-disc pl-6;
+  }
+  .prose-sop ol {
+    @apply list-decimal pl-6;
+  }
+  .prose-sop a {
+    @apply underline underline-offset-2;
+  }
+  .prose-sop blockquote {
+    @apply border-l-4 border-border bg-muted/40 px-4 py-2;
+  }
+  .prose-sop code {
+    @apply rounded bg-muted px-1 text-sm;
+  }
+  .prose-sop pre {
+    @apply overflow-x-auto rounded bg-muted p-3;
+  }
+  .prose-sop pre code {
+    @apply bg-transparent p-0;
+  }
+  .prose-sop table {
+    @apply my-3 w-full border-collapse text-sm;
+  }
+  .prose-sop th,
+  .prose-sop td {
+    @apply border px-2 py-1 text-left;
+  }
+}
+
+/* Editor (Milkdown): Obsidian syntax shown as chips that are kept verbatim. */
+.sop-editor .ProseMirror {
+  outline: none;
+  min-height: 50vh;
+  white-space: pre-wrap;
+}
+.sop-editor .obsidian-atom {
+  border-radius: 0.25rem;
+  padding: 0 0.25rem;
+  font-size: 0.9em;
+  background: var(--color-accent);
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+.sop-editor .obsidian-embed { font-weight: 500; }
+.sop-editor .obsidian-comment { color: var(--color-muted-foreground); font-style: italic; }
+.sop-editor .obsidian-highlight { background: #fef3c7; color: inherit; }
+.sop-editor .ProseMirror-selectednode { outline: 2px solid var(--color-ring); }
+.sop-editor table { border-collapse: collapse; }
+.sop-editor td, .sop-editor th { border: 1px solid var(--color-border); padding: 0.25rem 0.5rem; min-width: 4rem; }

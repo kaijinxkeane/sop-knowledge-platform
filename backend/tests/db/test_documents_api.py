@@ -69,3 +69,37 @@ async def test_core_lead_sees_bad_labels_as_restricted(client, docs, make_user, 
 
 async def test_requires_sign_in(client, docs):
     assert (await client.get(API)).status_code == 401
+
+
+async def test_stages_come_from_vault_config(client, make_user, sign_in):
+    h = await sign_in(await make_user(roles=("employee",)))
+    r = await client.get(f"{API}/stages", headers=h)
+    assert r.status_code == 200 and r.json()[0] == "discovery"
+
+
+async def test_backlinks_leave_out_notes_the_reader_cannot_see(
+    client, docs, sessions, make_user, sign_in
+):
+    from app.db.models import DocumentLink
+
+    target = docs["Booking a Training Room"]
+    async with sessions() as s:
+        for source in ("Discovery Workshop SOP", "Rate Card", "Leave Policy"):
+            s.add(DocumentLink(from_id=docs[source], target="Booking", to_id=target))
+        await s.commit()
+
+    def titles(r):
+        assert r.status_code == 200
+        return [b["title"] for b in r.json()]
+
+    public = await sign_in(await make_user(roles=("employee",)))
+    staff = await sign_in(await make_user(roles=("employee", "core-staff")))
+    lead = await sign_in(await make_user(roles=("employee", "core-lead")))
+    url = f"{API}/{target}/backlinks"
+    assert titles(await client.get(url, headers=public)) == ["Leave Policy"]
+    staff_sees = titles(await client.get(url, headers=staff))
+    assert staff_sees == ["Discovery Workshop SOP", "Leave Policy"]
+    assert "Rate Card" in titles(await client.get(url, headers=lead))
+    # Backlinks of a hidden note: 404, like the note itself.
+    hidden = await client.get(f"{API}/{docs['Rate Card']}/backlinks", headers=staff)
+    assert hidden.status_code == 404

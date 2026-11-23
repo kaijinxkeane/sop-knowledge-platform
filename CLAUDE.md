@@ -41,6 +41,11 @@ make frontend-dev                  # Vite on :5173, /api forwarded to the API fr
   `frontend/src/api/openapi.json` + `schema.d.ts`; CI fails if they're stale.
 - The stack serves the built app at http://localhost:8080 (`web`, Caddy).
   After pulling a compose network change, run `make down && make up`.
+- **The editor must not reformat what people didn't touch**
+  (`src/editor/editor.test.ts`): every demo-vault note must round-trip byte
+  for byte, and unchanged blocks are restored from the original before saving
+  (`src/editor/preserve.ts`). Obsidian syntax stays a verbatim atom
+  (`src/editor/obsidian.ts`). Clashes merge by block, never by a model.
 - Sign-in tests must keep the access token out of browser storage
   (`src/pages/SignIn.test.tsx`). UI text goes through `t()` (`src/i18n/en.ts`).
 
@@ -79,7 +84,7 @@ Behavioral evals (when changing workflow/prompt logic; needs
 ```
 docs/architecture/       — platform design + phased plan, frontend spec
 backend/                 — FastAPI app (uv project, Python 3.12)
-  app/api/               — routers (health, auth, me, documents, admin), content-free access log
+  app/api/               — routers (health, auth, me, documents, bookmarks + quick search, notes, reviews, admin, ...), content-free access log
   app/policy/            — policy engine (scopes, actions, fail-closed sensitivity)
   app/security/          — passwords (Argon2), TOTP, tokens, key derivation
   app/identity.py, app/audit.py, app/cli.py — users/roles, hash-chained audit log, admin CLI
@@ -89,7 +94,7 @@ backend/                 — FastAPI app (uv project, Python 3.12)
   app/retrieval/         — local embeddings, hybrid search (RLS + policy engine, distance cutoff), small-to-big expansion of hits
   app/classify/          — local Classifier, one-way rule, name detector, review service, eval (few-shot examples: built, off by default)
   app/agents/            — Concierge routing, department agents (answer contract), answer reuse, orchestration
-  app/governance/        — version-bound approvals (live vs current chunks), reviews jobs, notifications, webhooks
+  app/governance/        — version-bound approvals (live vs current chunks), readable past versions, reviews jobs, notifications, webhooks
   app/retention/         — handovers, gap topics + personal gaps, conflicts, retract, 24-month retention
   app/projects/          — project spaces: per-request project access, lead-approved shares, expiry
   app/eval/              — answering, retrieval + conflict-check eval runners, stats (tune on dev sets, compare on *-holdout.yaml)
@@ -100,7 +105,9 @@ frontend/                — React + TS (Vite), shadcn-style ui, TanStack Query,
   src/api/               — generated OpenAPI types (schema.d.ts) + client with token refresh
   src/auth/              — in-memory session, /me hooks, which menus show (cosmetic only)
   src/app/theme/         — all brand values (theme.css variables, brand.tsx name/logo)
-  src/i18n/, src/layout/, src/pages/, src/components/ui/
+  src/editor/            — Milkdown editor, Obsidian atoms, block preservation, 3-way merge, metadata form logic
+  src/lib/obsidian.ts    — Obsidian markdown for the reader (links resolved only to readable docs)
+  src/i18n/, src/layout/, src/pages/ (library/, write/, admin/), src/components/ui/
   deploy/Caddyfile       — serves dist/, proxies /api, security headers, no access log
 config/                  — models.yaml (tiers), spaces/*.yaml, roles.yaml, vault.yaml (folder rules), notice.md, eval/
 demo-vault/              — synthetic Obsidian vault (fictional data only) + demo-vault-labels.yaml
@@ -149,6 +156,11 @@ Planned (see the roadmap): the Phase 1–5 screens, TLS and Headscale in Phase 6
   access can only narrow. Old versions are shown only under the labels they had.
   Admins can't add roles to themselves (two-person rule). Red-team attacks live in
   `tests/db/test_redteam.py`: add one for every new endpoint that returns content.
+- Past versions (`app/governance/history.py`): people who can't see unapproved
+  changes get approved versions only, and any old version is judged by the
+  labels it had. Versions list, version text and review diffs all use it.
+- Bookmarks and Ctrl+K return titles only, re-checked against today's access;
+  never store or log quick-search queries.
 - Answer reuse (`app/agents/reuse.py`) is keyed on the exact prompt built from the
   asker's own retrieval; never look answers up by question alone, and never store
   outage, fallback or guard-trimmed answers. Retract and "not helpful" remove rows.

@@ -487,6 +487,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/stages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Stages
+         * @description Delivery stages in order (config/vault.yaml), for the Library's stage columns.
+         */
+        get: operations["list_stages_api_v1_documents_stages_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}": {
         parameters: {
             query?: never;
@@ -496,6 +516,27 @@ export interface paths {
         };
         /** Get Document */
         get: operations["get_document_api_v1_documents__document_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/backlinks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Backlinks
+         * @description Notes that link to or embed this one ("used in"). A linking note the user
+         *     can't read is left out entirely: no title, no count.
+         */
+        get: operations["get_backlinks_api_v1_documents__document_id__backlinks_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -572,8 +613,33 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Versions */
+        /**
+         * Get Versions
+         * @description Versions this person may read: approved ones (all versions for the
+         *     note's editors), each judged by the labels it had (app.governance.history).
+         */
         get: operations["get_versions_api_v1_documents__document_id__versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/versions/{commit}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Version
+         * @description The text of one version of a note, for reading and side-by-side diffs.
+         *     Unknown, unapproved (for non-editors) and once-narrower versions all 404.
+         */
+        get: operations["get_version_api_v1_documents__document_id__versions__commit__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -750,6 +816,41 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/bookmarks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Bookmarks */
+        get: operations["list_bookmarks_api_v1_me_bookmarks_get"];
+        put?: never;
+        /** Add Bookmark */
+        post: operations["add_bookmark_api_v1_me_bookmarks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/bookmarks/{bookmark_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Bookmark */
+        delete: operations["remove_bookmark_api_v1_me_bookmarks__bookmark_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1228,6 +1329,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/quick-search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Quick Search
+         * @description Ctrl+K: titles of documents, programmes, stages, bookmarks and your
+         *     conversations that match `q`. Titles only, never content.
+         */
+        get: operations["quick_search_api_v1_quick_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/bus-factor": {
         parameters: {
             query?: never;
@@ -1618,6 +1740,17 @@ export interface components {
              */
             ts: string;
         };
+        /** BacklinkOut */
+        BacklinkOut: {
+            /** Embed */
+            embed: boolean;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Title */
+            title: string;
+        };
         /** Body_upload_attachment_api_v1_notes__note_id__attachments_post */
         Body_upload_attachment_api_v1_notes__note_id__attachments_post: {
             /** File */
@@ -1626,6 +1759,43 @@ export interface components {
             original_link?: string | null;
             /** Source Tool */
             source_tool?: string | null;
+        };
+        /** BookmarkIn */
+        BookmarkIn: {
+            /** Part */
+            part?: number | null;
+            /**
+             * Target Id
+             * Format: uuid
+             */
+            target_id: string;
+            /**
+             * Target Type
+             * @enum {string}
+             */
+            target_type: "document" | "conversation";
+        };
+        /** BookmarkOut */
+        BookmarkOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Doc Type */
+            doc_type?: string | null;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind?: string | null;
+            /** Part */
+            part: number | null;
+            /** Target Id */
+            target_id: string;
+            /** Target Type */
+            target_type: string;
+            /** Title */
+            title: string;
         };
         /** BulkIn */
         BulkIn: {
@@ -2443,6 +2613,41 @@ export interface components {
             /** Vault Path */
             vault_path: string;
         };
+        /** QuickConversation */
+        QuickConversation: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+        };
+        /** QuickDoc */
+        QuickDoc: {
+            /** Doc Type */
+            doc_type: string;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Programme */
+            programme: string | null;
+            /** Stage */
+            stage: string | null;
+            /** Title */
+            title: string;
+        };
+        /** QuickOut */
+        QuickOut: {
+            /** Bookmarks */
+            bookmarks: components["schemas"]["BookmarkOut"][];
+            /** Conversations */
+            conversations: components["schemas"]["QuickConversation"][];
+            /** Documents */
+            documents: components["schemas"]["QuickDoc"][];
+            /** Programmes */
+            programmes: string[];
+            /** Stages */
+            stages: string[];
+        };
         /** ReceiverOut */
         ReceiverOut: {
             /** Acknowledged At */
@@ -2832,8 +3037,29 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** VersionContentOut */
+        VersionContentOut: {
+            /** Approved */
+            approved: boolean;
+            /** Author Name */
+            author_name: string;
+            /** Commit */
+            commit: string;
+            /**
+             * Committed At
+             * Format: date-time
+             */
+            committed_at: string;
+            /** Content */
+            content: string;
+        };
         /** VersionOut */
         VersionOut: {
+            /**
+             * Approved
+             * @default false
+             */
+            approved: boolean;
             /** Author Name */
             author_name: string;
             /** Author Source */
@@ -2847,6 +3073,16 @@ export interface components {
              * Format: date-time
              */
             committed_at: string;
+            /**
+             * Latest
+             * @default false
+             */
+            latest: boolean;
+            /**
+             * Live
+             * @default false
+             */
+            live: boolean;
         };
     };
     responses: never;
@@ -3858,6 +4094,26 @@ export interface operations {
             };
         };
     };
+    list_stages_api_v1_documents_stages_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string[];
+                };
+            };
+        };
+    };
     get_document_api_v1_documents__document_id__get: {
         parameters: {
             query?: never;
@@ -3876,6 +4132,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DocumentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_backlinks_api_v1_documents__document_id__backlinks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BacklinkOut"][];
                 };
             };
             /** @description Validation Error */
@@ -4002,6 +4289,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VersionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_version_api_v1_documents__document_id__versions__commit__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+                commit: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionContentOut"];
                 };
             };
             /** @description Validation Error */
@@ -4386,6 +4705,88 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeOut"];
+                };
+            };
+        };
+    };
+    list_bookmarks_api_v1_me_bookmarks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookmarkOut"][];
+                };
+            };
+        };
+    };
+    add_bookmark_api_v1_me_bookmarks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookmarkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookmarkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_bookmark_api_v1_me_bookmarks__bookmark_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookmark_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5250,6 +5651,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    quick_search_api_v1_quick_search_get: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuickOut"];
                 };
             };
             /** @description Validation Error */

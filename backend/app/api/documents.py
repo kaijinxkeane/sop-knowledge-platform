@@ -11,17 +11,26 @@ import mimetypes
 import uuid
 from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, current_user, get_db, get_git
-from app.db.models import AttachmentPart, Document, DocumentAccess, DocumentVersion
+from app.db.models import (
+    AttachmentPart,
+    Document,
+    DocumentAccess,
+    DocumentLink,
+    DocumentVersion,
+    Space,
+)
 from app.db.scoped import apply_reader_scope, has_pending_change, sees_latest, visible
+from app.governance.history import approved_commits, readable_versions
 from app.policy.engine import effective_access
-from app.vault.git import GitVault
+from app.vault.git import GitError, GitVault
+from app.vault.labels import vault_config
 
 router = APIRouter(prefix="/documents", tags=["knowledge"])
 NOT_FOUND = HTTPException(status.HTTP_404_NOT_FOUND, "not found")
@@ -48,6 +57,14 @@ class DocumentOut(BaseModel):
     review_due: date | None = None
 
 
+class VersionContentOut(BaseModel):
+    commit: str
+    author_name: str
+    committed_at: datetime
+    approved: bool
+    content: str
+
+
 class PartOut(BaseModel):
     part: str
     number: int
@@ -57,10 +74,20 @@ class PartOut(BaseModel):
 
 class VersionOut(BaseModel):
     commit: str
+    approved: bool = False  # this exact version was approved at some point
+    live: bool = False  # the approved version answers are cited from now
+    latest: bool = False  # the newest version (may be unapproved: editors only)
     author_name: str
     author_source: str  # app | git | unattributed
     authored_by: str | None
     committed_at: datetime
+
+
+class BacklinkOut(BaseModel):
+    id: str
+    title: str
+    kind: str
+    embed: bool  # embedded (![[...]]) rather than linked
 
 
 def _out(doc: Document, me: CurrentUser) -> DocumentOut | None:
@@ -127,6 +154,12 @@ async def list_documents(
     return [out for d in docs if (out := _out(d, me)) is not None]
 
 
+@router.get("/stages", response_model=list[str])
+async def list_stages(_: CurrentUser = Depends(current_user)) -> list[str]:
+    """Delivery stages in order (config/vault.yaml), for the Library's stage columns."""
+    return list(vault_config().stages)
+
+
 @router.get("/{document_id}", response_model=DocumentOut)
 async def get_document(
     document_id: uuid.UUID,
@@ -157,20 +190,81 @@ async def get_parts(
     ]
 
 
+@router.get("/{document_id}/backlinks", response_model=list[BacklinkOut])
+async def get_backlinks(
+    document_id: uuid.UUID,
+    me: CurrentUser = Depends(current_user),
+    session: AsyncSession = Depends(get_db),
+) -> list[BacklinkOut]:
+    """Notes that link to or embed this one ("used in"). A linking note the user
+    can't read is left out entirely: no title, no count."""
+    doc = await _visible(session, me, document_id)
+    rows = (
+        await session.execute(
+            select(Document, DocumentLink.embed)
+            .join(DocumentLink, DocumentLink.from_id == Document.id)
+            .where(DocumentLink.to_id == doc.id, Document.id != doc.id)
+            .order_by(Document.title)
+        )
+    ).all()
+    seen: dict[uuid.UUID, BacklinkOut] = {}
+    for d, embed in rows:
+        if d.id in seen or _out(d, me) is None:
+            continue
+        seen[d.id] = BacklinkOut(id=str(d.id), title=d.title, kind=d.kind, embed=embed)
+    return list(seen.values())
+
+
+async def _history_doc(
+    session: AsyncSession, me: CurrentUser, document_id: uuid.UUID
+) -> tuple[Document, bool]:
+    """A visible document and whether this user sees its unapproved changes,
+    both decided under RLS; then reloaded as the owner role (all access rows,
+    for the labels-it-had check, and approvals, which `sop_reader` can't read)."""
+    doc = await _visible(session, me, document_id)
+    editor = sees_latest(me.principal, doc)
+    await session.commit()
+    await session.refresh(doc)
+    return doc, editor
+
+
+async def _spaces(session: AsyncSession) -> set[str]:
+    return set((await session.execute(select(Space.name))).scalars())
+
+
 @router.get("/{document_id}/versions", response_model=list[VersionOut])
 async def get_versions(
     document_id: uuid.UUID,
     me: CurrentUser = Depends(current_user),
     session: AsyncSession = Depends(get_db),
+    git: GitVault = Depends(get_git),
 ) -> list[VersionOut]:
-    doc = await _visible(session, me, document_id)
-    rows = (
-        await session.execute(
-            select(DocumentVersion)
-            .where(DocumentVersion.document_id == doc.id)
-            .order_by(DocumentVersion.committed_at.desc())
+    """Versions this person may read: approved ones (all versions for the
+    note's editors), each judged by the labels it had (app.governance.history)."""
+    doc, editor = await _history_doc(session, me, document_id)
+    rows = list(
+        (
+            await session.execute(
+                select(DocumentVersion)
+                .where(DocumentVersion.document_id == doc.id)
+                .order_by(DocumentVersion.committed_at.desc())
+            )
+        ).scalars()
+    )
+    if doc.kind != "note":
+        readable = {v.git_commit for v in rows} if editor else set()
+        approved: set[str] = set()
+    else:
+        approved = await approved_commits(session, doc)
+        readable = await readable_versions(
+            session,
+            me.principal,
+            doc,
+            git,
+            [v.git_commit for v in rows],
+            await _spaces(session),
+            editor=editor,
         )
-    ).scalars()
     return [
         VersionOut(
             commit=v.git_commit,
@@ -178,9 +272,48 @@ async def get_versions(
             author_source=v.author_source,
             authored_by=str(v.authored_by) if v.authored_by else None,
             committed_at=v.committed_at,
+            approved=v.git_commit in approved,
+            live=v.git_commit == doc.approved_commit,
+            latest=v.git_commit == doc.current_commit,
         )
         for v in rows
+        if v.git_commit in readable
     ]
+
+
+@router.get("/{document_id}/versions/{commit}", response_model=VersionContentOut)
+async def get_version(
+    document_id: uuid.UUID,
+    commit: str = Path(pattern=r"^[0-9a-f]{40}$"),
+    me: CurrentUser = Depends(current_user),
+    session: AsyncSession = Depends(get_db),
+    git: GitVault = Depends(get_git),
+) -> VersionContentOut:
+    """The text of one version of a note, for reading and side-by-side diffs.
+    Unknown, unapproved (for non-editors) and once-narrower versions all 404."""
+    doc, editor = await _history_doc(session, me, document_id)
+    if doc.kind != "note":
+        raise NOT_FOUND
+    v = await session.scalar(
+        select(DocumentVersion).where(
+            DocumentVersion.document_id == doc.id, DocumentVersion.git_commit == commit
+        )
+    )
+    if v is None or commit not in await readable_versions(
+        session, me.principal, doc, git, [commit], await _spaces(session), editor=editor
+    ):
+        raise NOT_FOUND
+    try:
+        content = git.show(doc.vault_path, commit).decode("utf-8", errors="replace")
+    except GitError:
+        raise NOT_FOUND from None
+    return VersionContentOut(
+        commit=commit,
+        author_name=v.author_name,
+        committed_at=v.committed_at,
+        approved=commit in await approved_commits(session, doc),
+        content=content,
+    )
 
 
 @router.get("/{document_id}/file")

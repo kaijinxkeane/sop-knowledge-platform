@@ -1,5 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { t } from "@/i18n";
+import { BookmarkList } from "@/pages/library/Bookmarks";
 
 /** Ask-first Home (frontend spec §3). The ask box goes live with the Ask screen. */
 export function Home() {
@@ -13,6 +14,9 @@ export function Home() {
         disabled
       />
       <p className="mt-3 text-sm text-muted-foreground">{t("home.askSoon")}</p>
+      <div className="mx-auto mt-12 max-w-md text-left">
+        <BookmarkList />
+      </div>
     </section>
   );
 }

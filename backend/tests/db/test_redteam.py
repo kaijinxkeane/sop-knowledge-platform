@@ -57,6 +57,9 @@ async def test_hidden_document_is_404_on_every_endpoint(
         ("GET", f"/documents/{rate}", None),
         ("GET", f"/documents/{rate}/parts", None),
         ("GET", f"/documents/{rate}/versions", None),
+        ("GET", f"/documents/{rate}/backlinks", None),
+        ("GET", f"/documents/{rate}/versions/{'0' * 40}", None),
+        ("POST", "/me/bookmarks", {"target_type": "document", "target_id": rate}),
         ("GET", f"/documents/{rate}/file", None),
         ("GET", f"/notes/{rate}/source", None),
         ("GET", f"/notes/{rate}/diff", None),
@@ -251,9 +254,17 @@ async def test_old_restricted_version_is_not_readable_after_downgrade(
     assert r.status_code == 200, r.text
     await ClassifierService(sessions, no_names).run_pending(limit=100)  # core is name-checked
     assert (await client.get(f"{API}/documents/{pillars}", headers=hs)).status_code == 200
-    versions = (await client.get(f"{API}/documents/{pillars}/versions", headers=hs)).json()
+    # The attacker may know the old commit (from git or a link); take it from the lead's list.
+    versions = (await client.get(f"{API}/documents/{pillars}/versions", headers=hl)).json()
     oldest = versions[-1]["commit"]
-    for path in (f"/notes/{pillars}/diff?from={oldest}", f"/notes/{pillars}/diff?to={oldest}"):
+    listed = (await client.get(f"{API}/documents/{pillars}/versions", headers=hs)).json()
+    if oldest in {v["commit"] for v in listed}:
+        seen.append("versions list")
+    for path in (
+        f"/notes/{pillars}/diff?from={oldest}",
+        f"/notes/{pillars}/diff?to={oldest}",
+        f"/documents/{pillars}/versions/{oldest}",
+    ):
         r = await client.get(API + path, headers=hs)
         if r.status_code == 200 and secret in r.text:
             seen.append(path)
@@ -261,6 +272,8 @@ async def test_old_restricted_version_is_not_readable_after_downgrade(
     # The lead (who could read the old version) still can.
     r = await client.get(f"{API}/notes/{pillars}/diff?from={oldest}", headers=hl)
     assert r.status_code == 200 and secret in r.text
+    r = await client.get(f"{API}/documents/{pillars}/versions/{oldest}", headers=hl)
+    assert r.status_code == 200 and secret in r.json()["content"]
 
 
 # --- 5. Admin: content access by granting yourself a role -------------------------------------

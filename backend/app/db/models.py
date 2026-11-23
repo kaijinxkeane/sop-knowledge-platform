@@ -601,6 +601,33 @@ class SearchEvent(Base):
     created_at: Mapped[datetime] = _created()
 
 
+class Bookmark(Base):
+    """★ on a document (optionally one slide or page) or a conversation
+    (frontend spec §9.4). Private to its user. The target is re-checked against
+    today's access every time bookmarks are listed; nothing is shown for a
+    target the user can no longer open."""
+
+    __tablename__ = "bookmarks"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "target_type",
+            "target_id",
+            "part",
+            name="bookmark_once",
+            postgresql_nulls_not_distinct=True,
+        ),
+    )
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    target_type: Mapped[str] = mapped_column(String(16))  # document | conversation
+    target_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    part: Mapped[int | None] = mapped_column(Integer)  # slide or page number
+    created_at: Mapped[datetime] = _created()
+
+
 class GapTopic(Base):
     """Similar unanswered questions in one space, grouped nightly (plan §7)."""
 

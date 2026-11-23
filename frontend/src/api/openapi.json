@@ -218,6 +218,34 @@
         "title": "AuditOut",
         "type": "object"
       },
+      "BacklinkOut": {
+        "properties": {
+          "embed": {
+            "title": "Embed",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "kind",
+          "embed"
+        ],
+        "title": "BacklinkOut",
+        "type": "object"
+      },
       "Body_upload_attachment_api_v1_notes__note_id__attachments_post": {
         "properties": {
           "file": {
@@ -254,6 +282,110 @@
           "file"
         ],
         "title": "Body_upload_attachment_api_v1_notes__note_id__attachments_post",
+        "type": "object"
+      },
+      "BookmarkIn": {
+        "properties": {
+          "part": {
+            "anyOf": [
+              {
+                "maximum": 10000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Part"
+          },
+          "target_id": {
+            "format": "uuid",
+            "title": "Target Id",
+            "type": "string"
+          },
+          "target_type": {
+            "enum": [
+              "document",
+              "conversation"
+            ],
+            "title": "Target Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_type",
+          "target_id"
+        ],
+        "title": "BookmarkIn",
+        "type": "object"
+      },
+      "BookmarkOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "doc_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doc Type"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "part": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Part"
+          },
+          "target_id": {
+            "title": "Target Id",
+            "type": "string"
+          },
+          "target_type": {
+            "title": "Target Type",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "target_type",
+          "target_id",
+          "part",
+          "title",
+          "created_at"
+        ],
+        "title": "BookmarkOut",
         "type": "object"
       },
       "BulkIn": {
@@ -2569,6 +2701,124 @@
         "title": "ProposalOut",
         "type": "object"
       },
+      "QuickConversation": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "QuickConversation",
+        "type": "object"
+      },
+      "QuickDoc": {
+        "properties": {
+          "doc_type": {
+            "title": "Doc Type",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "programme": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Programme"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "kind",
+          "doc_type",
+          "programme",
+          "stage"
+        ],
+        "title": "QuickDoc",
+        "type": "object"
+      },
+      "QuickOut": {
+        "properties": {
+          "bookmarks": {
+            "items": {
+              "$ref": "#/components/schemas/BookmarkOut"
+            },
+            "title": "Bookmarks",
+            "type": "array"
+          },
+          "conversations": {
+            "items": {
+              "$ref": "#/components/schemas/QuickConversation"
+            },
+            "title": "Conversations",
+            "type": "array"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/QuickDoc"
+            },
+            "title": "Documents",
+            "type": "array"
+          },
+          "programmes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Programmes",
+            "type": "array"
+          },
+          "stages": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Stages",
+            "type": "array"
+          }
+        },
+        "required": [
+          "documents",
+          "programmes",
+          "stages",
+          "bookmarks",
+          "conversations"
+        ],
+        "title": "QuickOut",
+        "type": "object"
+      },
       "ReceiverOut": {
         "properties": {
           "acknowledged_at": {
@@ -3709,8 +3959,47 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "VersionContentOut": {
+        "properties": {
+          "approved": {
+            "title": "Approved",
+            "type": "boolean"
+          },
+          "author_name": {
+            "title": "Author Name",
+            "type": "string"
+          },
+          "commit": {
+            "title": "Commit",
+            "type": "string"
+          },
+          "committed_at": {
+            "format": "date-time",
+            "title": "Committed At",
+            "type": "string"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          }
+        },
+        "required": [
+          "commit",
+          "author_name",
+          "committed_at",
+          "approved",
+          "content"
+        ],
+        "title": "VersionContentOut",
+        "type": "object"
+      },
       "VersionOut": {
         "properties": {
+          "approved": {
+            "default": false,
+            "title": "Approved",
+            "type": "boolean"
+          },
           "author_name": {
             "title": "Author Name",
             "type": "string"
@@ -3738,6 +4027,16 @@
             "format": "date-time",
             "title": "Committed At",
             "type": "string"
+          },
+          "latest": {
+            "default": false,
+            "title": "Latest",
+            "type": "boolean"
+          },
+          "live": {
+            "default": false,
+            "title": "Live",
+            "type": "boolean"
           }
         },
         "required": [
@@ -5393,6 +5692,37 @@
         ]
       }
     },
+    "/api/v1/documents/stages": {
+      "get": {
+        "description": "Delivery stages in order (config/vault.yaml), for the Library's stage columns.",
+        "operationId": "list_stages_api_v1_documents_stages_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response List Stages Api V1 Documents Stages Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Stages",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
     "/api/v1/documents/{document_id}": {
       "get": {
         "operationId": "get_document_api_v1_documents__document_id__get",
@@ -5436,6 +5766,59 @@
           }
         ],
         "summary": "Get Document",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/documents/{document_id}/backlinks": {
+      "get": {
+        "description": "Notes that link to or embed this one (\"used in\"). A linking note the user\ncan't read is left out entirely: no title, no count.",
+        "operationId": "get_backlinks_api_v1_documents__document_id__backlinks_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BacklinkOut"
+                  },
+                  "title": "Response Get Backlinks Api V1 Documents  Document Id  Backlinks Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Backlinks",
         "tags": [
           "knowledge"
         ]
@@ -5595,6 +5978,7 @@
     },
     "/api/v1/documents/{document_id}/versions": {
       "get": {
+        "description": "Versions this person may read: approved ones (all versions for the\nnote's editors), each judged by the labels it had (app.governance.history).",
         "operationId": "get_versions_api_v1_documents__document_id__versions_get",
         "parameters": [
           {
@@ -5640,6 +6024,65 @@
           }
         ],
         "summary": "Get Versions",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/documents/{document_id}/versions/{commit}": {
+      "get": {
+        "description": "The text of one version of a note, for reading and side-by-side diffs.\nUnknown, unapproved (for non-editors) and once-narrower versions all 404.",
+        "operationId": "get_version_api_v1_documents__document_id__versions__commit__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "commit",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{40}$",
+              "title": "Commit",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionContentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Version",
         "tags": [
           "knowledge"
         ]
@@ -6199,6 +6642,121 @@
         "summary": "Get Me",
         "tags": [
           "me"
+        ]
+      }
+    },
+    "/api/v1/me/bookmarks": {
+      "get": {
+        "operationId": "list_bookmarks_api_v1_me_bookmarks_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BookmarkOut"
+                  },
+                  "title": "Response List Bookmarks Api V1 Me Bookmarks Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Bookmarks",
+        "tags": [
+          "knowledge"
+        ]
+      },
+      "post": {
+        "operationId": "add_bookmark_api_v1_me_bookmarks_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookmarkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookmarkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Add Bookmark",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/me/bookmarks/{bookmark_id}": {
+      "delete": {
+        "operationId": "remove_bookmark_api_v1_me_bookmarks__bookmark_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "bookmark_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Bookmark Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Remove Bookmark",
+        "tags": [
+          "knowledge"
         ]
       }
     },
@@ -7593,6 +8151,56 @@
         "summary": "Request Share",
         "tags": [
           "projects"
+        ]
+      }
+    },
+    "/api/v1/quick-search": {
+      "get": {
+        "description": "Ctrl+K: titles of documents, programmes, stages, bookmarks and your\nconversations that match `q`. Titles only, never content.",
+        "operationId": "quick_search_api_v1_quick_search_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuickOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Quick Search",
+        "tags": [
+          "knowledge"
         ]
       }
     },

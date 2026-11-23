@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import type { RouteObject } from "react-router";
+import { Outlet, type RouteObject } from "react-router";
 import type { Section } from "@/auth/permissions";
 import { t, type MessageKey } from "@/i18n";
 import { AppShell } from "@/layout/AppShell";
@@ -20,6 +20,12 @@ const AdminIndex = lazy(() =>
 );
 const Users = lazy(() => import("@/pages/admin/Users"));
 const Roles = lazy(() => import("@/pages/admin/Roles"));
+const Library = lazy(() => import("@/pages/library/Library"));
+const Reader = lazy(() => import("@/pages/library/Reader"));
+const Compare = lazy(() => import("@/pages/library/Compare"));
+const Write = lazy(() => import("@/pages/write/Write"));
+const NewNote = lazy(() => import("@/pages/write/NewNote"));
+const EditNote = lazy(() => import("@/pages/write/EditNote"));
 
 export function Loading() {
   return <p className="p-6 text-sm text-muted-foreground">{t("app.loading")}</p>;
@@ -46,7 +52,25 @@ export const routes: RouteObject[] = [
         element: <AppShell />,
         children: [
           { index: true, element: <Home /> },
-          ...(["ask", "library", "write", "review", "retain"] as const).map(placeholder),
+          ...(["ask", "review", "retain"] as const).map(placeholder),
+          {
+            path: "library",
+            element: <RequireSection section="library"><Outlet /></RequireSection>,
+            children: [
+              { index: true, element: suspend(<Library />) },
+              { path: ":id", element: suspend(<Reader />) },
+              { path: ":id/compare", element: suspend(<Compare />) },
+            ],
+          },
+          {
+            path: "write",
+            element: <RequireSection section="write"><Outlet /></RequireSection>,
+            children: [
+              { index: true, element: suspend(<Write />) },
+              { path: "new", element: suspend(<NewNote />) },
+              { path: ":id", element: suspend(<EditNote />) },
+            ],
+          },
           {
             path: "admin",
             element: <RequireSection section="admin">{suspend(<AdminLayout />)}</RequireSection>,

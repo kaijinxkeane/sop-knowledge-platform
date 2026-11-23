@@ -4,6 +4,7 @@ import { Link, NavLink, Outlet } from "react-router";
 import { brand, Logo } from "@/app/theme/brand";
 import { useMe, useSignOut } from "@/auth/hooks";
 import { visibleSections, type Section } from "@/auth/permissions";
+import { CommandPalette } from "@/components/CommandPalette";
 import { Button } from "@/components/ui/button";
 import { t, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/utils";
@@ -65,6 +66,7 @@ export function AppShell() {
           </nav>
           )}
           <div className="ml-auto flex items-center gap-3">
+            {!gated && <CommandPalette sections={sections} />}
             {gated ? (
               <span className="text-sm text-muted-foreground">{me.data.display_name}</span>
             ) : (

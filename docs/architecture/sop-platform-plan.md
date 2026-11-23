@@ -1254,7 +1254,75 @@ goes through the same labels, safeguards and name detector. Repeated images
 (logos) are read once, at most 60 per file; tiny images are skipped. About 0.4 s
 per image after a one-off 2-7 s load. The Docker image uses headless OpenCV.
 Off switch: `ocr.enabled` in `vault.yaml`.
-Still to do in Phase 2: the Library/editor UI.
+Phase 2 *UI*, slice 1 of 3 done (2026-11-23): the Library (browse by
+programme with stage columns and ⚠ for stages without SOPs, by stage, or by
+department; search with slide/page hits and counts-only outcome reporting) and
+the reader (Obsidian links resolved only against documents the reader can see;
+unknown and unreadable links both show "(note not available)", so a restricted
+title never appears; programme names open that programme's Library page;
+embeds as cards; tables; no raw HTML or script links), a deck viewer (each
+slide's text and speaker notes, `?slide=N`), PDFs in the browser viewer from a
+blob (`?page=N`; CSP now allows `frame-src blob:`), downloads fetched on click,
+"Used in" backlinks and version history. New endpoints: `GET /documents/stages`
+(order from `config/vault.yaml`) and `GET /documents/{id}/backlinks` (linking
+notes the reader can't see are left out; covered by the red-team IDOR loop).
+Initial JS 129 KB gzipped.
+
+Phase 2 *UI*, slice 2 of 3 done (2026-11-23): the editor (Milkdown, loaded
+only when editing; 137 KB gzipped). Obsidian syntax (links, embeds, tags,
+callout markers, comments, highlights, block ids) is held as verbatim chips.
+Before saving, every block the person didn't change is put back from the
+original source, so open-and-save changes nothing and a one-word fix is a
+one-line change; the round-trip test checks this on every demo-vault note.
+Also: metadata as a form (YAML comments and unknown fields kept; broken YAML
+is never overwritten), "needs lead approval" when loosening access, autosave
+of drafts 8 s after the last change, templates (SOP, checklist, run-sheet,
+playbook), new notes pre-filled from a gap (`/write/new?programme=&stage=&related=`),
+upload with the tool name and original-design link, link/embed picker
+listing only readable documents, a leave-without-saving warning, and the
+merge screen: changes in different blocks merge automatically, the same block
+changed on both sides is chosen per block (theirs or yours), nothing is merged
+by a model. Edit appears in the reader for contributors (cosmetic; the save
+endpoint checks again).
+
+Known limits of slice 2: each autosave is a commit (history gets busy on long
+drafts; squashing in-progress commits is a later option); images aren't shown
+inside the editor (they stay as `![[...]]` chips); the AI's label suggestion
+isn't shown inline yet (it needs a per-note suggestion endpoint); moving a
+note to another space isn't in the form (it needs the lead anyway).
+
+Phase 2 *UI*, slice 3 of 3 done (2026-11-23):
+- **Version history for readers.** `GET /documents/{id}/versions` now lists
+  only versions the person may read: approved ones (every version for the
+  note's editors), each judged by the labels it had
+  (`app/governance/history.py`, shared with the review diff). Before this,
+  anyone who could read a note saw every commit's author and time, unapproved
+  ones included. `GET /documents/{id}/versions/{commit}` returns one version's
+  text under the same rules (full 40-character commit of this note only; every
+  refusal is a 404). The reader opens an older version with a banner; the
+  compare page shows two versions side by side (line diff in the browser,
+  unchanged runs folded), by default the latest against the live one.
+- **Bookmarks** (`bookmarks` table, migration 0012; `GET/POST /me/bookmarks`,
+  `DELETE /me/bookmarks/{id}`): ★ on a document or one slide/page, listed on
+  Home and in the Library. Private to the user; each target is re-checked
+  against today's access on every list (hidden targets are left out, not
+  deleted); bookmarking something you can't open is a 404.
+- **Ctrl+K / ⌘K** (`GET /quick-search?q=`): titles of readable documents,
+  programmes and stages from them, your bookmarks and your own conversations,
+  plus actions shown only where the menu is. `%`, `_` and `\` match
+  literally; queries are never stored or logged. The dialog loads on first
+  use (initial JS 135 KB).
+- Red-team: the IDOR loop covers the version and bookmark endpoints, and the
+  old-restricted-version attack now also tries the versions list and
+  `/versions/{commit}` with a commit taken from the lead's view.
+
+Not done in Phase 2 (carried forward):
+- Conversations in bookmarks and Ctrl+K link to `/ask?conversation=`, which
+  opens once the Ask screen is built (Phase 3).
+- Diffs of decks and PDFs (only notes have version text).
+- **Slide pictures:** render each slide to an image at upload (LibreOffice,
+  headless, run on demand), served permission-checked; the viewer shows text
+  and notes until then. Images inside notes aren't shown yet either.
 
 Phase 2b *backend* done (2026-11-21):
 - **Classifier** (`app/classify/`): one local model call per document version.

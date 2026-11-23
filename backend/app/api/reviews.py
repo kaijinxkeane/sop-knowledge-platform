@@ -56,13 +56,12 @@ from app.db.scoped import apply_reader_scope, has_pending_change, sees_latest, v
 from app.governance import webhooks
 from app.governance.approvals import approve as approve_version
 from app.governance.approvals import write_back
+from app.governance.history import owner_space, version_readable
 from app.governance.notify import notify, users_with
 from app.governance.versions import with_frontmatter
-from app.policy.engine import Sensitivity, can_view_document
 from app.vault.git import GitError, GitVault
 from app.vault.indexer import Indexer
-from app.vault.labels import resolve_labels, vault_config
-from app.vault.parse import parse_note
+from app.vault.labels import vault_config
 
 router = APIRouter(tags=["workflow"])
 NOT_FOUND = HTTPException(status.HTTP_404_NOT_FOUND, "not found")
@@ -122,10 +121,6 @@ class NotificationOut(BaseModel):
 # --- helpers ----------------------------------------------------------------------
 
 
-def owner_space(doc: Document) -> str | None:
-    return next((a.space for a in doc.access if a.role == "owner"), None)
-
-
 async def _editor_doc(session: AsyncSession, me: CurrentUser, doc_id: uuid.UUID) -> Document:
     """A document this user can see *including* unapproved changes, else 404."""
     await session.commit()
@@ -152,36 +147,7 @@ async def _spaces(session: AsyncSession) -> set[str]:
 
 
 def _version_readable(me: CurrentUser, doc: Document, git: GitVault, commit: str, spaces) -> bool:
-    """May this user read that version, judged by the labels it had then?
-    The approved and latest versions follow the document's access (already
-    checked); for any other version the labels are re-read from its own
-    frontmatter and folder. Unknown labels fail closed: then only someone who
-    approves the owner space at `restricted` may read it."""
-    for known in (doc.approved_commit, doc.current_commit):
-        if known and known.startswith(commit):
-            return True
-    try:
-        text = git.show(doc.vault_path, commit).decode("utf-8", "replace")
-    except GitError:
-        return False
-    parsed = parse_note(doc.vault_path, text)
-    labels = resolve_labels(
-        doc.vault_path,
-        parsed.frontmatter,
-        text,
-        known_spaces=spaces,
-        config=vault_config(),
-        frontmatter_error=parsed.frontmatter_error,
-    )
-    rows = [(space, sens) for space, _, sens in labels.rows()]
-    if labels.space is None or not rows:
-        space = owner_space(doc)
-        return (
-            bool(space)
-            and me.principal.can("approve", space)
-            and me.principal.can_read(space, Sensitivity.RESTRICTED)
-        )
-    return can_view_document(me.principal, rows, safeguards=labels.safeguards)
+    return version_readable(me.principal, doc, git, commit, spaces)
 
 
 async def _change_authors(session: AsyncSession, doc: Document) -> set[uuid.UUID]:
