@@ -1,0 +1,372 @@
+# Conflict-check eval, DEV set (plan §7). FICTIONAL data only.
+#
+#   python -m app.cli eval-conflicts [--mode strict|screen] [--set dev|holdout]
+#
+# Each item is a pair of passages from two different approved SOPs, as the
+# nightly check sees them (the search index already found them close in
+# meaning). `conflict: true` means a member of staff following both would get
+# different instructions for the same situation.
+#
+# Tune prompts on this file only. conflicts-holdout.yaml is for the final
+# comparison and must not be used to adjust anything.
+#
+# Kinds of conflict: number, deadline, owner, order, rule (yes/no), tool.
+# Kinds of non-conflict (hard negatives, all on the same topic):
+#   detail     one passage adds detail the other leaves out
+#   situation  same topic, but different situations (programme, online/in person)
+#   reworded   same instruction in different words
+#   exception  one states an exception that the other explicitly allows
+
+items:
+  # --- conflicts ------------------------------------------------------------------
+  - id: d01
+    conflict: true
+    kind: number
+    a: {title: "Executive Presence Workshop - Running the Day", text: "Groups are 6 to 10 participants. If more than 10 sign up, open a second date rather than enlarging the group."}
+    b: {title: "Workshop Sales Guide", text: "The Executive Presence Workshop takes up to 14 participants per group, so fill each date before offering a new one."}
+  - id: d02
+    conflict: true
+    kind: deadline
+    a: {title: "Expense Claims", text: "Submit expense claims with receipts within 30 days of the purchase. Late claims need your manager's written approval."}
+    b: {title: "Finance Month-End Checklist", text: "Staff must submit all expense claims within 14 days of purchase so finance can close the month."}
+  - id: d03
+    conflict: true
+    kind: owner
+    a: {title: "Reporting an IT Issue", text: "Report a lost or stolen laptop to the IT lead immediately; the IT lead locks the device remotely."}
+    b: {title: "Security Incident Response", text: "A lost laptop is reported to the office manager, who decides whether IT needs to lock the device."}
+  - id: d04
+    conflict: true
+    kind: order
+    a: {title: "Signature Programme - Discovery Stage", text: "Run the values card sort first, then the 3-minute brand story exercise, so the story builds on the client's chosen values."}
+    b: {title: "Discovery Workshop Run-Sheet", text: "Open with the 3-minute brand story exercise. Only after the story, run the values card sort to test what the story revealed."}
+  - id: d05
+    conflict: true
+    kind: rule
+    a: {title: "Photography Consent at Events", text: "Never post photos of participants on social media without their signed consent form."}
+    b: {title: "Social Media Guidelines", text: "Group photos from training days can be posted on our company page without individual consent, as long as no one is tagged."}
+  - id: d06
+    conflict: true
+    kind: tool
+    a: {title: "Password Manager Policy", text: "Store all shared client account passwords in the company password manager. Never share passwords over chat."}
+    b: {title: "Client Social Accounts Handover", text: "Send the client's social media login to the content trainer in a direct chat message so they can start posting the same day."}
+  - id: d07
+    conflict: true
+    kind: number
+    a: {title: "Leave Policy", text: "Full-time staff get 18 days of annual leave per calendar year, plus public holidays."}
+    b: {title: "New Hire Onboarding Checklist", text: "Explain the leave entitlement: 14 days of annual leave per year, rising by one day for each year of service."}
+  - id: d08
+    conflict: true
+    kind: deadline
+    a: {title: "Client Contract Checklist", text: "Send the signed contract and first invoice to the client at least 10 working days before the first session."}
+    b: {title: "Signature Programme - Onboarding Stage", text: "Issue the contract and first invoice on the day of the first session, once the client has met their trainer."}
+  - id: d09
+    conflict: true
+    kind: owner
+    a: {title: "Booking AV Equipment", text: "Trainers book the projector and microphones themselves through the AV booking form."}
+    b: {title: "Training Day Logistics", text: "Only the office manager books AV equipment. Trainers send their needs to the office manager by Wednesday."}
+  - id: d10
+    conflict: true
+    kind: rule
+    a: {title: "Training Day Dress Code", text: "Trainers wear business attire on every training day, including online sessions."}
+    b: {title: "Online Session Setup", text: "For online sessions, trainers may dress casually; only the background needs to look professional."}
+  - id: d11
+    conflict: true
+    kind: number
+    a: {title: "Executive Presence Workshop - Feedback", text: "Send the feedback survey 2 days after the workshop and send one reminder after a week."}
+    b: {title: "Participant Survey Process", text: "Send the workshop feedback survey the same evening. Do not send reminders."}
+  - id: d12
+    conflict: true
+    kind: deadline
+    a: {title: "Reviewing SOPs", text: "Each SOP owner reviews their SOPs every 180 days."}
+    b: {title: "Quality Calendar", text: "All SOPs are reviewed once a year in January by their owners."}
+  - id: d13
+    conflict: true
+    kind: order
+    a: {title: "Laptop Setup for New Staff", text: "Turn on disk encryption before installing any other software, then enrol the laptop in device management."}
+    b: {title: "IT Onboarding Run-Sheet", text: "Enrol the laptop in device management first; it installs the apps. Turn on disk encryption at the end of the first week."}
+  - id: d14
+    conflict: true
+    kind: tool
+    a: {title: "Client File Storage", text: "Save client workbooks in the shared drive's Clients folder. Never keep client files on your desktop."}
+    b: {title: "Signature Programme - Content Stage", text: "Keep each client's workbook on your laptop desktop during the content stage so it's easy to find, and upload it at the end."}
+  - id: d15
+    conflict: true
+    kind: rule
+    a: {title: "Rescheduling a Session", text: "A client can reschedule a one-to-one session for free with at least 48 hours' notice."}
+    b: {title: "Client Terms Summary", text: "Rescheduling a one-to-one session always costs a fee of half a session, whatever the notice."}
+  - id: d16
+    conflict: true
+    kind: owner
+    a: {title: "Disciplinary Process", text: "Only the HR lead can issue a written warning, after a meeting with the employee."}
+    b: {title: "Managing Your Team", text: "Team leads issue written warnings to their own staff and send a copy to HR afterwards."}
+
+  # --- not conflicts (same topic) ------------------------------------------------
+  - id: d17
+    conflict: false
+    kind: detail
+    a: {title: "Expense Claims", text: "Submit expense claims with receipts within 30 days of the purchase."}
+    b: {title: "Travel Expenses", text: "For taxi claims, include the trip receipt and the client or venue you travelled to. Claims follow the usual 30-day rule."}
+  - id: d18
+    conflict: false
+    kind: situation
+    a: {title: "Executive Presence Workshop - Running the Day", text: "The workshop is one full day for groups of 6 to 10."}
+    b: {title: "Signature Programme - Overview", text: "The Signature Programme runs for 12 weeks, one-to-one, with a session every week."}
+  - id: d19
+    conflict: false
+    kind: reworded
+    a: {title: "Reporting an IT Issue", text: "Log every IT problem in the helpdesk form so the IT lead can track it."}
+    b: {title: "IT Basics for New Staff", text: "Got a computer problem? Use the helpdesk form. That's how the IT lead keeps track of issues."}
+  - id: d20
+    conflict: false
+    kind: situation
+    a: {title: "Online Session Setup", text: "For online sessions, send the video link 24 hours before the session."}
+    b: {title: "Training Room Sessions", text: "For in-person sessions, send the venue address and parking details 3 days before."}
+  - id: d21
+    conflict: false
+    kind: exception
+    a: {title: "Leave Policy", text: "Annual leave must be requested two weeks ahead. In an emergency, your manager can approve leave at shorter notice."}
+    b: {title: "Compassionate Leave", text: "For a family emergency, tell your manager as soon as you can; leave can be approved the same day."}
+  - id: d22
+    conflict: false
+    kind: detail
+    a: {title: "Signature Programme - Discovery Stage", text: "Run the values card sort in the first discovery session."}
+    b: {title: "Values Card Sort", text: "Give the client the 40-card deck, ask for three piles (always, sometimes, never), then narrow 'always' to five cards. Allow 25 minutes."}
+  - id: d23
+    conflict: false
+    kind: reworded
+    a: {title: "Password Manager Policy", text: "Use the company password manager for all shared passwords."}
+    b: {title: "Client Social Accounts Handover", text: "Client social media logins go into the company password manager, in the client's shared folder."}
+  - id: d24
+    conflict: false
+    kind: situation
+    a: {title: "Booking AV Equipment", text: "Book the Large Room projector at least 2 days ahead through the AV form."}
+    b: {title: "Small Room Equipment", text: "The Small Room has a TV screen that is always available; no booking is needed."}
+  - id: d25
+    conflict: false
+    kind: detail
+    a: {title: "Client Contract Checklist", text: "Check that the contract states the programme, the number of sessions and the payment schedule."}
+    b: {title: "Contract Renewals", text: "When renewing, also check that the contract has the new end date and that the client's billing contact is still correct."}
+  - id: d26
+    conflict: false
+    kind: exception
+    a: {title: "Photography Consent at Events", text: "Get signed consent before posting any participant's photo. The only exception is photos where no participant can be identified, such as hands on a workbook."}
+    b: {title: "Social Media Guidelines", text: "Close-ups of workbooks or flip charts, with no faces, can be posted without consent forms."}
+  - id: d27
+    conflict: false
+    kind: situation
+    a: {title: "New Hire Onboarding Checklist", text: "On day one, the new hire meets their buddy and receives their laptop."}
+    b: {title: "Contractor Onboarding", text: "Freelance trainers bring their own laptop and get guest access to the shared drive only."}
+  - id: d28
+    conflict: false
+    kind: reworded
+    a: {title: "Training Day Timings", text: "Training days run from 9:00 to 17:00, with doors open at 8:30."}
+    b: {title: "Room Setup Checklist", text: "Arrive by 8:30 to set up; participants start at 9 and leave by 5 pm."}
+  - id: d29
+    conflict: false
+    kind: detail
+    a: {title: "Reporting an IT Issue", text: "Report a lost laptop to the IT lead straight away."}
+    b: {title: "Security Incident Response", text: "After reporting a lost laptop to the IT lead, also write down where and when you last had it; IT will ask for this."}
+  - id: d30
+    conflict: false
+    kind: situation
+    a: {title: "Rescheduling a Session", text: "One-to-one Signature sessions can be rescheduled free with 48 hours' notice."}
+    b: {title: "Workshop Cancellations", text: "Places on the Executive Presence Workshop can be moved to another date once, with 7 days' notice."}
+  - id: d31
+    conflict: false
+    kind: exception
+    a: {title: "Laptop Setup for New Staff", text: "Install only approved software. Ask the IT lead to approve anything not on the list."}
+    b: {title: "Design Tools", text: "The content team uses Canva, which the IT lead has approved for everyone in content roles."}
+  - id: d32
+    conflict: false
+    kind: detail
+    a: {title: "Executive Presence Workshop - Feedback", text: "Send the feedback survey 2 days after the workshop."}
+    b: {title: "Participant Survey Process", text: "Surveys are sent from the survey tool's Workshop template. Add the workshop date to the survey title before sending."}
+
+  # --- harder: long passages and implicit conflicts (added 2026-11-23) -------------
+  # buried     a conflict inside a long passage that is otherwise consistent
+  # implicit   a conflict that needs a small inference (units, calendars, roles)
+  # long       long same-topic passages that agree (hard negative)
+  # equivalent different words or units for the same rule (hard negative)
+  - id: d33
+    conflict: true
+    kind: buried
+    a:
+      title: "Executive Presence Workshop - Running the Day"
+      text: >-
+        Arrive at 8:15 to set up the room in a U-shape with the flip chart at the open end. Test the
+        camera and the clicker before anyone arrives. Welcome participants at the door and hand out
+        name cards. Open at 9:00 with the agenda and the ground rules. The morning covers first
+        impressions, posture and voice, with a short exercise after each part. Lunch is at 12:30
+        for 45 minutes. In the afternoon, each participant gives a 2-minute pitch to the group and
+        receives feedback from two peers and the trainer. Close at 17:00 with the closing circle.
+    b:
+      title: "Pitch Practice Exercise"
+      text: >-
+        The pitch exercise is the centre of the afternoon. Brief the group on the feedback rules:
+        start with one strength, then one change, and keep it specific. Each participant has
+        4 minutes for their pitch so there is time to recover from a slow start. Feedback comes from
+        two peers and then the trainer. Keep a visible timer on the screen so people can pace
+        themselves, and thank each speaker before moving on.
+  - id: d34
+    conflict: true
+    kind: buried
+    a:
+      title: "Expense Claims"
+      text: >-
+        Claims are made through the expenses form on the staff portal. Attach a photo of each
+        receipt; a bank statement is not a receipt. Taxi trips need the start and end points.
+        Client meals need the client's company name and the number of people. Claims must be
+        submitted within 30 days of the purchase. Your manager approves the claim, then finance
+        pays it with the next payroll. Claims over $500 also need the CEO's approval.
+    b:
+      title: "Client Entertainment"
+      text: >-
+        Taking a client to lunch is a normal part of the programmes. Keep it simple and choose a
+        place close to the office. Note the client's company and the number of people on the
+        receipt. Any claim for client entertainment is approved by finance directly, without your
+        manager, so it can be processed faster. Alcohol is not reimbursed.
+  - id: d35
+    conflict: true
+    kind: buried
+    a:
+      title: "New Hire Onboarding Checklist"
+      text: >-
+        Before day one: HR sends the welcome email and the staff notice, and the IT lead prepares
+        the laptop. On day one: the new hire meets their buddy, gets a building pass and a tour,
+        and reads the staff notice. In week one: they shadow two training sessions and complete the
+        password manager setup. The probation review takes place at the end of month three with
+        the hiring manager and HR.
+    b:
+      title: "Probation Reviews"
+      text: >-
+        Every new hire has a probation review with their hiring manager. Prepare by collecting
+        feedback from the people they worked with most. Discuss what went well and what to work
+        on. The review is held at the end of the sixth month. Record the outcome in the HR system
+        the same week and tell HR if the probation should be extended.
+  - id: d36
+    conflict: true
+    kind: buried
+    a:
+      title: "Signature Programme - Content Stage"
+      text: >-
+        In the content stage, the client and trainer turn the brand statement into posts. Plan a
+        month of content in the first content session. The client drafts; the trainer edits for
+        voice. Each post is checked against the brand pillars. The client publishes from their own
+        account. The trainer never posts on the client's behalf, even if the client asks, because
+        the voice must stay the client's own.
+    b:
+      title: "Client Social Accounts Handover"
+      text: >-
+        Some clients want help getting started on social media. Store their login in the company
+        password manager, in the client's shared folder. When a client is travelling or busy, the
+        trainer may publish the approved posts from the client's account on their behalf, and
+        tells the client the same day. Remove the login from the password manager at the end of
+        the programme.
+  - id: d37
+    conflict: true
+    kind: implicit
+    a: {title: "Leave Policy", text: "Request annual leave at least two weeks before the first day off."}
+    b: {title: "Team Calendar", text: "Leave requests need 5 working days' notice so the team calendar can be updated."}
+  - id: d38
+    conflict: true
+    kind: implicit
+    a: {title: "Booking a Training Room", text: "Only staff with the contribute permission may book the Large Room."}
+    b: {title: "New Hire Onboarding Checklist", text: "In their first week, every new hire, including those with read-only access, books the Large Room for their practice session."}
+  - id: d39
+    conflict: true
+    kind: implicit
+    a: {title: "Reviewing SOPs", text: "Each SOP is reviewed every 6 months by its owner."}
+    b: {title: "SOP Template", text: "Set the review cycle field to 365 days for every new SOP."}
+  - id: d40
+    conflict: true
+    kind: implicit
+    a: {title: "Workshop Cancellations", text: "Places can be moved to another date with at least 7 days' notice."}
+    b: {title: "Workshop Sales Guide", text: "Tell clients they can move their place for free up until the Friday before a Monday workshop."}
+  - id: d41
+    conflict: false
+    kind: long
+    a:
+      title: "Executive Presence Workshop - Running the Day"
+      text: >-
+        Arrive at 8:15 to set up the room in a U-shape with the flip chart at the open end. Test the
+        camera and the clicker before anyone arrives. Open at 9:00 with the agenda and the ground
+        rules. The morning covers first impressions, posture and voice. Lunch is at 12:30 for
+        45 minutes. In the afternoon, each participant gives a 2-minute pitch and receives feedback
+        from two peers and the trainer. Close at 17:00 with the closing circle.
+    b:
+      title: "Pitch Practice Exercise"
+      text: >-
+        The pitch exercise is the centre of the afternoon. Brief the group on the feedback rules:
+        start with one strength, then one change, and keep it specific. Each participant has
+        2 minutes for their pitch; stop them kindly at the limit. Feedback comes from two peers and
+        then the trainer. Keep a visible timer on the screen, and thank each speaker before moving
+        on.
+  - id: d42
+    conflict: false
+    kind: long
+    a:
+      title: "Expense Claims"
+      text: >-
+        Claims are made through the expenses form on the staff portal. Attach a photo of each
+        receipt; a bank statement is not a receipt. Claims must be submitted within 30 days of the
+        purchase. Your manager approves the claim, then finance pays it with the next payroll.
+        Claims over $500 also need the CEO's approval.
+    b:
+      title: "Client Entertainment"
+      text: >-
+        Taking a client to lunch is a normal part of the programmes. Choose a place close to the
+        office. Note the client's company and the number of people on the receipt. Claim it on the
+        expenses form like any other expense; your manager approves it. Alcohol is not reimbursed.
+  - id: d43
+    conflict: false
+    kind: long
+    a:
+      title: "New Hire Onboarding Checklist"
+      text: >-
+        Before day one: HR sends the welcome email and the staff notice, and the IT lead prepares
+        the laptop. On day one: the new hire meets their buddy, gets a building pass and a tour.
+        In week one: they shadow two training sessions and set up the password manager. The
+        probation review takes place at the end of month three.
+    b:
+      title: "Probation Reviews"
+      text: >-
+        Every new hire has a probation review with their hiring manager at the end of their third
+        month. Prepare by collecting feedback from the people they worked with most. Record the
+        outcome in the HR system the same week and tell HR if the probation should be extended.
+  - id: d44
+    conflict: false
+    kind: long
+    a:
+      title: "Signature Programme - Content Stage"
+      text: >-
+        In the content stage, the client and trainer turn the brand statement into posts. Plan a
+        month of content in the first content session. The client drafts; the trainer edits for
+        voice. Each post is checked against the brand pillars. The client publishes from their own
+        account.
+    b:
+      title: "Client Social Accounts Handover"
+      text: >-
+        Some clients want help getting started on social media. If a client shares a login so the
+        trainer can review their profile settings, store it in the company password manager, in
+        the client's shared folder, and remove it at the end of the programme. Trainers don't
+        publish posts; that stays with the client.
+  - id: d45
+    conflict: false
+    kind: equivalent
+    a: {title: "Leave Policy", text: "Request annual leave at least two weeks before the first day off."}
+    b: {title: "Team Calendar", text: "Leave requests need 10 working days' notice so the team calendar can be updated."}
+  - id: d46
+    conflict: false
+    kind: equivalent
+    a: {title: "Reviewing SOPs", text: "Each SOP is reviewed every 6 months by its owner."}
+    b: {title: "SOP Template", text: "Set the review cycle field to 180 days for every new SOP."}
+  - id: d47
+    conflict: false
+    kind: equivalent
+    a: {title: "Training Day Timings", text: "Training days finish at 17:00."}
+    b: {title: "Room Setup Checklist", text: "Clear the room after participants leave at 5 pm."}
+  - id: d48
+    conflict: false
+    kind: equivalent
+    a: {title: "Signature Programme - Overview", text: "The programme lasts three months, with a one-to-one session each week."}
+    b: {title: "Signature Programme - Proposal Template", text: "Describe the programme as 12 weekly one-to-one sessions."}

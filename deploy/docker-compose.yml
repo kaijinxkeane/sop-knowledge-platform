@@ -1,6 +1,9 @@
 # Local development / single-machine deployment (Mac mini or Windows+WSL2).
 # Ollama runs natively on the host (Docker can't use the Mac GPU), reached via
-# host.docker.internal. Caddy (TLS + frontend) and Headscale arrive in later phases.
+# host.docker.internal. `web` (Caddy) serves the frontend and proxies /api;
+# TLS and Headscale arrive in Phase 6.
+#
+#   open http://localhost:8080      # the web app (WEB_PORT)
 #
 #   cp .env.example .env            # then edit
 #   ./deploy/init-demo-vault.sh     # development only: create the demo vault repo
@@ -21,6 +24,9 @@ x-backend: &backend
     VAULT_PATH: /vault
     SOP_CONFIG_DIR: /config
     OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    # uvicorn trusts X-Forwarded-For only from Caddy (`web`), so the sign-in
+    # rate limit sees each person's address, not one shared proxy address.
+    FORWARDED_ALLOW_IPS: ${WEB_IP:-172.29.86.10}
   volumes:
     - ${VAULT_HOST_PATH:-./data/vault}:/vault
     - ../config:/config:ro
@@ -77,6 +83,31 @@ services:
   worker:
     <<: *backend
     command: ["arq", "app.workers.main.WorkerSettings"]
+
+  web:
+    build:
+      context: ../frontend
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:8080"
+    networks:
+      default:
+        ipv4_address: ${WEB_IP:-172.29.86.10}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+networks:
+  default:
+    ipam:
+      config:
+        # Fixed so the API can trust exactly one proxy address (WEB_IP).
+        - subnet: ${STACK_SUBNET:-172.29.86.0/24}
 
 volumes:
   pgdata:

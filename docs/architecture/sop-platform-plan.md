@@ -1188,8 +1188,16 @@ repo on the company device, mounted at deploy time via `VAULT_PATH`.
 
 **Progress:** Phase 0 *backend* done (2026-11-20): the gateway with its data
 boundary, the Docker stack, migrations, the demo vault, CI and a content-free
-logging policy. The Phase 0 *frontend* skeleton follows when frontend work
-starts (backend first, by decision).
+logging policy. Phase 0 *frontend* done (2026-11-23): `frontend/` with Vite +
+React + TypeScript, shadcn-style components, a neutral theme in
+`src/app/theme`, an i18n layer, a typed client generated from the OpenAPI spec
+(CI fails when it is stale), the layout shell with permission-aware menus, and
+the sign-in page (password, then TOTP; the access token is kept in memory only,
+and the refresh cookie restores the session after a reload). The `web` service
+(Caddy) serves the build at http://localhost:8080, proxies `/api`, and sets a
+strict CSP, with no access log. The API trusts `X-Forwarded-For` only from Caddy's
+fixed address, so the sign-in rate limit counts each person separately. Initial
+JS is 122 KB gzipped (budget 300 KB). The TOTP enrolment screen comes in Phase 1.
 
 Phase 1 *backend* done (2026-11-21): sign-in with password then mandatory
 TOTP (enrolment on first sign-in, replay protection, lockout after 5
@@ -1199,8 +1207,17 @@ detection, invite links (no email needed), the policy engine
 Postgres RLS via the `sop_reader` role (`app/db/scoped.py`), append-only
 hash-chained audit log, staff notice acknowledgement, admin API with
 last-admin protection, default roles in `config/roles.yaml`, and a CLI
-(`python -m app.cli`). The Phase 1 *UI* (sign-in, TOTP enrolment, notice,
-admin screens) comes with the frontend skeleton.
+(`python -m app.cli`). Phase 1 *UI* done (2026-11-23): two-factor setup at
+first sign-in (QR code drawn in the browser, so the secret never goes to an
+outside service), set-password page for invite links (token in the URL
+fragment, removed from the address bar on load), the staff notice as a gate
+until acknowledged (markdown without raw HTML) and on its own page, an account
+page, and Admin → users (invite with a one-time link, edit, new password link,
+reset two-factor, unlock; no new roles for yourself) and roles and grants
+(company-wide grants offer only company actions). New endpoint
+`GET /admin/options` (manage_users): every space and the allowed actions, since
+`/spaces` lists only spaces the caller can read. Admin screens and the markdown
+renderer load on demand; initial JS 127 KB gzipped.
 
 Phase 2 *backend* done (2026-11-21), except OCR:
 - **Parsers** (`app/vault/parse.py`): Obsidian notes (frontmatter, wikilinks,
@@ -1403,10 +1420,34 @@ Phase 5 *backend* done (2026-11-21):
 - **Coverage map** (`/reports/coverage`; titles for leads, counts for HR),
   **staleness** (`/spaces/{s}/stale`), **bus factor** (`/reports/bus-factor`;
   sole human author, and people with a `leaving_on` date set by the admin).
-- **Conflict detection** (nightly, at most 10 local-model checks): the closest
+- **Conflict detection** (nightly, up to 500 local-model checks): the closest
   passage pairs between approved SOPs. Each pair of approved versions is
   checked once. Results go to people who can read both SOPs and lead one of
   their spaces.
+  - **Eval (2026-11-23)**, `python -m app.cli eval-conflicts [--stage search]`:
+    48 labelled fictional pairs for tuning (`config/eval/conflicts.yaml`) and
+    36 held out (`conflicts-holdout.yaml`), half conflicts each. They include
+    conflicts buried in long passages, implicit ones (units, roles) and
+    same-topic pairs that agree. The held-out set has now been used once;
+    later tuning needs fresh held-out pairs.
+  - **Search settings** (tuned on dev): the old 0.25 cutoff with 3 neighbours
+    let only 7/24 dev and 2/18 held-out conflicts reach the model. Now 0.55
+    with 10 neighbours: 24/24 dev, 16/18 held out. Up to 500 checks a night
+    (~3 s each, ~25 min; job timeout 1 h). Already-checked pairs are skipped
+    inside the query, so they no longer use up the row limit and starve new SOPs.
+  - **The 8B judge** (current prompt, 3 runs): dev 91.7% of conflicts caught,
+    12.5% false alarms; held out 83.3% caught, 22.2% false alarms. Weak spots:
+    one contradicting sentence inside a long passage (held out 3/9), and the
+    same rule in other words or units ("every quarter" vs "four times a
+    year": 3/9). A revised prompt aimed at both made no difference (1 of 144
+    trials, p = 1.0), and an over-flagging screen prompt did worse (93.8% vs
+    100% on the first 32 pairs); neither is used.
+  - **End to end on held-out pairs:** 15 of 18 conflicts found, up from 2.
+  - **Deferred (to do, 2026-11-23):** a stronger second-stage model has a real
+    job now (equivalent or reworded pairs the 8B flags). Try a 14B in Ollama
+    overnight on the dev set before AirLLM. Buried conflicts are misses, so a
+    confirm stage can't fix them; smaller passages or a stronger first stage
+    could. Listed under "Deferred work" below.
 - **Retract** (`POST /retractions`, `manage_users`): a document, or a value
   plus its common encodings (llm-wiki's `retract_patterns`).
   - What it purges: the index, answers that cited the document, chat text,
@@ -1528,6 +1569,15 @@ Docker can't use the Mac GPU. Only `demo-vault/` is used.
 **Later:** SSO (Entra/Google/OIDC: groups map onto roles, so the grants model
 is unchanged), Slack/Teams adapters, the dashboard app, ticketing integrations
 (Jira/ServiceNow handoff when the bot can't answer), and multi-tenant support.
+
+### Deferred work (to do)
+
+- **Conflict check, second stage** (deferred 2026-11-23, frontend first): test
+  a 14B in Ollama as a confirm stage after the 8B, overnight, on
+  `config/eval/conflicts.yaml`, aimed at the 8B's false alarms on rules written
+  in other words or units. Write fresh held-out pairs first: `conflicts-holdout.yaml`
+  has been used once. Try AirLLM only if a 14B (or 32B on a 32 GB host) isn't
+  enough. Separately, look at buried conflicts (smaller passages for the check).
 
 ## 13. Open questions for the owner
 

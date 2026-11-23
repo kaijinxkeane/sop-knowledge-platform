@@ -1,0 +1,24 @@
+import js from "@eslint/js";
+import reactHooks from "eslint-plugin-react-hooks";
+import globals from "globals";
+import tseslint from "typescript-eslint";
+
+export default tseslint.config(
+  { ignores: ["dist", "src/api/schema.d.ts"] },
+  {
+    files: ["**/*.{ts,tsx}"],
+    extends: [js.configs.recommended, ...tseslint.configs.recommended],
+    languageOptions: { ecmaVersion: 2022, globals: globals.browser },
+    plugins: { "react-hooks": reactHooks },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      // Content never goes to the console (plan: logs never contain content).
+      "no-console": "error",
+    },
+  },
+  {
+    files: ["scripts/**/*.mjs"],
+    languageOptions: { globals: globals.node },
+    rules: { "no-console": "off" },
+  },
+);

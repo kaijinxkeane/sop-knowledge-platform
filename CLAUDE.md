@@ -29,6 +29,21 @@ SOP_LIVE_TESTS=1 uv run pytest -m live   # from backend/: opt-in real-provider t
   real company data. Regenerate decks/worksheets with
   `uv run python scripts/generate_demo_assets.py` (from `backend/`).
 
+**Frontend** (run before declaring any frontend change done):
+
+```bash
+make frontend-install              # once (npm ci in frontend/)
+make frontend-test                 # API-client check, eslint, tsc, vitest, build, 300 KB JS budget
+make frontend-dev                  # Vite on :5173, /api forwarded to the API from `make up`
+```
+
+- **Changed a backend endpoint or model?** Run `make api-client` and commit
+  `frontend/src/api/openapi.json` + `schema.d.ts`; CI fails if they're stale.
+- The stack serves the built app at http://localhost:8080 (`web`, Caddy).
+  After pulling a compose network change, run `make down && make up`.
+- Sign-in tests must keep the access token out of browser storage
+  (`src/pages/SignIn.test.tsx`). UI text goes through `t()` (`src/i18n/en.ts`).
+
 **Inherited llm-wiki structural tests** (`make plugin-tests`). They need no LLM and
 finish quickly:
 
@@ -77,14 +92,20 @@ backend/                 — FastAPI app (uv project, Python 3.12)
   app/governance/        — version-bound approvals (live vs current chunks), reviews jobs, notifications, webhooks
   app/retention/         — handovers, gap topics + personal gaps, conflicts, retract, 24-month retention
   app/projects/          — project spaces: per-request project access, lead-approved shares, expiry
-  app/eval/              — answering + retrieval eval runners, stats (tune on questions.yaml, compare on questions-holdout.yaml)
+  app/eval/              — answering, retrieval + conflict-check eval runners, stats (tune on dev sets, compare on *-holdout.yaml)
   app/workers/           — arq worker: index git changes every minute, nightly unattributed check
   wiki_core/             — loads scripts/llm-wiki in place (single copy of the helpers)
   tests/
+frontend/                — React + TS (Vite), shadcn-style ui, TanStack Query, React Router
+  src/api/               — generated OpenAPI types (schema.d.ts) + client with token refresh
+  src/auth/              — in-memory session, /me hooks, which menus show (cosmetic only)
+  src/app/theme/         — all brand values (theme.css variables, brand.tsx name/logo)
+  src/i18n/, src/layout/, src/pages/, src/components/ui/
+  deploy/Caddyfile       — serves dist/, proxies /api, security headers, no access log
 config/                  — models.yaml (tiers), spaces/*.yaml, roles.yaml, vault.yaml (folder rules), notice.md, eval/
 demo-vault/              — synthetic Obsidian vault (fictional data only) + demo-vault-labels.yaml
 deploy/                  — docker-compose.yml, init-demo-vault.sh (dev only)
-.github/workflows/ci.yml — backend tests, image build, inherited structural tests
+.github/workflows/ci.yml — backend + frontend tests, image builds, inherited structural tests
 scripts/llm-wiki         — deterministic wiki helpers (loaded by backend/wiki_core)
 scripts/llm-wiki-session — session capture helper
 claude-plugin/           — inherited llm-wiki workflow specs, reused as agent prompt material
@@ -93,8 +114,7 @@ claude-plugin/           — inherited llm-wiki workflow specs, reused as agent 
 tests/                   — structural tests, fixtures (golden-wiki, defects), promptfoo evals
 ```
 
-Planned (see the roadmap): `frontend/` (React + TypeScript via Vite, built to
-static files), agents, retrieval and Caddy/Headscale in `deploy/`.
+Planned (see the roadmap): the Phase 1–5 screens, TLS and Headscale in Phase 6.
 
 ## Security rules for platform code
 
@@ -135,6 +155,10 @@ static files), agents, retrieval and Caddy/Headscale in `deploy/`.
 - Project shares need the department lead's approval, checked on their own roles
   (`principal_for`), never on project access. Partial shares are checked in both
   `sop_doc_visible()` (v4) and `can_view_document(..., path=, doc_id=)`: keep them in sync.
+- The frontend keeps the access token in memory only (never localStorage or
+  sessionStorage); the refresh token is the httpOnly `sop_refresh` cookie. Hiding
+  a menu is cosmetic: every check stays in the backend. Hidden pages look like 404s.
+- The API trusts `X-Forwarded-For` only from Caddy (`FORWARDED_ALLOW_IPS` = `WEB_IP`).
 - Never commit secrets (`.env`, API keys, `.claude/settings.local.json`).
 - Every model call goes through `ModelGateway` with an explicit `ContentScope`;
   never call a provider SDK directly from agents.

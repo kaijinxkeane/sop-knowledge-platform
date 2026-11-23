@@ -1,7 +1,8 @@
 # Common development commands. Run from the repository root.
 COMPOSE := docker compose --env-file .env -f deploy/docker-compose.yml
 
-.PHONY: help env demo-vault up down logs ps test lint smoke smoke-docker plugin-tests seed-demo admin index
+.PHONY: help env demo-vault up down logs ps test lint smoke smoke-docker plugin-tests seed-demo admin index \
+	frontend-install frontend-dev frontend-test api-client
 
 help:
 	@echo "make env          create .env from .env.example (then add your API key)"
@@ -12,6 +13,9 @@ help:
 	@echo "make test         backend unit tests + lint (database tests need \`make up\`)"
 	@echo "make smoke        call every model tier once (Claude + local Ollama)"
 	@echo "make plugin-tests inherited llm-wiki structural tests"
+	@echo "make frontend-dev  web app with hot reload on :5173 (API from \`make up\`)"
+	@echo "make frontend-test frontend lint + types + tests + build + size budget"
+	@echo "make api-client    regenerate the typed API client after backend API changes"
 
 env:
 	@test -f .env && echo ".env already exists" || (cp .env.example .env && echo "created .env")
@@ -54,3 +58,15 @@ plugin-tests:
 
 index:  ## (re)index the vault now; ARGS="--full" rebuilds everything
 	$(COMPOSE) exec api python -m app.cli index $(ARGS)
+
+frontend-install:
+	cd frontend && npm ci
+
+frontend-dev:  ## Vite forwards /api to the API on :8000
+	cd frontend && npm run dev
+
+frontend-test:
+	cd frontend && npm run check:api && npm run lint && npm run typecheck && npm test && npm run build && npm run check:size
+
+api-client:
+	cd frontend && npm run gen:api

@@ -9,6 +9,8 @@
     python -m app.cli eval-answers [--model TAG]    Phase 3 answering eval (dev stack, demo vault)
     python -m app.cli compare-evals A.json B.json   paired comparison of two eval runs (--out)
     python -m app.cli eval-retrieval [--questions F] do the passages contain the answer?
+    python -m app.cli eval-conflicts [--stage judge|search] [--set dev|holdout]
+                                                    conflict-check eval (local, no DB)
 
 Development only (refused unless SOP_ENV=development; fictional data):
     python -m app.cli seed-demo                     demo users + demo document labels
@@ -219,6 +221,64 @@ async def cmd_eval_classifier(
         )
 
 
+async def cmd_eval_conflicts(
+    set_name: str,
+    model: str | None,
+    tier: str,
+    repeats: int,
+    out: str | None,
+    stage: str = "judge",
+) -> None:
+    import dataclasses
+    import json
+
+    from app.eval.conflicts import SETS, evaluate, load_items, search_recall
+    from app.models.gateway import build_gateway
+
+    if stage == "search":
+        from app.retrieval.embed import embed_documents
+
+        items = load_items(get_settings().config_dir / "eval" / SETS[set_name])
+        rows = await search_recall(
+            items,
+            embed_documents,
+            cutoffs=[0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55],
+            ks=[3, 5, 10],
+        )
+        for r in rows:
+            print(json.dumps(r))
+        if out:
+            Path(out).write_text(json.dumps(rows, indent=2))  # noqa: ASYNC240 - CLI only
+        return
+
+    gateway = build_gateway()
+    if model:
+        cfg = gateway.config.tier(tier)
+        gateway.config.tiers[tier] = dataclasses.replace(cfg, model=model)
+    used = gateway.config.tier(tier)
+    if used.location != "local":
+        sys.exit("the conflict eval runs on local tiers only")
+    items = load_items(get_settings().config_dir / "eval" / SETS[set_name])
+
+    def progress(t):
+        if not t.correct:
+            got = "error" if t.got is None else ("flagged" if t.got else "cleared")
+            print(f"  run {t.run + 1} {t.item} ({t.kind}): {got}", flush=True)
+
+    result = await evaluate(
+        gateway,
+        items,
+        model=used.model,
+        set_name=set_name,
+        repeats=repeats,
+        tier=tier,
+        progress=progress,
+    )
+    print(json.dumps(result.summary(), indent=2))
+    if out:
+        Path(out).write_text(json.dumps(result.to_json(), indent=2))  # noqa: ASYNC240 - CLI only
+
+
 def cmd_compare_evals(a: str, b: str) -> None:
     import json
 
@@ -374,6 +434,13 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("eval-retrieval")
     p.add_argument("--questions", default="questions.yaml")
     p.add_argument("--only", default=None)
+    p = sub.add_parser("eval-conflicts")
+    p.add_argument("--stage", choices=["judge", "search"], default="judge")
+    p.add_argument("--set", dest="set_name", choices=["dev", "holdout"], default="dev")
+    p.add_argument("--model", default=None)
+    p.add_argument("--tier", default="background")
+    p.add_argument("--repeats", type=int, default=1)
+    p.add_argument("--out", default=None)
     p = sub.add_parser("compare-evals")
     p.add_argument("a")
     p.add_argument("b")
@@ -416,6 +483,15 @@ def main(argv: list[str] | None = None) -> None:
                 )
             elif args.cmd == "eval-retrieval":
                 await cmd_eval_retrieval(args.questions, args.only)
+            elif args.cmd == "eval-conflicts":
+                await cmd_eval_conflicts(
+                    args.set_name,
+                    args.model,
+                    args.tier,
+                    args.repeats,
+                    args.out,
+                    args.stage,
+                )
             elif args.cmd == "compare-evals":
                 cmd_compare_evals(args.a, args.b)
             elif args.cmd == "eval-answers":

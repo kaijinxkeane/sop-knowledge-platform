@@ -10,7 +10,7 @@
 - every minute (at :45): deliver queued webhooks
 - daily 07:00: review-due reminders
 - nightly 02:30: group gap events into topics, refresh handover readers
-- nightly 03:00: conflict check between approved SOPs (bounded)
+- nightly 03:00: conflict check between approved SOPs (up to 500 pairs, ~25 min)
 - nightly 03:30: delete records past the retention period (24 months)
 - every 15 minutes: heartbeat
 
@@ -159,7 +159,7 @@ class WorkerSettings:
         cron(deliver_webhooks, second=45, unique=True, timeout=300),
         cron(review_reminders, hour=7, minute=0, unique=True, timeout=300),
         cron(group_gaps, hour=2, minute=30, unique=True, timeout=1800),
-        cron(detect_conflicts, hour=3, minute=0, unique=True, timeout=1800),
+        cron(detect_conflicts, hour=3, minute=0, unique=True, timeout=3600),
         cron(apply_retention, hour=3, minute=30, unique=True, timeout=1800),
         cron(project_reminders, hour=7, minute=10, unique=True, timeout=300),
     ]

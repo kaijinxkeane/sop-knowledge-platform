@@ -20,9 +20,17 @@ async def admin(make_user, sign_in):
 
 async def test_non_admins_are_refused(client, make_user, sign_in):
     headers = await sign_in(await make_user(roles=("employee", "core-lead")))
-    for path in ("/users", "/roles", "/audit"):
+    for path in ("/users", "/roles", "/audit", "/options"):
         assert (await client.get(API + path, headers=headers)).status_code == 403
     assert (await client.get(API + "/users")).status_code == 401
+
+
+async def test_options_list_every_space_and_action(client, admin):
+    _, h = admin
+    body = (await client.get(API + "/options", headers=h)).json()
+    assert {"core", "it", "hr"} <= {sp["name"] for sp in body["spaces"]}
+    assert "approve" in body["space_actions"] and "manage_users" in body["global_actions"]
+    assert body["sensitivities"] == ["public", "internal", "restricted"]
 
 
 async def test_create_user_returns_one_time_invite(client, admin):

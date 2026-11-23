@@ -1,0 +1,259 @@
+# Conflict-check eval, HOLD-OUT set. FICTIONAL data only.
+#
+# Used only for the final comparison: never tune prompts, thresholds or models
+# on these items (tune on conflicts.yaml). Same format and kinds as the dev set.
+
+items:
+  # --- conflicts ------------------------------------------------------------------
+  - id: h01
+    conflict: true
+    kind: number
+    a: {title: "Room Setup Checklist", text: "Set the thermostat to 23 degrees before participants arrive."}
+    b: {title: "Venue Comfort Guide", text: "Keep the training room at 20 degrees; warmer rooms make people sleepy after lunch."}
+  - id: h02
+    conflict: true
+    kind: deadline
+    a: {title: "Refreshments for Training Rooms", text: "Order coffee and snacks through the catering form at least two working days ahead."}
+    b: {title: "Training Day Logistics", text: "Catering orders must be in by noon the Friday before, whatever day the training is."}
+  - id: h03
+    conflict: true
+    kind: owner
+    a: {title: "Signature Programme - Delivery Stage", text: "The lead trainer approves the client's final brand statement before it is shared."}
+    b: {title: "Brand Statement Sign-Off", text: "The CEO approves every client's final brand statement; trainers don't sign off statements."}
+  - id: h04
+    conflict: true
+    kind: order
+    a: {title: "Executive Presence Workshop - Running the Day", text: "Film each participant's 2-minute pitch before lunch, then give feedback in the afternoon."}
+    b: {title: "Pitch Practice Exercise", text: "Give the group feedback guidelines and practise in pairs first; film the pitches only in the last hour of the day."}
+  - id: h05
+    conflict: true
+    kind: rule
+    a: {title: "Laptop Setup for New Staff", text: "Staff may not use personal USB drives on company laptops."}
+    b: {title: "Sharing Large Files", text: "For files too large to email, copy them to your own USB stick and hand it to the client."}
+  - id: h06
+    conflict: true
+    kind: tool
+    a: {title: "Booking a Training Room", text: "Book training rooms in the shared office calendar, and add the programme name to the booking."}
+    b: {title: "Office Manager Requests", text: "Room bookings are made by email to the office manager, who keeps the room spreadsheet."}
+  - id: h07
+    conflict: true
+    kind: number
+    a: {title: "Signature Programme - Overview", text: "The programme is 12 weekly one-to-one sessions."}
+    b: {title: "Signature Programme - Proposal Template", text: "Describe the programme to prospects as 8 one-to-one sessions over 12 weeks."}
+  - id: h08
+    conflict: true
+    kind: deadline
+    a: {title: "Lost Property", text: "Unclaimed lost property is donated after 30 days."}
+    b: {title: "Reception Procedures", text: "Reception keeps lost items for 7 days, then clears the box."}
+  - id: h09
+    conflict: true
+    kind: owner
+    a: {title: "New Hire Onboarding Checklist", text: "HR orders the new hire's laptop two weeks before their start date."}
+    b: {title: "Laptop Setup for New Staff", text: "The hiring manager orders the laptop once the contract is signed; HR is not involved."}
+  - id: h10
+    conflict: true
+    kind: rule
+    a: {title: "Client Gifts", text: "Staff must not accept gifts from clients worth more than $50."}
+    b: {title: "End of Programme", text: "Clients often give trainers a thank-you gift at graduation; accept it graciously, whatever it is."}
+  - id: h11
+    conflict: true
+    kind: number
+    a: {title: "Password Manager Policy", text: "Passwords must be at least 16 characters long."}
+    b: {title: "IT Basics for New Staff", text: "Pick a password of at least 10 characters and change it every 90 days."}
+  - id: h12
+    conflict: true
+    kind: deadline
+    a: {title: "Handover Notes", text: "When a trainer leaves a client account, send the handover note at least 5 working days before their last session."}
+    b: {title: "Leaving the Company", text: "Write your client handover notes on your last day, so they are as up to date as possible."}
+
+  # --- not conflicts (same topic) ------------------------------------------------
+  - id: h13
+    conflict: false
+    kind: detail
+    a: {title: "Room Setup Checklist", text: "Put a flip chart with fresh paper in every room."}
+    b: {title: "Flip Chart Supplies", text: "Spare flip chart pads are in the store cupboard, second shelf. Tell the office manager when there are fewer than three left."}
+  - id: h14
+    conflict: false
+    kind: situation
+    a: {title: "Executive Presence Workshop - Pricing Notes", text: "Group bookings of the workshop are invoiced to the employer."}
+    b: {title: "Signature Programme - Billing", text: "Signature clients pay personally, in three instalments."}
+  - id: h15
+    conflict: false
+    kind: reworded
+    a: {title: "Refreshments for Training Rooms", text: "Order catering two working days ahead using the catering form."}
+    b: {title: "Training Day Logistics", text: "Use the catering form, and get your order in at least two working days before the training."}
+  - id: h16
+    conflict: false
+    kind: exception
+    a: {title: "Laptop Setup for New Staff", text: "No personal USB drives on company laptops. Company-issued encrypted drives are allowed."}
+    b: {title: "Sharing Large Files", text: "For large files, ask IT for a company encrypted USB drive."}
+  - id: h17
+    conflict: false
+    kind: situation
+    a: {title: "Booking a Training Room", text: "Book the Large Room in the shared office calendar."}
+    b: {title: "Booking Outside Venues", text: "For venues outside the office, the office manager books and pays; send them the date and group size."}
+  - id: h18
+    conflict: false
+    kind: detail
+    a: {title: "Signature Programme - Overview", text: "The programme is 12 weekly one-to-one sessions."}
+    b: {title: "Signature Programme - Session Plan", text: "Weeks 1 to 3 are discovery, 4 to 6 strategy, 7 to 10 content and 11 to 12 delivery."}
+  - id: h19
+    conflict: false
+    kind: reworded
+    a: {title: "Lost Property", text: "Lost items go in the box at reception; anything unclaimed after 30 days is donated."}
+    b: {title: "Reception Procedures", text: "Keep found items in the reception box for a month. After that, donate them."}
+  - id: h20
+    conflict: false
+    kind: exception
+    a: {title: "Client Gifts", text: "Do not accept client gifts worth more than $50 without the CEO's approval."}
+    b: {title: "End of Programme", text: "If a client offers an expensive graduation gift, thank them and ask the CEO whether you may accept it."}
+  - id: h21
+    conflict: false
+    kind: detail
+    a: {title: "Password Manager Policy", text: "Passwords must be at least 16 characters long."}
+    b: {title: "IT Basics for New Staff", text: "Let the password manager generate your passwords; it makes them 20 characters by default."}
+  - id: h22
+    conflict: false
+    kind: situation
+    a: {title: "Handover Notes", text: "When a trainer leaves a client account, send the handover note 5 working days before their last session."}
+    b: {title: "Holiday Cover", text: "When a trainer is on leave for a week or less, a short email to the covering trainer is enough; no handover note is needed."}
+  - id: h23
+    conflict: false
+    kind: detail
+    a: {title: "New Hire Onboarding Checklist", text: "HR orders the new hire's laptop two weeks before their start date."}
+    b: {title: "Laptop Setup for New Staff", text: "When the new laptop arrives, the IT lead sets it up and installs the standard apps before day one."}
+  - id: h24
+    conflict: false
+    kind: reworded
+    a: {title: "Room Setup Checklist", text: "Arrange chairs in a U-shape facing the flip chart."}
+    b: {title: "Workshop Room Layout", text: "Chairs go in a horseshoe, open end towards the flip chart."}
+
+  # --- harder: long passages and implicit conflicts (added 2026-11-23) -------------
+  - id: h25
+    conflict: true
+    kind: buried
+    a:
+      title: "Laptop Setup for New Staff"
+      text: >-
+        The IT lead sets up each laptop before day one. Turn on disk encryption first, then enrol
+        the laptop in device management, which installs the standard apps. Sign in to the password
+        manager and the shared drive. Install only approved software. Screens lock after 5 minutes
+        without use. Back up work to the shared drive, never to a personal cloud account.
+    b:
+      title: "Working from Home"
+      text: >-
+        Staff can work from home two days a week. Use the company laptop and a private room for
+        client calls. Connect through the office VPN before opening the shared drive. If your home
+        internet is slow, save a copy of your files to your personal cloud storage so you can keep
+        working. Keep your laptop locked when you step away.
+  - id: h26
+    conflict: true
+    kind: buried
+    a:
+      title: "Handover Notes"
+      text: >-
+        When a trainer leaves a client account, they write a handover note using the template. It
+        covers the client and programme, the current stage, what is done, open actions with dates,
+        upcoming sessions, client preferences, files and risks. The receiving trainer reads it and
+        confirms it in the app. The note is visible only to the people it is sent to and the
+        department lead.
+    b:
+      title: "Leaving the Company"
+      text: >-
+        In your last month, agree a leaving date with your manager and return your building pass on
+        your last day. Write a handover note for each of your client accounts and share it on the
+        team channel so everyone can see what's happening with your clients. HR arranges your exit
+        interview.
+  - id: h27
+    conflict: true
+    kind: buried
+    a:
+      title: "Refreshments for Training Rooms"
+      text: >-
+        Order coffee, tea and snacks through the catering form at least two working days ahead.
+        Choose the number of people and any dietary needs. Water is always provided. For full-day
+        workshops, add lunch to the order. The office manager checks orders each morning and
+        confirms them with the caterer.
+    b:
+      title: "Workshop Budget"
+      text: >-
+        Each workshop has a budget for room, materials and food. Lunch is not provided at
+        full-day workshops; tell participants to bring their own or point them to the cafes
+        nearby. Keep materials costs down by reusing printed card decks.
+  - id: h28
+    conflict: true
+    kind: implicit
+    a: {title: "Expense Claims", text: "Submit claims within 30 days of the purchase."}
+    b: {title: "Finance Month-End Checklist", text: "A purchase made on the 3rd of a month must be claimed by the end of that same month."}
+  - id: h29
+    conflict: true
+    kind: implicit
+    a: {title: "Disciplinary Process", text: "Only the HR lead can issue a written warning."}
+    b: {title: "Managing Your Team", text: "The CEO, as core lead, issues written warnings to core staff; HR is told afterwards."}
+  - id: h30
+    conflict: true
+    kind: implicit
+    a: {title: "Password Manager Policy", text: "Change shared passwords every quarter."}
+    b: {title: "IT Basics for New Staff", text: "Shared passwords are changed twice a year, in January and July."}
+  - id: h31
+    conflict: false
+    kind: long
+    a:
+      title: "Laptop Setup for New Staff"
+      text: >-
+        The IT lead sets up each laptop before day one. Turn on disk encryption first, then enrol
+        the laptop in device management. Sign in to the password manager and the shared drive.
+        Install only approved software. Back up work to the shared drive, never to a personal cloud
+        account.
+    b:
+      title: "Working from Home"
+      text: >-
+        Staff can work from home two days a week. Use the company laptop and a private room for
+        client calls. Connect through the office VPN before opening the shared drive. If your home
+        internet is slow, tell the IT lead; don't copy files elsewhere. Keep your laptop locked
+        when you step away.
+  - id: h32
+    conflict: false
+    kind: long
+    a:
+      title: "Handover Notes"
+      text: >-
+        When a trainer leaves a client account, they write a handover note using the template. It
+        covers the client and programme, the current stage, open actions with dates, upcoming
+        sessions, client preferences and risks. The note is visible only to the people it is sent
+        to and the department lead.
+    b:
+      title: "Leaving the Company"
+      text: >-
+        In your last month, agree a leaving date with your manager. Write a handover note in the
+        app for each of your client accounts and send it to the trainer taking over. HR arranges
+        your exit interview.
+  - id: h33
+    conflict: false
+    kind: long
+    a:
+      title: "Refreshments for Training Rooms"
+      text: >-
+        Order coffee, tea and snacks through the catering form at least two working days ahead.
+        Choose the number of people and any dietary needs. For full-day workshops, add lunch to the
+        order. The office manager confirms orders with the caterer.
+    b:
+      title: "Workshop Budget"
+      text: >-
+        Each workshop has a budget for room, materials and food, including lunch for full-day
+        workshops. Keep materials costs down by reusing printed card decks.
+  - id: h34
+    conflict: false
+    kind: equivalent
+    a: {title: "Password Manager Policy", text: "Change shared passwords every quarter."}
+    b: {title: "IT Basics for New Staff", text: "Shared passwords are changed four times a year: January, April, July and October."}
+  - id: h35
+    conflict: false
+    kind: equivalent
+    a: {title: "Lost Property", text: "Unclaimed lost property is donated after 30 days."}
+    b: {title: "Reception Procedures", text: "Keep found items for about a month before donating them."}
+  - id: h36
+    conflict: false
+    kind: equivalent
+    a: {title: "Training Day Timings", text: "Doors open half an hour before the 9:00 start."}
+    b: {title: "Reception Procedures", text: "Unlock the training rooms at 8:30 on training days."}

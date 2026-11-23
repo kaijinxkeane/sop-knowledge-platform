@@ -1,0 +1,43 @@
+# Serves the built web app and forwards /api to the backend, so the browser
+# only ever talks to one origin (no CORS). Plain HTTP on localhost for now;
+# TLS and the company domain are added in Phase 6 (plan §3.3).
+{
+	admin off
+	auto_https off
+}
+
+:8080 {
+	encode zstd gzip
+
+	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	# The API. Caddy ignores any X-Forwarded-For sent by the client and sets it
+	# to the real address; the API trusts it only from this container's IP.
+	handle /api/* {
+		reverse_proxy api:8000 {
+			# Answers stream over SSE: pass each event on at once.
+			flush_interval -1
+		}
+	}
+
+	handle {
+		root * /srv
+		# Hashed bundles never change; everything else (index.html) is revalidated.
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		@pages not path /assets/*
+		header @pages Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+
+	# No `log` directive on purpose: Caddy then writes no access log, because
+	# paths and query strings can carry content (plan: content-free logs).
+}

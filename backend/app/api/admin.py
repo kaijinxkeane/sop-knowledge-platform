@@ -26,7 +26,7 @@ from app.identity import (
     issue_invite,
     roles_by_name,
 )
-from app.policy.engine import GrantError, validate_grant
+from app.policy.engine import GLOBAL_ACTIONS, SPACE_ACTIONS, GrantError, validate_grant
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 manage_users = require_global("manage_users")
@@ -111,6 +111,20 @@ class AuditOut(BaseModel):
     target_type: str | None
     target_id: str | None
     details: dict
+
+
+class SpaceOption(BaseModel):
+    name: str
+    title: str
+
+
+class OptionsOut(BaseModel):
+    """What the admin screens can offer when editing grants (labels only, no content)."""
+
+    spaces: list[SpaceOption]
+    space_actions: list[str]
+    global_actions: list[str]
+    sensitivities: list[Sensitivity]
 
 
 class ChainOut(BaseModel):
@@ -206,6 +220,23 @@ def _grant(g: GrantIn, spaces: list[str]) -> Grant:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
     return Grant(
         space=rule.space, max_sensitivity=rule.max_sensitivity.label, actions=sorted(rule.actions)
+    )
+
+
+# --- options -----------------------------------------------------------------
+
+
+@router.get("/options", response_model=OptionsOut)
+async def options(
+    _: CurrentUser = Depends(manage_users), session: AsyncSession = Depends(get_db)
+) -> OptionsOut:
+    """Every space, even ones the admin can't read: grants are given for them."""
+    spaces = (await session.execute(select(Space).order_by(Space.name))).scalars().all()
+    return OptionsOut(
+        spaces=[SpaceOption(name=sp.name, title=sp.title) for sp in spaces],
+        space_actions=sorted(SPACE_ACTIONS),
+        global_actions=sorted(GLOBAL_ACTIONS),
+        sensitivities=["public", "internal", "restricted"],
     )
 
 

@@ -532,3 +532,16 @@ async def test_opened_results_but_used_none_is_a_personal_gap(
     async with sessions() as s:
         ev = await s.get(SearchEvent, uuid.UUID(sid))
         assert (ev.opened, ev.used) == (4, True)
+
+
+async def test_checked_pairs_never_crowd_out_new_ones(indexed, sessions):
+    # A tiny row limit: before the fix the closest (already checked) pairs filled
+    # it on every run, so later pairs were never reached.
+    gw = SaysConflict()
+    seen = set()
+    for _ in range(3):
+        await detect_conflicts(sessions, gw, max_pairs=1, maxd=0.95, row_limit=2)
+        async with sessions() as s:
+            rows = (await s.execute(select(Conflict.document_a, Conflict.document_b))).all()
+        seen = {tuple(r) for r in rows}
+    assert gw.calls == 3 and len(seen) == 3
