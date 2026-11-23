@@ -636,10 +636,31 @@ export interface paths {
         };
         /**
          * Get Version
-         * @description The text of one version of a note, for reading and side-by-side diffs.
-         *     Unknown, unapproved (for non-editors) and once-narrower versions all 404.
+         * @description One version's text, for reading and side-by-side diffs. Notes: the file
+         *     itself. Decks, PDFs and documents: the text the indexer reads (each slide's
+         *     text and speaker notes, each page's text), plus their slides or pages.
          */
         get: operations["get_version_api_v1_documents__document_id__versions__commit__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/versions/{commit}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Version File
+         * @description The original file of one version (an old deck to download, an old PDF to view).
+         */
+        get: operations["get_version_file_api_v1_documents__document_id__versions__commit__file_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2005,6 +2026,8 @@ export interface components {
             comment: string;
             /** Helpful */
             helpful: boolean;
+            /** Reason */
+            reason?: ("wrong" | "outdated" | "missing_steps" | "unclear" | "other") | null;
         };
         /** GovernanceItem */
         GovernanceItem: {
@@ -3052,6 +3075,11 @@ export interface components {
             committed_at: string;
             /** Content */
             content: string;
+            /**
+             * Parts
+             * @default []
+             */
+            parts: components["schemas"]["PartOut"][];
         };
         /** VersionOut */
         VersionOut: {
@@ -4321,6 +4349,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VersionContentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_version_file_api_v1_documents__document_id__versions__commit__file_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+                commit: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

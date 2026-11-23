@@ -5,15 +5,17 @@ import { Button } from "@/components/ui/button";
 import { t } from "@/i18n";
 import { BookmarkButton } from "./BookmarkButton";
 import { cn } from "@/lib/utils";
-import { useParts, type Doc } from "./api";
+import { useParts, type Doc, type Part } from "./api";
 
 /**
  * Slide by slide: each slide's text and speaker notes. ?slide=N (from a
  * citation or search hit) opens that slide. Slide pictures need server-side
  * rendering, which isn't built yet.
  */
-export function DeckViewer({ doc }: { doc: Doc }) {
-  const parts = useParts(doc.id, true);
+export function DeckViewer({ doc, versionParts }: { doc: Doc; versionParts?: Part[] }) {
+  // An older version brings its own slides; otherwise the current ones.
+  const current = useParts(doc.id, !versionParts);
+  const parts = versionParts ? { data: versionParts, isPending: false, isError: false } : current;
   const [params, setParams] = useSearchParams();
   const slides = (parts.data ?? []).filter((p) => p.part === "slide");
   const total = slides.length;

@@ -36,6 +36,7 @@ from app.governance.access import hold_until_approved
 from app.governance.approvals import apply_baseline, baseline_needed
 from app.governance.injection import scan as scan_instructions
 from app.governance.versions import governed_hash
+from app.policy.engine import effective_access
 from app.retention.retract import is_retracted
 from app.retrieval.embed import Embedder
 from app.vault.git import GitVault
@@ -229,7 +230,14 @@ class Indexer:
         commit = self.git.last_commit(rel)
         if commit is not None:
             doc.current_commit = commit.sha
-            await self._record_version(s, doc, commit, digest)
+            # The narrower of old and new access while a change waits (hold_until_approved).
+            snapshot = [
+                [space, sens.label]
+                for space, sens in effective_access(
+                    [(r.space, r.sensitivity) for r in rows], doc.safeguards or ()
+                )
+            ]
+            await self._record_version(s, doc, commit, digest, snapshot)
         doc.indexed_at = datetime.now(UTC)
         if unchanged and await s.scalar(select(func.count()).where(Chunk.document_id == doc.id)):
             return "unchanged"
@@ -275,7 +283,9 @@ class Indexer:
         # documents.safeguards floor them to `restricted` at read time
         # (policy engine + RLS), and lift again once they are cleared.
 
-    async def _record_version(self, s: AsyncSession, doc: Document, commit, digest: str) -> None:
+    async def _record_version(
+        self, s: AsyncSession, doc: Document, commit, digest: str, access: list
+    ) -> None:
         exists = await s.scalar(
             select(func.count()).where(
                 DocumentVersion.document_id == doc.id, DocumentVersion.git_commit == commit.sha
@@ -301,6 +311,7 @@ class Indexer:
                 author_name=commit.author_name,
                 author_source=source,
                 committed_at=commit.committed_at,
+                access=access,
             )
         )
 

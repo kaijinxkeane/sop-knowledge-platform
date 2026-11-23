@@ -46,6 +46,7 @@ from app.db.models import (
     ReviewRequest,
     SearchEvent,
 )
+from app.vault import renditions
 from app.vault.git import GitVault
 
 MARKER = "[RETRACTED]"
@@ -131,6 +132,7 @@ async def _purge_document(
 
 async def retract_document(s: AsyncSession, doc_id: uuid.UUID, actor: uuid.UUID) -> RetractResult:
     result = RetractResult()
+    renditions.forget_all()
     doc = await s.get(Document, doc_id)
     if doc is None:
         return result
@@ -187,6 +189,7 @@ def _like(p: str) -> str:
 async def retract_term(
     s: AsyncSession, term: str, actor: uuid.UUID, git: GitVault | None = None
 ) -> RetractResult:
+    renditions.forget_all()
     term = term.strip()
     if len(term) < MIN_TERM:
         raise ValueError(f"the value to retract needs at least {MIN_TERM} characters")

@@ -186,3 +186,36 @@ async def test_outage_is_not_a_gap(indexed, client, make_user, sign_in, sessions
     assert done and all(d["unavailable"] for d in done)
     async with sessions() as s:
         assert not (await s.execute(select(GapEvent))).scalars().all()
+
+
+async def test_no_answer_can_become_an_sop_request(model, client, make_user, sign_in, sessions):
+    h = await sign_in(await make_user(roles=NEW_HIRE))
+    _, events = await ask(client, h, "zebra quantum volcano")
+    done = events[-1][1]
+    assert done["answered"] is False and done["question_id"]
+    r = await client.post(
+        "/api/v1/me/gaps/request", headers=h, json={"key": done["question_id"], "space": "core"}
+    )
+    assert r.status_code == 202
+    # Someone else can't use that question id.
+    other = await sign_in(await make_user(roles=NEW_HIRE))
+    r = await client.post(
+        "/api/v1/me/gaps/request", headers=other, json={"key": done["question_id"], "space": "core"}
+    )
+    assert r.status_code == 404
+
+
+async def test_not_helpful_reasons(model, client, make_user, sign_in, sessions):
+    from app.db.models import MessageFeedback
+
+    h = await sign_in(await make_user(roles=CORE_STAFF))
+    _, events = await ask(client, h, "How long does the Discovery Workshop last?")
+    msg = events[-1][1]["message_id"]
+    url = f"/api/v1/messages/{msg}/feedback"
+    r = await client.post(url, headers=h, json={"helpful": False, "reason": "outdated"})
+    assert r.status_code == 204
+    async with sessions() as s:
+        fb = await s.get(MessageFeedback, msg)
+    assert (fb.helpful, fb.reason) == (False, "outdated")
+    for bad in ({"helpful": False, "reason": "spite"}, {"helpful": True, "reason": "wrong"}):
+        assert (await client.post(url, headers=h, json=bad)).status_code == 422

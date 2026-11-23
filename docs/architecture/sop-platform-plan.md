@@ -1316,10 +1316,19 @@ Phase 2 *UI*, slice 3 of 3 done (2026-11-23):
   old-restricted-version attack now also tries the versions list and
   `/versions/{commit}` with a commit taken from the lead's view.
 
+Deck and PDF versions (2026-11-23):
+- Each attachment version keeps the labels it was indexed under
+  (`document_versions.access`, migration 0013), so an old deck or PDF is
+  judged by those labels like an old note. Versions indexed before 0013 have
+  no snapshot and fail closed (owner-space approver only).
+- `GET /documents/{id}/versions/{commit}` returns a text rendition of any kind
+  ("## Slide n: title" with notes, "## Page n"), made on demand with the
+  indexer's parsers (`app/vault/renditions.py`, in-memory LRU of 16, cleared on
+  retract); `/versions/{commit}/file` serves that version's file. The reader
+  shows old decks slide by slide and old PDFs in the viewer; compare diffs the
+  text renditions.
+
 Not done in Phase 2 (carried forward):
-- Conversations in bookmarks and Ctrl+K link to `/ask?conversation=`, which
-  opens once the Ask screen is built (Phase 3).
-- Diffs of decks and PDFs (only notes have version text).
 - **Slide pictures:** render each slide to an image at upload (LibreOffice,
   headless, run on demand), served permission-checked; the viewer shows text
   and notes until then. Images inside notes aren't shown yet either.
@@ -1415,6 +1424,30 @@ Phase 3 *backend* done (2026-11-21):
   fallback-model answers and answers the output guard trimmed are never stored.
   Reused answers are marked `reused` in the stream, the message and the audit.
 - **Still to do in Phase 3**: the Ask UI.
+
+Phase 3 *UI*, slice 1 of 2 done (2026-11-23):
+- **Ask screen** (`/ask`, `frontend/src/pages/ask/`): answers stream in
+  (fetch + ReadableStream through `authFetch`, so the token stays in memory),
+  with live steps from `routing`/`agent_dispatched`, one section per department
+  (never merged), and numbered citations. Clicking a citation opens a side
+  panel with the cited note section highlighted, or the slide with its speaker
+  notes and neighbours, or the PDF page, plus version, author and approver.
+  Answer markdown renders with no raw HTML, no images and no links except
+  citation markers (the output guard already removes them server-side).
+- **Stop** aborts the stream; **Copy** copies the text with its sources.
+- **No answer** says so plainly and offers Request an SOP (`/me/gaps/request`
+  keyed on the question id, now sent in the `done` event), Start a draft (only
+  for people who can write) and Suggest an expert (authors from `/me/gaps`).
+- **Unavailable** (stream error or outage) says the Library still works and
+  links to a Library search for the same question.
+- **👎 reasons** (wrong / outdated / missing steps / unclear / other):
+  `message_feedback.reason`, migration 0014, refused on 👍.
+- Home's ask box opens `/ask?q=`; conversations are listed by day.
+- Measured live (8B, M-series Mac, warm): first words after ~5–15 s, a short
+  answer done in ~15 s.
+
+Still to do (Phase 3 slice 2): conversation search, rename and hide; follow-up
+chips; programme and stage filters; the remaining Home cards.
 
 Phase 4 *backend* done (2026-11-21):
 - **Version-bound approvals** (`app/governance/`): an approval covers one

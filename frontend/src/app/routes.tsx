@@ -23,6 +23,7 @@ const Roles = lazy(() => import("@/pages/admin/Roles"));
 const Library = lazy(() => import("@/pages/library/Library"));
 const Reader = lazy(() => import("@/pages/library/Reader"));
 const Compare = lazy(() => import("@/pages/library/Compare"));
+const Ask = lazy(() => import("@/pages/ask/Ask"));
 const Write = lazy(() => import("@/pages/write/Write"));
 const NewNote = lazy(() => import("@/pages/write/NewNote"));
 const EditNote = lazy(() => import("@/pages/write/EditNote"));
@@ -52,7 +53,11 @@ export const routes: RouteObject[] = [
         element: <AppShell />,
         children: [
           { index: true, element: <Home /> },
-          ...(["ask", "review", "retain"] as const).map(placeholder),
+          ...(["review", "retain"] as const).map(placeholder),
+          {
+            path: "ask",
+            element: <RequireSection section="ask">{suspend(<Ask />)}</RequireSection>,
+          },
           {
             path: "library",
             element: <RequireSection section="library"><Outlet /></RequireSection>,

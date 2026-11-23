@@ -246,6 +246,11 @@ class DocumentVersion(Base):
     author_name: Mapped[str] = mapped_column(Text)
     author_source: Mapped[str] = mapped_column(String(16))  # app | git | unattributed
     committed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # Effective access in force when this version was indexed ([[space, sensitivity]],
+    # safeguard floor applied). Decks and PDFs keep no labels inside the file, so
+    # this is how an old version stays under the labels it had. NULL: recorded
+    # before 0013, unknown (fails closed).
+    access: Mapped[list | None] = mapped_column(JSONB)
     indexed_at: Mapped[datetime] = _created()
 
 
@@ -431,6 +436,8 @@ class MessageFeedback(Base):
     )
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     helpful: Mapped[bool] = mapped_column(Boolean)
+    # wrong | outdated | missing_steps | unclear | other (only when not helpful)
+    reason: Mapped[str | None] = mapped_column(String(16))
     comment: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = _created()
 

@@ -59,6 +59,7 @@ async def test_hidden_document_is_404_on_every_endpoint(
         ("GET", f"/documents/{rate}/versions", None),
         ("GET", f"/documents/{rate}/backlinks", None),
         ("GET", f"/documents/{rate}/versions/{'0' * 40}", None),
+        ("GET", f"/documents/{rate}/versions/{'0' * 40}/file", None),
         ("POST", "/me/bookmarks", {"target_type": "document", "target_id": rate}),
         ("GET", f"/documents/{rate}/file", None),
         ("GET", f"/notes/{rate}/source", None),

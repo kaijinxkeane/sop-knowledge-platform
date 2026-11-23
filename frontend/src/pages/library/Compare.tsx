@@ -102,7 +102,6 @@ export default function Compare() {
 
   if (doc.isError || versions.isError) return <NotFound />;
   if (doc.isPending || versions.isPending) return <Loading />;
-  if (doc.data.kind !== "note") return <NotFound />;
   const set = (k: "from" | "to", v: string) =>
     setParams((p) => {
       p.set(k, v);
@@ -118,6 +117,7 @@ export default function Compare() {
         {doc.data.title}
       </Link>
       <h1 className="text-2xl font-semibold">{t("compare.title")}</h1>
+      {doc.data.kind !== "note" && <p className="text-sm text-muted-foreground">{t("compare.textOnly")}</p>}
       {list.length < 2 ? (
         <p className="text-sm text-muted-foreground">{t("compare.onlyOne")}</p>
       ) : (

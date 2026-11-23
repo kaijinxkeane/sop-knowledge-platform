@@ -3,10 +3,10 @@ import { t } from "@/i18n";
 import { useFileUrl, type Doc } from "./api";
 
 /** The browser's own PDF viewer, on a blob: URL; ?page=N opens that page. */
-export function PdfViewer({ doc }: { doc: Doc }) {
-  const { url, failed } = useFileUrl(doc);
+export function PdfViewer({ doc, commit, page: at }: { doc: Doc; commit?: string | null; page?: number }) {
+  const { url, failed } = useFileUrl(doc, commit);
   const [params] = useSearchParams();
-  const page = Number(params.get("page") ?? "");
+  const page = at ?? Number(params.get("page") ?? "");
   if (failed) return <p className="text-sm text-muted-foreground">{t("doc.loadFailed")}</p>;
   if (!url) return <p className="text-sm text-muted-foreground">{t("app.loading")}</p>;
   return (

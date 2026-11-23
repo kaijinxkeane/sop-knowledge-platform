@@ -67,7 +67,7 @@ function Meta({ doc }: { doc: Doc }) {
   );
 }
 
-function DownloadButton({ doc }: { doc: Doc }) {
+function DownloadButton({ doc, commit }: { doc: Doc; commit?: string | null }) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   return (
@@ -79,7 +79,7 @@ function DownloadButton({ doc }: { doc: Doc }) {
         onClick={() => {
           setBusy(true);
           setFailed(false);
-          downloadFile(doc)
+          downloadFile(doc, commit)
             .catch(() => setFailed(true))
             .finally(() => setBusy(false));
         }}
@@ -132,21 +132,19 @@ function Sidebar({ doc, viewing }: { doc: Doc; viewing: string | null }) {
                   {t("doc.unattributed")}
                 </Badge>
               )}
-              {doc.kind === "note" && (
-                <div className="mt-1 flex gap-3 text-xs">
-                  <Link className="underline underline-offset-2" to={`/library/${doc.id}?version=${v.commit}`}>
-                    {t("version.read")}
+              <div className="mt-1 flex gap-3 text-xs">
+                <Link className="underline underline-offset-2" to={`/library/${doc.id}?version=${v.commit}`}>
+                  {t("version.read")}
+                </Link>
+                {i + 1 < (versions.data?.length ?? 0) && (
+                  <Link
+                    className="underline underline-offset-2"
+                    to={`/library/${doc.id}/compare?from=${versions.data![i + 1]!.commit}&to=${v.commit}`}
+                  >
+                    {t("version.compare")}
                   </Link>
-                  {i + 1 < (versions.data?.length ?? 0) && (
-                    <Link
-                      className="underline underline-offset-2"
-                      to={`/library/${doc.id}/compare?from=${versions.data![i + 1]!.commit}&to=${v.commit}`}
-                    >
-                      {t("version.compare")}
-                    </Link>
-                  )}
-                </div>
-              )}
+                )}
+              </div>
             </li>
           ))}
         </ol>
@@ -175,8 +173,20 @@ function OldVersion({ doc, commit }: { doc: Doc; commit: string }) {
         <Link className="underline underline-offset-2" to={`/library/${doc.id}/compare?from=${commit}`}>
           {t("version.compareWithLatest")}
         </Link>
+        {doc.kind !== "note" && <DownloadButton doc={doc} commit={commit} />}
       </div>
-      <NoteView text={v.data.content} docs={docs.data ?? []} />
+      {doc.kind === "note" ? (
+        <NoteView text={v.data.content} docs={docs.data ?? []} />
+      ) : ext(doc) === "pptx" ? (
+        <DeckViewer doc={doc} versionParts={v.data.parts ?? []} />
+      ) : ext(doc) === "pdf" ? (
+        <PdfViewer doc={doc} commit={commit} />
+      ) : (
+        <>
+          <p className="mb-2 text-xs text-muted-foreground">{t("version.textOnly")}</p>
+          <NoteView text={v.data.content} docs={docs.data ?? []} />
+        </>
+      )}
     </>
   );
 }
@@ -185,7 +195,7 @@ function Body({ doc, version }: { doc: Doc; version: string | null }) {
   const isNote = doc.kind === "note";
   const text = useNoteText(doc.id, isNote && !version);
   const docs = useDocuments();
-  if (isNote && version) return <OldVersion doc={doc} commit={version} />;
+  if (version) return <OldVersion doc={doc} commit={version} />;
   if (isNote) {
     if (text.isPending || docs.isPending) {
       return <p className="text-sm text-muted-foreground">{t("app.loading")}</p>;

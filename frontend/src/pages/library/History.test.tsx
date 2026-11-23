@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { session } from "@/auth/session";
 import { json, makeMe, mockFetch, renderApp, type Handler } from "@/test/utils";
 
@@ -69,6 +69,11 @@ function api(extra: Record<string, Handler> = {}, me = makeMe()) {
   });
   return { ...mock, marks };
 }
+
+beforeEach(() => {
+  URL.createObjectURL = vi.fn(() => "blob:x");
+  URL.revokeObjectURL = vi.fn();
+});
 
 describe("version history", () => {
   it("marks the live and unapproved versions and opens an older one read-only", async () => {
@@ -187,5 +192,53 @@ describe("Ctrl+K", () => {
     await screen.findByRole("heading", { level: 1 });
     await userEvent.click(screen.getByRole("button", { name: /Search/ }));
     expect(await screen.findByRole("option", { name: /New SOP/ })).toBeInTheDocument();
+  });
+});
+
+describe("deck and PDF versions", () => {
+  const deck = { ...doc, id: "d1", title: "Brand Foundations", vault_path: "T/Brand Foundations.pptx", kind: "attachment", doc_type: "deck" };
+  const pdf = { ...doc, id: "p1", title: "Worksheet", vault_path: "T/Worksheet.pdf", kind: "attachment", doc_type: "pdf" };
+  const D1 = "4".repeat(40);
+  const deckApi = () =>
+    api({
+      "GET /api/v1/documents": () => json([deck, pdf]),
+      "GET /api/v1/documents/d1": () => json(deck),
+      "GET /api/v1/documents/d1/backlinks": () => json([]),
+      "GET /api/v1/documents/d1/versions": () => json([v(D1, { approved: true })]),
+      "GET /api/v1/documents/d1/parts": () => json([{ part: "slide", number: 1, title: "Welcome (current)", speaker_notes: "" }]),
+      [`GET /api/v1/documents/d1/versions/${D1}`]: () =>
+        json({
+          commit: D1,
+          author_name: "Avery Tan",
+          committed_at: "2026-10-01T09:00:00Z",
+          approved: true,
+          content: "## Slide 1: Welcome (old)\n",
+          parts: [{ part: "slide", number: 1, title: "Welcome (old)", speaker_notes: "Old notes." }],
+        }),
+      "GET /api/v1/documents/p1": () => json(pdf),
+      "GET /api/v1/documents/p1/backlinks": () => json([]),
+      "GET /api/v1/documents/p1/versions": () => json([v(D1, { approved: true })]),
+      [`GET /api/v1/documents/p1/versions/${D1}`]: () =>
+        json({ commit: D1, author_name: "Avery Tan", committed_at: "2026-10-01T09:00:00Z", approved: true, content: "## Page 1\n", parts: [] }),
+      [`GET /api/v1/documents/p1/versions/${D1}/file`]: () => new Response(new Uint8Array([37, 80, 68, 70])),
+    });
+
+  it("opens an old deck version with its own slides and notes", async () => {
+    deckApi();
+    renderApp(`/library/d1?version=${D1}`);
+    expect(await screen.findByRole("heading", { name: "Welcome (old)" })).toBeInTheDocument();
+    expect(screen.getByText("Old notes.")).toBeInTheDocument();
+    expect(screen.queryByText("Welcome (current)")).toBeNull();
+    // The banner offers that version's original file.
+    const banner = screen.getByRole("note");
+    expect(within(banner).getByRole("button", { name: /Download original/ })).toBeInTheDocument();
+  });
+
+  it("shows an old PDF version from its own file", async () => {
+    const { calls } = deckApi();
+    renderApp(`/library/p1?version=${D1}`);
+    await screen.findByTitle("PDF: Worksheet");
+    expect(calls.some((c) => c.url.endsWith(`/versions/${D1}/file`))).toBe(true);
+    expect(calls.some((c) => c.url.endsWith("/p1/file"))).toBe(false);
   });
 });

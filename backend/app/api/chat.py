@@ -7,7 +7,7 @@ Events on POST /conversations/{id}/messages (text/event-stream):
   citation         {space, n, document_id, title, vault_path, heading, part, part_number,
                     version, written_by, approved_by, approval, approved_on}
   section_done     {space, no_answer, unavailable, confidence, model, escalated, contact?}
-  done             {message_id, answered}
+  done             {message_id, question_id, answered}
 Conversations are private to their owner. The audit log and the gap log get
 ids and outcomes only, never the question or the answer.
 """
@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import UTC, datetime
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
@@ -75,8 +76,13 @@ class MessageOut(BaseModel):
     created_at: datetime
 
 
+FEEDBACK_REASONS = ("wrong", "outdated", "missing_steps", "unclear", "other")
+
+
 class FeedbackIn(BaseModel):
     helpful: bool
+    # 👎 reasons (frontend spec §4); they feed gap topics and the improvement set.
+    reason: Literal["wrong", "outdated", "missing_steps", "unclear", "other"] | None = None
     comment: str = Field(default="", max_length=1000)
 
 
@@ -360,7 +366,15 @@ async def post_message(
                 },
             )
             await s.commit()
-        yield _sse("done", {"message_id": str(msg.id), "answered": bool(answered)})
+        # question_id: the key for "Request an SOP" (POST /me/gaps/request) after a no-answer.
+        yield _sse(
+            "done",
+            {
+                "message_id": str(msg.id),
+                "question_id": str(question_id),
+                "answered": bool(answered),
+            },
+        )
 
     return StreamingResponse(
         events(),
@@ -380,11 +394,14 @@ async def feedback(
     if msg is None or msg.role != "assistant":
         raise NOT_FOUND
     await _own(session, me, msg.conversation_id)
+    if body.helpful and body.reason:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "reasons are for 'not helpful'")
     await session.merge(
         MessageFeedback(
             message_id=msg.id,
             user_id=me.user.id,
             helpful=body.helpful,
+            reason=body.reason,
             comment=body.comment.strip(),
         )
     )

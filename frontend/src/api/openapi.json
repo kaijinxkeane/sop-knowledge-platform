@@ -954,6 +954,24 @@
           "helpful": {
             "title": "Helpful",
             "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "wrong",
+                  "outdated",
+                  "missing_steps",
+                  "unclear",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
           }
         },
         "required": [
@@ -3981,6 +3999,14 @@
           "content": {
             "title": "Content",
             "type": "string"
+          },
+          "parts": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/PartOut"
+            },
+            "title": "Parts",
+            "type": "array"
           }
         },
         "required": [
@@ -6031,7 +6057,7 @@
     },
     "/api/v1/documents/{document_id}/versions/{commit}": {
       "get": {
-        "description": "The text of one version of a note, for reading and side-by-side diffs.\nUnknown, unapproved (for non-editors) and once-narrower versions all 404.",
+        "description": "One version's text, for reading and side-by-side diffs. Notes: the file\nitself. Decks, PDFs and documents: the text the indexer reads (each slide's\ntext and speaker notes, each page's text), plus their slides or pages.",
         "operationId": "get_version_api_v1_documents__document_id__versions__commit__get",
         "parameters": [
           {
@@ -6083,6 +6109,63 @@
           }
         ],
         "summary": "Get Version",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/documents/{document_id}/versions/{commit}/file": {
+      "get": {
+        "description": "The original file of one version (an old deck to download, an old PDF to view).",
+        "operationId": "get_version_file_api_v1_documents__document_id__versions__commit__file_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "commit",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{40}$",
+              "title": "Commit",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Version File",
         "tags": [
           "knowledge"
         ]

@@ -57,11 +57,14 @@ export const useBacklinks = (id: string) =>
     queryFn: () => unwrap(api.GET("/api/v1/documents/{document_id}/backlinks", path(id))),
   });
 
-export async function fetchFile(id: string): Promise<Blob> {
-  const { data, response } = await api.GET("/api/v1/documents/{document_id}/file", {
-    ...path(id),
-    parseAs: "blob",
-  });
+/** The file, or with `commit` that version's original file. */
+export async function fetchFile(id: string, commit?: string | null): Promise<Blob> {
+  const { data, response } = commit
+    ? await api.GET("/api/v1/documents/{document_id}/versions/{commit}/file", {
+        params: { path: { document_id: id, commit } },
+        parseAs: "blob",
+      })
+    : await api.GET("/api/v1/documents/{document_id}/file", { ...path(id), parseAs: "blob" });
   if (!response.ok || !data) throw new ApiError(response.status);
   return data as Blob;
 }
@@ -89,11 +92,11 @@ const SAFE_TYPES: Record<string, string> = {
  * extension (never the server's guess); the URL is freed when the viewer
  * closes, and the bytes aren't kept in the cache afterwards.
  */
-export function useFileUrl(doc: Doc | undefined) {
+export function useFileUrl(doc: Doc | undefined, commit?: string | null) {
   const ext = doc?.vault_path.split(".").pop()?.toLowerCase() ?? "";
   const file = useQuery({
-    queryKey: ["document", doc?.id, "file"],
-    queryFn: () => fetchFile(doc!.id),
+    queryKey: ["document", doc?.id, "file", commit ?? null],
+    queryFn: () => fetchFile(doc!.id, commit),
     enabled: !!doc,
     gcTime: 0,
   });
@@ -111,9 +114,9 @@ export function useFileUrl(doc: Doc | undefined) {
 export const fileName = (doc: Doc) => doc.vault_path.split("/").pop() ?? doc.title;
 
 /** Fetch on click and hand the file to the browser as a download. */
-export async function downloadFile(doc: Doc): Promise<void> {
+export async function downloadFile(doc: Doc, commit?: string | null): Promise<void> {
   const ext = doc.vault_path.split(".").pop()?.toLowerCase() ?? "";
-  const blob = new Blob([await fetchFile(doc.id)], {
+  const blob = new Blob([await fetchFile(doc.id, commit)], {
     type: SAFE_TYPES[ext] ?? "application/octet-stream",
   });
   const url = URL.createObjectURL(blob);

@@ -5,8 +5,11 @@ Two rules, both needed:
   false) only gets versions that were approved at some point. Unapproved edits
   are for the note's editors.
 - **Labels it had:** any version other than the approved and latest ones is
-  judged by the labels in its own frontmatter and folder, so an old restricted
-  version stays restricted after the note was made more open.
+  judged by the labels it had, so an old restricted version stays restricted
+  after the document was made more open. Notes: re-read from that version's own
+  frontmatter and folder. Decks, PDFs and other files keep no labels inside, so
+  the access snapshot taken when the version was indexed is used
+  (`document_versions.access`); a version without one fails closed.
 """
 
 from __future__ import annotations
@@ -25,17 +28,36 @@ def owner_space(doc: Document) -> str | None:
     return next((a.space for a in doc.access if a.role == "owner"), None)
 
 
+def _lead_only(principal: Principal, doc: Document) -> bool:
+    """Unknown labels: only someone who approves the owner space at `restricted`."""
+    space = owner_space(doc)
+    return (
+        bool(space)
+        and principal.can("approve", space)
+        and principal.can_read(space, Sensitivity.RESTRICTED)
+    )
+
+
 def version_readable(
-    principal: Principal, doc: Document, git: GitVault, commit: str, spaces
+    principal: Principal,
+    doc: Document,
+    git: GitVault,
+    commit: str,
+    spaces,
+    *,
+    snapshot: list | None = None,
 ) -> bool:
     """May this user read that version, judged by the labels it had then?
     The approved and latest versions follow the document's access (already
-    checked); for any other version the labels are re-read from its own
-    frontmatter and folder. Unknown labels fail closed: then only someone who
-    approves the owner space at `restricted` may read it."""
+    checked); any other version is judged by its own labels (see module doc).
+    Unknown labels fail closed."""
     for known in (doc.approved_commit, doc.current_commit):
         if known and known.startswith(commit):
             return True
+    if doc.kind != "note":
+        if not snapshot:
+            return _lead_only(principal, doc)
+        return can_view_document(principal, [(sp, sens) for sp, sens in snapshot])
     try:
         text = git.show(doc.vault_path, commit).decode("utf-8", "replace")
     except GitError:
@@ -51,12 +73,7 @@ def version_readable(
     )
     rows = [(space, sens) for space, _, sens in labels.rows()]
     if labels.space is None or not rows:
-        space = owner_space(doc)
-        return (
-            bool(space)
-            and principal.can("approve", space)
-            and principal.can_read(space, Sensitivity.RESTRICTED)
-        )
+        return _lead_only(principal, doc)
     return can_view_document(principal, rows, safeguards=labels.safeguards)
 
 
@@ -77,17 +94,18 @@ async def readable_versions(
     principal: Principal,
     doc: Document,
     git: GitVault,
-    commits: list[str],
+    commits: dict[str, list | None],
     spaces,
     *,
     editor: bool,
 ) -> set[str]:
-    """The subset of `commits` this person may read (both rules above).
+    """The subset of `commits` ({commit: access snapshot}) this person may read.
     `editor` is `sees_latest(...)`, decided under RLS before this is called;
     this runs as the owner role (approvals aren't readable by `sop_reader`)."""
     approved = await approved_commits(session, doc)
     return {
         c
-        for c in commits
-        if (editor or c in approved) and version_readable(principal, doc, git, c, spaces)
+        for c, snapshot in commits.items()
+        if (editor or c in approved)
+        and version_readable(principal, doc, git, c, spaces, snapshot=snapshot)
     }

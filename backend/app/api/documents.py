@@ -31,6 +31,7 @@ from app.governance.history import approved_commits, readable_versions
 from app.policy.engine import effective_access
 from app.vault.git import GitError, GitVault
 from app.vault.labels import vault_config
+from app.vault.renditions import rendition
 
 router = APIRouter(prefix="/documents", tags=["knowledge"])
 NOT_FOUND = HTTPException(status.HTTP_404_NOT_FOUND, "not found")
@@ -62,7 +63,8 @@ class VersionContentOut(BaseModel):
     author_name: str
     committed_at: datetime
     approved: bool
-    content: str
+    content: str  # notes: the file; other files: their text, one section per slide/page
+    parts: list[PartOut] = []  # slides or pages of that version (decks, PDFs)
 
 
 class PartOut(BaseModel):
@@ -251,20 +253,16 @@ async def get_versions(
             )
         ).scalars()
     )
-    if doc.kind != "note":
-        readable = {v.git_commit for v in rows} if editor else set()
-        approved: set[str] = set()
-    else:
-        approved = await approved_commits(session, doc)
-        readable = await readable_versions(
-            session,
-            me.principal,
-            doc,
-            git,
-            [v.git_commit for v in rows],
-            await _spaces(session),
-            editor=editor,
-        )
+    approved = await approved_commits(session, doc)
+    readable = await readable_versions(
+        session,
+        me.principal,
+        doc,
+        git,
+        {v.git_commit: v.access for v in rows},
+        await _spaces(session),
+        editor=editor,
+    )
     return [
         VersionOut(
             commit=v.git_commit,
@@ -281,6 +279,27 @@ async def get_versions(
     ]
 
 
+async def _readable_version(
+    session: AsyncSession, me: CurrentUser, git: GitVault, document_id: uuid.UUID, commit: str
+) -> tuple[Document, DocumentVersion, bytes]:
+    """One version this person may read (app.governance.history), with its bytes.
+    Unknown, unapproved (for non-editors) and once-narrower versions all 404."""
+    doc, editor = await _history_doc(session, me, document_id)
+    v = await session.scalar(
+        select(DocumentVersion).where(
+            DocumentVersion.document_id == doc.id, DocumentVersion.git_commit == commit
+        )
+    )
+    if v is None or commit not in await readable_versions(
+        session, me.principal, doc, git, {commit: v.access}, await _spaces(session), editor=editor
+    ):
+        raise NOT_FOUND
+    try:
+        return doc, v, git.show(doc.vault_path, commit)
+    except GitError:
+        raise NOT_FOUND from None
+
+
 @router.get("/{document_id}/versions/{commit}", response_model=VersionContentOut)
 async def get_version(
     document_id: uuid.UUID,
@@ -289,31 +308,43 @@ async def get_version(
     session: AsyncSession = Depends(get_db),
     git: GitVault = Depends(get_git),
 ) -> VersionContentOut:
-    """The text of one version of a note, for reading and side-by-side diffs.
-    Unknown, unapproved (for non-editors) and once-narrower versions all 404."""
-    doc, editor = await _history_doc(session, me, document_id)
-    if doc.kind != "note":
-        raise NOT_FOUND
-    v = await session.scalar(
-        select(DocumentVersion).where(
-            DocumentVersion.document_id == doc.id, DocumentVersion.git_commit == commit
-        )
-    )
-    if v is None or commit not in await readable_versions(
-        session, me.principal, doc, git, [commit], await _spaces(session), editor=editor
-    ):
-        raise NOT_FOUND
-    try:
-        content = git.show(doc.vault_path, commit).decode("utf-8", errors="replace")
-    except GitError:
-        raise NOT_FOUND from None
+    """One version's text, for reading and side-by-side diffs. Notes: the file
+    itself. Decks, PDFs and documents: the text the indexer reads (each slide's
+    text and speaker notes, each page's text), plus their slides or pages."""
+    doc, v, data = await _readable_version(session, me, git, document_id, commit)
+    if doc.kind == "note":
+        content, parts = data.decode("utf-8", errors="replace"), []
+    else:
+        try:
+            r = await rendition(doc.vault_path, commit, data)
+        except Exception:  # noqa: BLE001 - an old file that no longer parses
+            raise NOT_FOUND from None
+        content = r.text
+        parts = [
+            PartOut(part=p.part, number=p.number, title=p.title, speaker_notes=p.speaker_notes)
+            for p in r.parts
+        ]
     return VersionContentOut(
         commit=commit,
         author_name=v.author_name,
         committed_at=v.committed_at,
         approved=commit in await approved_commits(session, doc),
         content=content,
+        parts=parts,
     )
+
+
+@router.get("/{document_id}/versions/{commit}/file")
+async def get_version_file(
+    document_id: uuid.UUID,
+    commit: str = Path(pattern=r"^[0-9a-f]{40}$"),
+    me: CurrentUser = Depends(current_user),
+    session: AsyncSession = Depends(get_db),
+    git: GitVault = Depends(get_git),
+) -> Response:
+    """The original file of one version (an old deck to download, an old PDF to view)."""
+    doc, _, data = await _readable_version(session, me, git, document_id, commit)
+    return _file_response(doc, data)
 
 
 @router.get("/{document_id}/file")
@@ -331,6 +362,10 @@ async def get_file(
         data = read_for(me, doc, git)
     except (OSError, ValueError):
         raise NOT_FOUND from None
+    return _file_response(doc, data)
+
+
+def _file_response(doc: Document, data: bytes) -> Response:
     media = mimetypes.guess_type(doc.vault_path)[0] or "application/octet-stream"
     name = doc.vault_path.rsplit("/", 1)[-1].replace('"', "")
     return Response(
