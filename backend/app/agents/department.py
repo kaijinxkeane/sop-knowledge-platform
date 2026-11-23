@@ -102,6 +102,8 @@ class Section:
     total_ms: int = 0
     error: str | None = None  # the model failed: unavailable, not "no SOP covers this"
     dropped_lines: int = 0  # uncited lines removed by the output guard
+    reused: bool = False  # served from answer_reuse (no model call)
+    reuse_key: str | None = None
 
 
 def system_prompt(profile: SpaceProfile) -> str:
@@ -199,6 +201,17 @@ class HeadParser:
         return self._resolve(final=True)
 
 
+def answer_tiers(gateway: ModelGateway, profile: SpaceProfile) -> list[str]:
+    tiers = ["answer-local"] if profile.local_only else ["answer"]
+    if (
+        not profile.local_only
+        and gateway.is_configured("answer")
+        and gateway.is_configured("reasoning")
+    ):
+        tiers.append("reasoning")  # escalation only when Claude is really there
+    return tiers
+
+
 async def answer(
     gateway: ModelGateway,
     profile: SpaceProfile,
@@ -220,13 +233,7 @@ async def answer(
         yield {"type": "section_done", "section": sec}
         return
 
-    tiers = ["answer-local"] if profile.local_only else ["answer"]
-    if (
-        not profile.local_only
-        and gateway.is_configured("answer")
-        and gateway.is_configured("reasoning")
-    ):
-        tiers.append("reasoning")  # escalation only when Claude is really there
+    tiers = answer_tiers(gateway, profile)
     system, user = system_prompt(profile), user_prompt(question, passages)
 
     text = ""

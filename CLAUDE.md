@@ -70,10 +70,10 @@ backend/                 — FastAPI app (uv project, Python 3.12)
   app/identity.py, app/audit.py, app/cli.py — users/roles, hash-chained audit log, admin CLI
   app/models/            — model gateway: tiers, data boundary, anthropic + openai_compat adapters
   app/db/                — SQLAlchemy models, Alembic migrations (incl. RLS), scoped reader
-  app/vault/             — parsers (md/pptx/pdf/docx), rule labels + safeguards, git layer, indexer, write rules
+  app/vault/             — parsers (md/pptx/pdf/docx/images), local OCR, rule labels + safeguards, git layer, indexer, write rules
   app/retrieval/         — local embeddings, hybrid search (RLS + policy engine, distance cutoff), small-to-big expansion of hits
   app/classify/          — local Classifier, one-way rule, name detector, review service, eval (few-shot examples: built, off by default)
-  app/agents/            — Concierge routing, department agents (answer contract), orchestration
+  app/agents/            — Concierge routing, department agents (answer contract), answer reuse, orchestration
   app/governance/        — version-bound approvals (live vs current chunks), reviews jobs, notifications, webhooks
   app/retention/         — handovers, gap topics + personal gaps, conflicts, retract, 24-month retention
   app/projects/          — project spaces: per-request project access, lead-approved shares, expiry
@@ -129,6 +129,9 @@ static files), agents, retrieval and Caddy/Headscale in `deploy/`.
   access can only narrow. Old versions are shown only under the labels they had.
   Admins can't add roles to themselves (two-person rule). Red-team attacks live in
   `tests/db/test_redteam.py`: add one for every new endpoint that returns content.
+- Answer reuse (`app/agents/reuse.py`) is keyed on the exact prompt built from the
+  asker's own retrieval; never look answers up by question alone, and never store
+  outage, fallback or guard-trimmed answers. Retract and "not helpful" remove rows.
 - Project shares need the department lead's approval, checked on their own roles
   (`principal_for`), never on project access. Partial shares are checked in both
   `sop_doc_visible()` (v4) and `can_view_document(..., path=, doc_id=)`: keep them in sync.

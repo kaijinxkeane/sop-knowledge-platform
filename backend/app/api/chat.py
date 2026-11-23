@@ -227,6 +227,8 @@ def _section_record(sec: Section, contact: str) -> dict:
         "tier": sec.tier,
         "fallback_from": sec.fallback_from,
         "escalated": sec.escalated,
+        "reused": sec.reused,
+        "reuse_key": sec.reuse_key,
     }
 
 
@@ -286,6 +288,7 @@ async def post_message(
                         "confidence": sec.confidence,
                         "model": sec.model,
                         "escalated": sec.escalated,
+                        "reused": sec.reused,
                         "contact": profiles[sec.space].contact if sec.no_answer else None,
                     },
                 )
@@ -353,6 +356,7 @@ async def post_message(
                     "answered": [x.space for x in answered],
                     "documents": sorted({c["document_id"] for x in answered for c in x.citations}),
                     "models": sorted({x.model for x in sections if x.model}),
+                    "reused": [x.space for x in sections if x.reused],
                 },
             )
             await s.commit()
@@ -385,6 +389,10 @@ async def feedback(
         )
     )
     if not body.helpful:
+        # never serve this answer to anyone again
+        from app.agents.reuse import forget_keys
+
+        await forget_keys(session, [sec.get("reuse_key") for sec in msg.sections])
         question = await session.scalar(
             select(ChatMessage.id)
             .where(

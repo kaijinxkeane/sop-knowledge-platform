@@ -409,6 +409,21 @@ class MessageCitation(Base):
     part_number: Mapped[int | None] = mapped_column(Integer)
 
 
+class AnswerReuse(Base):
+    """A department answer kept for reuse (plan §5.2). The key covers the exact
+    prompt (question, the approved passages and their versions, the space's
+    rules) and the models, so any change to a cited SOP is a new key."""
+
+    __tablename__ = "answer_reuse"
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    space: Mapped[str] = mapped_column(String(64))
+    section: Mapped[dict] = mapped_column(JSONB)
+    document_ids: Mapped[list[uuid.UUID]] = mapped_column(ARRAY(UUID(as_uuid=True)))
+    hits: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = _created()
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class MessageFeedback(Base):
     __tablename__ = "message_feedback"
     message_id: Mapped[uuid.UUID] = mapped_column(
@@ -580,6 +595,9 @@ class SearchEvent(Base):
     vector: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM))
     results: Mapped[int] = mapped_column(Integer)
     best_distance: Mapped[float | None] = mapped_column(Float)
+    # reported by the Library when the user leaves the results (no document ids)
+    opened: Mapped[int] = mapped_column(Integer, default=0)
+    used: Mapped[bool | None] = mapped_column(Boolean)  # None: not reported
     created_at: Mapped[datetime] = _created()
 
 

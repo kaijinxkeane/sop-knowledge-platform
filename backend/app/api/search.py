@@ -9,8 +9,10 @@ alone and `semantic` is false.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, current_user, get_db, get_query_embedder
@@ -38,6 +40,7 @@ class HitOut(BaseModel):
 
 
 class SearchOut(BaseModel):
+    search_id: str | None = None  # for POST /search/{id}/outcome
     semantic: bool
     results: list[HitOut]
 
@@ -78,17 +81,17 @@ async def search_endpoint(
     user_id = me.principal.user_id
     await session.rollback()  # leave reader mode before writing the history row
     distances = [h.distance for h in hits if h.distance is not None]
-    session.add(
-        SearchEvent(
-            user_id=user_id,
-            query=q,
-            vector=vector,
-            results=len(hits),
-            best_distance=min(distances) if distances else None,
-        )
+    event = SearchEvent(
+        user_id=user_id,
+        query=q,
+        vector=vector,
+        results=len(hits),
+        best_distance=min(distances) if distances else None,
     )
+    session.add(event)
     await session.commit()
     return SearchOut(
+        search_id=str(event.id),
         semantic=vector is not None,
         results=[
             HitOut(
@@ -109,3 +112,26 @@ async def search_endpoint(
             for h in hits
         ],
     )
+
+
+class OutcomeIn(BaseModel):
+    opened: int = Field(ge=0, le=500)  # how many results the user opened
+    used: bool  # did any of them help ("this answered it", copy, cite, ...)
+
+
+@router.post("/search/{search_id}/outcome", status_code=204)
+async def search_outcome(
+    search_id: uuid.UUID,
+    body: OutcomeIn,
+    me: CurrentUser = Depends(current_user),
+    session: AsyncSession = Depends(get_db),
+) -> None:
+    """Sent by the Library when the user leaves a results page. Opening several
+    results and using none is a gap signal in the user's own "gaps from your
+    searches". Counts only: which documents were opened is not stored."""
+    event = await session.get(SearchEvent, search_id)
+    if event is None or event.user_id != me.user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not found")
+    event.opened = max(event.opened, body.opened)
+    event.used = bool(event.used) or body.used  # once useful, stays useful
+    await session.commit()

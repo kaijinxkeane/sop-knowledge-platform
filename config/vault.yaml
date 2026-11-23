@@ -74,3 +74,14 @@ projects:
 # [intranet.example.com]. Empty: no links in answers.
 answers:
   allowed_link_domains: []
+  # The same question against the same approved passages reuses the stored
+  # answer (app/agents/reuse.py) for this many days. 0 turns it off.
+  reuse_days: 30
+
+# Local OCR (app/vault/ocr.py) reads text inside images: scanned PDF pages,
+# pictures on slides, images in Word files and image files. CPU only, nothing
+# leaves the machine. Lines below min_confidence are dropped.
+ocr:
+  enabled: true
+  min_confidence: 0.6
+  max_images_per_file: 60

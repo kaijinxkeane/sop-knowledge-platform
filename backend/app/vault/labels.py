@@ -19,6 +19,7 @@ import yaml
 
 from app.config import get_settings
 from app.policy.engine import Sensitivity, resolve_sensitivity
+from app.vault.ocr import OcrSettings
 
 _PATTERNS = {
     "email": re.compile(r"\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b"),
@@ -55,6 +56,8 @@ class VaultConfig:
     handover_roles: tuple[str, ...] = ()
     retention_months: int = 24
     allowed_link_domains: tuple[str, ...] = ()  # links allowed in answers (output_guard)
+    ocr: OcrSettings = OcrSettings()
+    answer_reuse_days: int = 30  # 0 turns answer reuse off
 
     def is_handover(self, path: str) -> bool:
         return path.startswith(self.handover_folder + "/")
@@ -104,6 +107,12 @@ def load_vault_config(config_dir: Path | None = None) -> VaultConfig:
         retention_months=int(data.get("retention_months") or 24),
         allowed_link_domains=tuple(
             str(d) for d in (data.get("answers") or {}).get("allowed_link_domains") or ()
+        ),
+        answer_reuse_days=int((data.get("answers") or {}).get("reuse_days", 30)),
+        ocr=OcrSettings(
+            enabled=bool((data.get("ocr") or {}).get("enabled", True)),
+            min_confidence=float((data.get("ocr") or {}).get("min_confidence") or 0.6),
+            max_images=int((data.get("ocr") or {}).get("max_images_per_file") or 60),
         ),
     )
 

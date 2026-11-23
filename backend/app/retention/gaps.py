@@ -35,6 +35,7 @@ TOPIC_DISTANCE = 0.35  # a question joins a topic if this close to its centre (c
 META_DISTANCE = 0.6  # nearest SOP close enough to borrow programme/stage from
 ACCESS_DISTANCE = 0.45  # a hidden document this close "covers" the topic
 WEAK_DISTANCE = 0.5  # a search whose best semantic match is farther than this is weak
+OPENED_UNUSED = 2  # opened this many results and used none
 MIN_PEOPLE_FOR_HR = 3
 LABEL_SYSTEM = (
     "Several staff asked these questions and the company's SOPs had no good "
@@ -275,6 +276,7 @@ class PersonalGap:
     search_ids: list[uuid.UUID] = field(default_factory=list)
     question_ids: list[uuid.UUID] = field(default_factory=list)
     unanswered_chat: bool = False
+    looked_and_left: bool = False  # opened several results, none helped
     vector: list[float] | None = None
 
 
@@ -297,7 +299,10 @@ async def personal_gaps(
     weak = [
         x
         for x in searches
-        if x.results == 0 or x.best_distance is None or x.best_distance > WEAK_DISTANCE
+        if x.results == 0
+        or x.best_distance is None
+        or x.best_distance > WEAK_DISTANCE
+        or (x.used is False and x.opened >= OPENED_UNUSED)  # looked, found nothing useful
     ]
     events = (
         (
@@ -314,7 +319,14 @@ async def personal_gaps(
     )
     qtexts = await question_texts(s, list(events))
     items: list[tuple[str, list[float] | None, datetime, str, uuid.UUID]] = [
-        (x.query, _vec(x.vector), x.created_at, "search", x.id) for x in weak
+        (
+            x.query,
+            _vec(x.vector),
+            x.created_at,
+            "search_unused" if x.used is False and x.opened >= OPENED_UNUSED else "search",
+            x.id,
+        )
+        for x in weak
     ]
     seen_questions: set[uuid.UUID] = set()
     for e in events:  # one question can be a gap in several spaces: count it once
@@ -338,12 +350,13 @@ async def personal_gaps(
             groups.append(target)
         target.count += 1
         target.label, target.last_at = label, max(target.last_at, at)
-        if kind == "search":
+        if kind in ("search", "search_unused"):
             target.search_ids.append(ref)
+            target.looked_and_left = target.looked_and_left or kind == "search_unused"
         elif ref not in target.question_ids:
             target.question_ids.append(ref)
             target.unanswered_chat = target.unanswered_chat or kind == "no_answer"
-    keep = [g for g in groups if g.count >= 2 or g.unanswered_chat]
+    keep = [g for g in groups if g.count >= 2 or g.unanswered_chat or g.looked_and_left]
     return sorted(keep, key=lambda g: (-g.count, -g.last_at.timestamp()))
 
 

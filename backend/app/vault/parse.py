@@ -5,7 +5,8 @@
 - .pptx decks: one chunk per slide (title, text, tables, speaker notes).
 - .pdf: one chunk per page, including fillable form-field labels.
 - .docx: chunked by heading.
-OCR for text inside images is a later addition (needs a local OCR engine).
+- Images (.png/.jpg/.jpeg) and text inside images in decks, scanned PDF pages
+  and Word files: local OCR (app/vault/ocr.py), marked "Text in image".
 """
 
 from __future__ import annotations
@@ -15,10 +16,20 @@ import re
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 
+from app.vault.ocr import ImageReader
 from wiki_core import parse_frontmatter_block, split_markdown_frontmatter
 
 NOTE_EXT = {".md"}
-ATTACHMENT_EXT = {".pptx": "deck", ".pdf": "pdf", ".docx": "document"}
+ATTACHMENT_EXT = {
+    ".pptx": "deck",
+    ".pdf": "pdf",
+    ".docx": "document",
+    ".png": "image",
+    ".jpg": "image",
+    ".jpeg": "image",
+}
+IMAGE_EXT = {".png", ".jpg", ".jpeg"}
+SCANNED_PAGE = 30  # a PDF page with less text than this is read with OCR
 MAX_CHUNK = 1500  # characters
 
 _WIKILINK = re.compile(r"(!?)\[\[([^\]|#^]+)(?:[#^][^\]|]*)?(?:\|[^\]]*)?\]\]")
@@ -78,6 +89,8 @@ def parse_file(path: str, data: bytes) -> Parsed:
         return parse_pdf(path, data)
     if ext == ".docx":
         return parse_docx(path, data)
+    if ext in IMAGE_EXT:
+        return parse_image(path, data)
     raise ValueError(f"unsupported file type: {ext}")
 
 
@@ -160,7 +173,7 @@ def parse_note(path: str, text: str) -> Parsed:
 
 
 def _is_file(target: str) -> bool:
-    return PurePosixPath(target).suffix.lower() in set(ATTACHMENT_EXT) | {".png", ".jpg", ".jpeg"}
+    return PurePosixPath(target).suffix.lower() in set(ATTACHMENT_EXT)
 
 
 def _markdown_chunks(body: str) -> list[Chunk]:
@@ -210,9 +223,30 @@ def _split(text: str) -> list[str]:
 # --- attachments -------------------------------------------------------------
 
 
+def _pictures(shapes):
+    """Picture shapes on a slide (pictures and picture placeholders), inside groups too."""
+    from pptx.shapes.group import GroupShape
+    from pptx.shapes.picture import Picture
+    from pptx.shapes.placeholder import PlaceholderPicture
+
+    for shape in shapes:
+        if isinstance(shape, GroupShape):
+            yield from _pictures(shape.shapes)
+        elif isinstance(shape, Picture | PlaceholderPicture):
+            yield shape
+
+
+def _image_blob(shape) -> bytes | None:
+    try:
+        return shape.image.blob
+    except Exception:  # noqa: BLE001 - linked or unsupported picture
+        return None
+
+
 def parse_pptx(path: str, data: bytes) -> Parsed:
     from pptx import Presentation
 
+    ocr = ImageReader()
     deck = Presentation(io.BytesIO(data))
     title = (deck.core_properties.title or "").strip() or PurePosixPath(path).stem
     chunks, parts = [], []
@@ -229,6 +263,11 @@ def parse_pptx(path: str, data: bytes) -> Parsed:
             if getattr(shape, "has_table", False) and shape.has_table:
                 for row in shape.table.rows:
                     texts.append(" | ".join(c.text.strip() for c in row.cells))
+        for pic in _pictures(slide.shapes):
+            blob = _image_blob(pic)
+            seen = ocr(blob) if blob else ""
+            if seen:
+                texts.append(f"Text in image: {seen}")
         notes = ""
         if slide.has_notes_slide:
             notes = slide.notes_slide.notes_text_frame.text.strip()
@@ -251,6 +290,7 @@ def parse_pptx(path: str, data: bytes) -> Parsed:
 def parse_pdf(path: str, data: bytes) -> Parsed:
     from pypdf import PdfReader
 
+    ocr = ImageReader()
     reader = PdfReader(io.BytesIO(data))
     meta_title = ((reader.metadata or {}).get("/Title") or "").strip() if reader.metadata else ""
     title = meta_title or PurePosixPath(path).stem
@@ -264,6 +304,10 @@ def parse_pdf(path: str, data: bytes) -> Parsed:
                 label = obj.get("/TU") or obj.get("/T")
                 if label:
                     labels.append(str(label))
+        if len(text) < SCANNED_PAGE:
+            seen = "\n".join(filter(None, (ocr(b) for b in _page_images(page))))
+            if seen:
+                text = (text + "\n" if text else "") + f"Text in image: {seen}"
         if labels:
             text += "\nForm fields: " + "; ".join(labels)
         first = text.splitlines()[0][:120] if text else ""
@@ -289,9 +333,35 @@ def parse_docx(path: str, data: bytes) -> Parsed:
     for table in document.tables:
         for row in table.rows:
             md_lines.append(" | ".join(c.text.strip() for c in row.cells))
+    ocr = ImageReader()
+    seen = []
+    for rel in document.part.rels.values():
+        if "image" in rel.reltype and not rel.is_external:
+            text = ocr(rel.target_part.blob)
+            if text:
+                seen.append(text)
+    if seen:
+        md_lines += ["", "## Text in images", *seen]
     return Parsed(
         kind="attachment",
         doc_type="document",
         title=title,
         chunks=_markdown_chunks("\n".join(md_lines)),
     )
+
+
+def _page_images(page):
+    try:
+        for img in page.images:
+            yield img.data
+    except Exception:  # noqa: BLE001 - unsupported image encoding
+        return
+
+
+def parse_image(path: str, data: bytes) -> Parsed:
+    from app.vault.ocr import read_image
+
+    title = PurePosixPath(path).stem
+    text = read_image(data)
+    chunks = [Chunk(text=f"Text in image: {text}", heading="Image")] if text else []
+    return Parsed(kind="attachment", doc_type="image", title=title, chunks=chunks)

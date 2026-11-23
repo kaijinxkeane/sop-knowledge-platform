@@ -14,9 +14,31 @@ from app.identity import principal_for
 
 
 async def users_with(s: AsyncSession, action: str, space: str) -> list[uuid.UUID]:
-    """Active users who hold `action` on `space` (e.g. the space's leads)."""
-    users = (await s.execute(select(User).where(User.is_active.is_(True)))).scalars().all()
-    return [u.id for u in users if principal_for(u).can(action, space)]
+    """Active users who hold `action` on `space` (e.g. the space's leads).
+
+    Project spaces (`p-...`) have no role grants: their approver is the project
+    lead and their reviewers are its members, worked out exactly as on a
+    request (`principal_with_projects`), so an ended project asks nobody."""
+    if not space.startswith("p-"):
+        users = (await s.execute(select(User).where(User.is_active.is_(True)))).scalars().all()
+        return [u.id for u in users if principal_for(u).can(action, space)]
+    from app.db.models import Project
+    from app.projects.service import principal_with_projects
+
+    p = (await s.execute(select(Project).where(Project.space == space))).scalar_one_or_none()
+    if p is None:
+        return []
+    ids = {p.lead_id, *(m.user_id for m in p.members)}
+    users = (
+        (await s.execute(select(User).where(User.id.in_(ids), User.is_active.is_(True))))
+        .scalars()
+        .all()
+    )
+    out = []
+    for u in users:
+        if (await principal_with_projects(s, u, principal_for(u))).can(action, space):
+            out.append(u.id)
+    return out
 
 
 async def users_with_role(s: AsyncSession, roles: Iterable[str]) -> list[uuid.UUID]:

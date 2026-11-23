@@ -53,6 +53,9 @@ async def apply_retention(
             ("webhook_deliveries", WebhookDelivery, WebhookDelivery.created_at),
         ):
             out[name] = (await s.execute(delete(model).where(col < cutoff))).rowcount or 0
+        from app.agents.reuse import expired
+
+        out["reused_answers"] = await expired(s, now)
         # Audit log: keep the chain verifiable from the oldest kept event.
         await s.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": audit._LOCK_KEY})
         last_old = (

@@ -15,11 +15,13 @@ even when the user reads it through a shared space.
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from app.agents import reuse
 from app.agents.department import Section, answer
 from app.agents.router import Route, route
 from app.db.models import DocumentAccess
@@ -30,6 +32,8 @@ from app.models.types import ContentScope
 from app.policy.engine import Principal
 from app.retrieval.search import Hit, expand, search
 from app.spaces import SpaceProfile
+
+log = logging.getLogger("sop.concierge")
 
 ROUTE_HITS = 12
 SPACE_HITS = 6
@@ -95,6 +99,21 @@ async def boundary_scope(sessions: async_sessionmaker, space: str, hits: list[Hi
     return ContentScope.of(space, *spaces)
 
 
+async def _reused(sessions, key: str, space: str):
+    try:
+        return await reuse.lookup(sessions, key, space)
+    except Exception:  # noqa: BLE001 - reuse is an optimisation; answer normally
+        log.warning("answer_reuse_failed")
+        return None
+
+
+async def _keep(sessions, key: str, sec) -> None:
+    try:
+        await reuse.store(sessions, key, sec)
+    except Exception:  # noqa: BLE001
+        log.warning("answer_reuse_failed")
+
+
 async def ask(
     *,
     principal: Principal,
@@ -125,7 +144,17 @@ async def ask(
     async def run(space: str) -> None:
         try:
             scope = await boundary_scope(sessions, space, per_space[space])
-            async for event in answer(gateway, profiles[space], question, per_space[space], scope):
+            passages = per_space[space]
+            key = reuse.key_for(gateway, profiles[space], question, passages, scope)
+            if passages and (hit := await _reused(sessions, key, space)) is not None:
+                hit.passages = passages
+                if hit.text:
+                    await queue.put({"type": "token", "space": space, "text": hit.text})
+                await queue.put({"type": "section_done", "section": hit})
+                return
+            async for event in answer(gateway, profiles[space], question, passages, scope):
+                if event["type"] == "section_done":
+                    await _keep(sessions, key, event["section"])
                 await queue.put(event)
         except Exception as exc:  # noqa: BLE001 - one department failing doesn't stop others
             sec = Section(space=space, no_answer=True, confidence="low", error=type(exc).__name__)

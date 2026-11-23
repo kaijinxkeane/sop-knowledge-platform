@@ -312,3 +312,38 @@ async def test_frontmatter_cannot_move_a_project_note_into_a_department(
     async with sessions() as s:
         d = await s.get(Document, uuid.UUID(note["id"]))
         assert {a.space for a in d.access} == {p["space"]}, r.text
+
+
+async def test_project_reviews_go_to_the_project_lead(
+    indexed, sessions, client, make_user, sign_in
+):
+    """Not to department approvers, who hold nothing on the project space."""
+    p, lead, member, other, hr, h = await setup(client, make_user, sign_in, shares=())
+    core_lead = await make_user(roles=CORE_LEAD)
+    note = (
+        await client.post(
+            f"{API}/notes",
+            headers=h[member],
+            json={"title": "Run sheet", "space": p["space"], "body": "# Run sheet"},
+        )
+    ).json()
+    r = await client.post(f"{API}/notes/{note['id']}/submit", headers=h[member])
+    assert r.status_code in (200, 201), r.text
+    async with sessions() as s:
+        got = {
+            n.user_id
+            for n in (
+                await s.execute(select(Notification).where(Notification.kind == "review_requested"))
+            ).scalars()
+        }
+    assert lead.user.id in got
+    assert not got & {core_lead.user.id, hr.user.id, other.user.id, member.user.id}
+    # once the project has ended, nobody is asked
+    async with sessions() as s:
+        proj = await s.get(Project, uuid.UUID(p["id"]))
+        proj.ends_on = date.today() - timedelta(days=1)
+        proj.starts_on = date.today() - timedelta(days=30)
+        await s.commit()
+        from app.governance.notify import users_with
+
+        assert await users_with(s, "approve", p["space"]) == []

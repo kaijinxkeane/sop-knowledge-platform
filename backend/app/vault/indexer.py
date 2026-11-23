@@ -9,6 +9,7 @@ stored without vectors (keyword search still works) and filled in later.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 import uuid
@@ -190,7 +191,8 @@ class Indexer:
         if await is_retracted(s, rel, digest):
             return "skipped"  # purged by an admin; back only once its owners change it
         try:
-            parsed = parse_file(rel, data)
+            # OCR is CPU work: keep the event loop free while it runs
+            parsed = await asyncio.to_thread(parse_file, rel, data)
         except Exception:  # noqa: BLE001 - a corrupt file must not stop indexing
             log.warning("parse_failed", extra={"fields": {"path_hash": digest[:12]}})
             return "skipped"

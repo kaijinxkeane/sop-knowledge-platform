@@ -1229,7 +1229,15 @@ Phase 2 *backend* done (2026-11-21), except OCR:
 - **Library endpoints**: filters, `/parts`, `/versions` and `/file`.
 - **Worker**: indexes Obsidian commits every minute; nightly 02:05 check.
 
-Still to do in Phase 2: local OCR for images, and the Library/editor UI.
+Local OCR done (2026-11-23), `app/vault/ocr.py`: RapidOCR (ONNX models inside
+the package, CPU only, no downloads) reads image files, pictures on slides
+(including groups and placeholders), scanned PDF pages (pages with under 30
+characters of text) and images in Word files, marked "Text in image". The text
+goes through the same labels, safeguards and name detector. Repeated images
+(logos) are read once, at most 60 per file; tiny images are skipped. About 0.4 s
+per image after a one-off 2-7 s load. The Docker image uses headless OpenCV.
+Off switch: `ocr.enabled` in `vault.yaml`.
+Still to do in Phase 2: the Library/editor UI.
 
 Phase 2b *backend* done (2026-11-21):
 - **Classifier** (`app/classify/`): one local model call per document version.
@@ -1311,7 +1319,17 @@ Phase 3 *backend* done (2026-11-21):
   word: median 5.5 s, p90 11.3 s on the 16 GB MacBook.
 - **Outage handling**: when an agent's model call fails, its section is marked
   `unavailable`. The user is told to try again and no knowledge gap is logged.
-- **Still to do in Phase 3**: the Ask UI and answer reuse (cost lever 5).
+- **Answer reuse** (cost lever 5, 2026-11-23), `app/agents/reuse.py`, migration
+  0011: a department answer is stored under a hash of its exact prompt (the
+  question, normalised for case and spacing; the approved passages retrieved
+  for *this* user, with their document versions and chunk ids; the space's
+  rules), the models and the link allowlist. It is served only after the
+  asker's own retrieval returned the same passages, so it never crosses access.
+  Any change to a cited SOP gives a new key. Rows go at once on retract or a
+  "not helpful" vote, and after `answers.reuse_days` (30, 0 = off). Outages,
+  fallback-model answers and answers the output guard trimmed are never stored.
+  Reused answers are marked `reused` in the stream, the message and the audit.
+- **Still to do in Phase 3**: the Ask UI.
 
 Phase 4 *backend* done (2026-11-21):
 - **Version-bound approvals** (`app/governance/`): an approval covers one
@@ -1379,8 +1397,9 @@ Phase 5 *backend* done (2026-11-21):
   user, as private history covered by the retention period. Weak searches and
   unanswered questions are grouped. Related SOPs and experts come only from
   what the user can read, so a restricted SOP is never confirmed.
-  "Request an SOP" tells the leads anonymously. Not yet: the "opened results
-  but used none" signal (it needs the frontend).
+  "Request an SOP" tells the leads anonymously. "Opened results but used
+  none": the Library reports `POST /search/{id}/outcome` (counts only, no
+  document ids); opening 2+ results and using none is a gap on its own.
 - **Coverage map** (`/reports/coverage`; titles for leads, counts for HR),
   **staleness** (`/spaces/{s}/stale`), **bus factor** (`/reports/bus-factor`;
   sole human author, and people with a `leaving_on` date set by the admin).
@@ -1451,8 +1470,9 @@ Project spaces (2026-11-22), `app/projects/`, `app/api/projects.py`, migration 0
   everywhere). People past their `leaving_on` date lose project access.
 - Access is worked out on every request (`principal_with_projects` in
   `current_user`), so there is no clean-up job.
-- Not yet: review requests in a project space notify the department approvers
-  (`users_with`), not the project lead, and the frontend screens.
+- Review requests in a project space go to the project lead (approve) and its
+  members (review), worked out like a request, so an ended project asks nobody
+  (`users_with`). Not yet: the frontend screens.
 
 Red-team (2026-11-22), `tests/db/test_redteam.py` (35 attacks) and
 `tests/test_live_models.py` (planted instructions, real 8B). Found and fixed:
@@ -1545,12 +1565,11 @@ Still open (none block Phases 0–5):
 
 1. **Usage:** expected users and questions per day, to refine cost estimates
    (the cost dashboard will measure this anyway).
-2. **Host memory:** local text jobs now use `qwen3:4b` (Classifier, router)
-   and `qwen3:8b` (background). On 16 GB only one of them fits alongside the
-   stack, so they load one at a time; if the Phase 2b eval picks 8B for the
-   Classifier, one 8B model serves every local text job. 32 GB keeps both
-   loaded and leaves room for local answering. Decide before buying, since
-   Mac memory can't be upgraded.
+2. **Host memory:** settled (2026-11-22): one local model, `qwen3:8b`, serves
+   answering, classifying and routing, with `qwen3-embedding:0.6b` for search.
+   Both stay loaded at once (about 8.3 GB). OCR adds about 0.5 GB on the
+   worker. 16 GB runs this; 32 GB leaves room for a larger local answering
+   model in Phase 7. Decide before buying, since Mac memory can't be upgraded.
 3. **Office internet:** does it have a public IP (no CGNAT)? Needed for
    Headscale (§3.3).
 4. **Programme and stage names:** the real list, or keep the placeholders

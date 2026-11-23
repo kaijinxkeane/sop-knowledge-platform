@@ -106,6 +106,9 @@ async def _purge_document(
         )
         await s.execute(delete(MessageCitation).where(MessageCitation.message_id.in_(cited)))
         result.answers_removed += len(cited)
+    from app.agents.reuse import forget_documents
+
+    await forget_documents(s, [doc.id])
     await s.execute(
         update(GapTopic)
         .where(GapTopic.access_gap_document_id == doc.id)
@@ -151,6 +154,7 @@ async def retract_document(s: AsyncSession, doc_id: uuid.UUID, actor: uuid.UUID)
 _TEXT_COLUMNS = [
     ("messages", "content"),
     ("messages", "sections::text"),
+    ("answer_reuse", "section::text"),
     ("conversations", "title"),
     ("search_events", "query"),
     ("handover_comments", "body"),
@@ -227,6 +231,11 @@ async def retract_term(
             setattr(row, col.key, _redact(getattr(row, col.key), rx))
         result.redacted[key] = len(rows)
 
+    from app.db.models import AnswerReuse
+
+    result.redacted["reused_answers"] = (
+        await s.execute(delete(AnswerReuse).where(matching(cast(AnswerReuse.section, Text))))
+    ).rowcount or 0
     await redact(ChatMessage, ChatMessage.content, key="messages")
     msgs = (
         (await s.execute(select(ChatMessage).where(matching(cast(ChatMessage.sections, Text)))))

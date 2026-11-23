@@ -90,7 +90,8 @@ def test_docx_by_heading():
         ("b.PPTX", True),
         ("c.pdf", True),
         ("d.docx", True),
-        ("e.png", False),
+        ("e.png", True),  # read with local OCR
+        ("e.svg", False),
         ("f.txt", False),
     ],
 )

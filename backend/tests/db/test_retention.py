@@ -503,3 +503,32 @@ async def test_retention_deletes_old_records_and_keeps_the_audit_chain(
         async with sessions() as s:
             await s.execute(text("DELETE FROM audit_events"))
             await s.commit()
+
+
+async def test_opened_results_but_used_none_is_a_personal_gap(
+    indexed, sessions, client, make_user, sign_in
+):
+    me, other = await make_user(roles=STAFF), await make_user(roles=STAFF)
+    hm, ho = await sign_in(me), await sign_in(other)
+    r = await client.get(f"{API}/search", params={"q": "Discovery Workshop agenda"}, headers=hm)
+    sid = r.json()["search_id"]
+    assert r.json()["results"]
+    assert (await client.get(f"{API}/me/gaps", headers=hm)).json() == []  # good results
+    out = f"{API}/search/{sid}/outcome"
+    assert (
+        await client.post(out, headers=ho, json={"opened": 3, "used": False})
+    ).status_code == 404
+    assert (
+        await client.post(out, headers=hm, json={"opened": 1, "used": False})
+    ).status_code == 204
+    assert (await client.get(f"{API}/me/gaps", headers=hm)).json() == []  # one look isn't a gap
+    await client.post(out, headers=hm, json={"opened": 3, "used": False})
+    mine = (await client.get(f"{API}/me/gaps", headers=hm)).json()
+    assert len(mine) == 1 and mine[0]["count"] == 1
+    # once something helped, it stays helped
+    await client.post(out, headers=hm, json={"opened": 4, "used": True})
+    await client.post(out, headers=hm, json={"opened": 4, "used": False})
+    assert (await client.get(f"{API}/me/gaps", headers=hm)).json() == []
+    async with sessions() as s:
+        ev = await s.get(SearchEvent, uuid.UUID(sid))
+        assert (ev.opened, ev.used) == (4, True)
