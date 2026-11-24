@@ -170,3 +170,44 @@ def test_judge_marks_unit_notes_as_system_added():
     from app.retention.conflicts import UNITS_NOTE
 
     assert "added by the system" in UNITS_NOTE and "not a contradiction" in UNITS_NOTE
+
+
+async def test_focus_pairs_the_most_alike_sentences():
+    from app.retention.focus import closest_statements
+
+    words = ["pitch", "lunch", "room"]
+
+    async def embed(texts):  # one dimension per topic word
+        return [[float(w in t.lower()) for w in words] + [0.1] for t in texts]
+
+    a = "Lunch is at 12:30. Each pitch lasts 2 minutes. Set up the room early."
+    b = "Each pitch lasts 4 minutes. Book the room."
+    pairs = await closest_statements(a, b, embed, top=2)
+    assert set(pairs) == {
+        ("Each pitch lasts 2 minutes.", "Each pitch lasts 4 minutes."),
+        ("Set up the room early.", "Book the room."),
+    }  # each sentence used once: lunch has no partner left
+    assert await closest_statements("One rule.", "Another rule.", embed) == []
+
+
+async def test_strict_screen_and_focus_reach_the_prompt():
+    from app.retention.conflicts import FOCUS_NOTE, SCREEN_NOTE, STRICT_NOTE, judge_pair
+
+    sent = {}
+
+    class Gw:
+        async def chat(self, tier, *, system, messages, scope, json_mode=False, **_):
+            sent.update(system=system, user=messages[0].content)
+            return ChatResult('{"conflict": false}', tier, "f", "m", "stop", Usage(), 1)
+
+    async def embed(texts):
+        return [[1.0, float(i)] for i, _ in enumerate(texts)]
+
+    await judge_pair(
+        Gw(), "First <b>rule</b>. Second rule.", "Third rule. Fourth.", title_a="A", title_b="B",
+        scope=ContentScope.unclassified(), strict=True, screen=True, embed=embed,
+    )  # fmt: skip
+    assert STRICT_NOTE in sent["system"] and SCREEN_NOTE in sent["system"]
+    assert FOCUS_NOTE in sent["system"]
+    closest = sent["user"].split("<closest>")[1]
+    assert "<b>" not in closest  # passage text stays escaped data inside the block

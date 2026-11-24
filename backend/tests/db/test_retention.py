@@ -28,7 +28,7 @@ from app.db.models import (
 )
 from app.identity import get_user, principal_for
 from app.models.types import ChatResult, Usage
-from app.retention.conflicts import detect_conflicts
+from app.retention.conflicts import SCREEN_NOTE, STRICT_NOTE, detect_conflicts
 from app.retention.gaps import group_gaps
 from app.retention.retention import apply_retention
 from app.spaces import space_profiles
@@ -539,10 +539,11 @@ class TwoModels:
 
     def __init__(self, confirm_answers):
         self.config = type("C", (), {"tiers": {"background": None, "conflict-confirm": None}})()
-        self.answers, self.calls = list(confirm_answers), []
+        self.answers, self.calls, self.systems = list(confirm_answers), [], {}
 
     async def chat(self, tier, *, system, messages, scope, json_mode=False, **_):
         self.calls.append(tier)
+        self.systems[tier] = system
         if tier == "background":
             text, model = '{"conflict": true, "explanation": "8B says so."}', "fake-8b"
         else:
@@ -560,6 +561,10 @@ async def test_conflicts_need_the_second_opinion_too(indexed, sessions):
     # All 8B checks first, then the 14B on its flags: each model loads once.
     assert gw.calls == ["background"] * 3 + ["conflict-confirm"] * 3
     assert report == {"checked": 2, "conflicts": 1, "unconfirmed": 1}
+    # Unstated group overrides count on both stages; only the 8B is told to flag if unsure.
+    assert all(STRICT_NOTE in system for system in gw.systems.values())
+    assert SCREEN_NOTE in gw.systems["background"]
+    assert SCREEN_NOTE not in gw.systems["conflict-confirm"]
     async with sessions() as s:
         q = select(Conflict.conflict, Conflict.model, Conflict.explanation)
         rows = (await s.execute(q)).all()

@@ -1,0 +1,196 @@
+# Conflict-check eval, third HOLD-OUT set (written 2026-11-24). FICTIONAL data only.
+#
+# Written before the missed-conflict fixes were built or run (plan §7: a stricter
+# exception rule with a screening first stage, and sentence focus for buried
+# conflicts). Never tune prompts, thresholds or models on these items: tune on
+# conflicts.yaml. 18 conflicts, 18 not, on topics no earlier set uses.
+#
+# A rule for one group that overrides a company-wide rule without saying so is a
+# conflict (m05, m07); the same override that names the rule it is allowed
+# under is an exception (m19-m22). Long passages that agree (m23-m26) check that
+# sentence focus doesn't invent conflicts.
+
+items:
+  # --- conflicts ------------------------------------------------------------------
+  - id: m01
+    conflict: true
+    kind: number
+    a: {title: "Pricing and Discounts", text: "Trainers may offer a discount of up to 10% on any programme fee."}
+    b: {title: "Closing a Sale", text: "To close a deal this quarter, offer up to 15% off the programme fee without asking anyone."}
+  - id: m02
+    conflict: true
+    kind: number
+    a: {title: "Certificates of Completion", text: "Participants receive a certificate if they attend at least 80% of the sessions."}
+    b: {title: "Programme Wrap-Up", text: "Only participants who attended every session get a certificate."}
+  - id: m03
+    conflict: true
+    kind: deadline
+    a: {title: "Cancellation Terms", text: "Clients who cancel a workshop less than 14 days before it pay half the fee."}
+    b: {title: "Rescheduling Workshops", text: "There is no fee for cancelling a workshop up to 7 days before it; after that, half the fee is charged."}
+  - id: m04
+    conflict: true
+    kind: deadline
+    a: {title: "Participant Feedback Survey", text: "Send the feedback survey within two days of the last session."}
+    b: {title: "Monthly Reporting", text: "Feedback surveys for all programmes are sent together on the last working day of the month."}
+  - id: m05
+    conflict: true
+    kind: deadline
+    a: {title: "Invoicing Clients", text: "All client invoices are payable within 30 days of the invoice date."}
+    b: {title: "Signature Programme - Billing", text: "Signature programme invoices are due on receipt, before the first session."}
+  - id: m06
+    conflict: true
+    kind: owner
+    a: {title: "Non-Disclosure Agreements", text: "The CEO signs every NDA on the company's behalf."}
+    b: {title: "Client Onboarding Paperwork", text: "The office manager signs the client's NDA during onboarding and files it."}
+  - id: m07
+    conflict: true
+    kind: owner
+    a: {title: "Refunds", text: "Only finance issues refunds to clients or participants."}
+    b: {title: "Session Cancelled on the Day", text: "If a session is cancelled on the day, the trainer refunds the participant's fee in cash on the spot."}
+  - id: m08
+    conflict: true
+    kind: rule
+    a: {title: "Using Client Logos", text: "Never show a client's logo in our marketing without the client's written permission."}
+    b: {title: "Website Client Wall", text: "Add the logo of every client we have worked with to the client wall on the website."}
+  - id: m09
+    conflict: true
+    kind: rule
+    a: {title: "Interns", text: "Interns do not have access to client folders."}
+    b: {title: "Session Admin", text: "After each session, the intern updates the client's folder with the attendance sheet and notes."}
+  - id: m10
+    conflict: true
+    kind: order
+    a: {title: "Booking External Venues", text: "Pay the venue deposit only after the client has signed the contract."}
+    b: {title: "Holding a Date", text: "Pay the venue deposit first to hold the date, then send the client the contract."}
+  - id: m11
+    conflict: true
+    kind: tool
+    a: {title: "Running Webinars", text: "Run every public webinar on Zoom with registration turned on."}
+    b: {title: "Webinar Checklist", text: "Public webinars are hosted on Microsoft Teams so attendees don't need another app."}
+  - id: m12
+    conflict: true
+    kind: buried
+    a: {title: "Petty Cash", text: "The office manager keeps the petty cash box locked in the top drawer. Use it for small purchases such as milk, stamps or a taxi to the post office. Write the date, amount and reason in the petty cash book. Put the receipt in the envelope inside the box. Each purchase can be at most $50. The box is counted and topped up on the first Monday of the month."}
+    b: {title: "Office Supplies", text: "Order paper, toner and stationery through the supplier account every second Thursday. For anything urgent, buy it locally and pay from petty cash, which covers purchases of up to $100. Keep the receipt and log it in the petty cash book. Large items such as chairs or screens go through the purchase request form."}
+  - id: m13
+    conflict: true
+    kind: buried
+    a: {title: "Recording Webinars", text: "Tell attendees at the start that the webinar is recorded. Record in gallery view so slides and speaker are both visible. Trim the waiting time at the start and the end. Add captions before sharing. Share the recording only with registered attendees, by a link that expires after 30 days. Keep the original file in the webinar folder."}
+    b: {title: "Content Calendar", text: "Plan two social posts for each webinar: one invitation a week before and one highlight the day after. Upload the full webinar recording to the company video channel as a public video, with the title and a short summary. Add the link to the newsletter. Reply to comments within a working day."}
+  - id: m14
+    conflict: true
+    kind: buried
+    a: {title: "Archiving Client Files", text: "When a programme ends, move the client folder to the archive drive. Remove draft documents and duplicates first. Keep the contract, invoices, attendance sheets and the final report. Rename the folder with the client name and the end date. Client files are kept for seven years after the programme ends, then deleted."}
+    b: {title: "Data Protection Basics", text: "Collect only the personal data a programme needs. Store it in the client folder, never in email. Lock your screen when you leave your desk. Delete a client's files two years after their programme ends. Report any data loss to the office manager the same day."}
+  - id: m15
+    conflict: true
+    kind: buried
+    a: {title: "Office Parking", text: "The building has two parking levels for us. Staff park on level 3. Level 2 is kept free for clients and visitors on training days. Display the parking pass on the dashboard. Electric cars can charge in the two bays next to the lift."}
+    b: {title: "Welcoming Clients", text: "Email clients the address and the nearest train station a week before. Ask them to arrive ten minutes early. Clients park on level 3 and take the lift to reception. Offer water or coffee when they arrive and show them where the restrooms are."}
+  - id: m16
+    conflict: true
+    kind: implicit
+    a: {title: "Accessibility Requests", text: "A trainer calls every participant who has noted an accessibility need before the programme starts, to agree any adjustments."}
+    b: {title: "Before the Programme", text: "Before the programme, participants receive the automated welcome email only; trainers make first contact on the day."}
+  - id: m17
+    conflict: true
+    kind: implicit
+    a: {title: "Door Codes", text: "The office door code is shared only with staff and changed if anyone leaves."}
+    b: {title: "Evening Masterclass Invitations", text: "Put the office door code in the joining email so participants can let themselves in after hours."}
+  - id: m18
+    conflict: true
+    kind: implicit
+    a: {title: "Client Data on Devices", text: "Client personal data stays on company laptops."}
+    b: {title: "Preparing a Coaching Session", text: "Trainers can review the client's profile and past notes at home on their own tablet the evening before."}
+
+  # --- not conflicts --------------------------------------------------------------
+  - id: m19
+    conflict: false
+    kind: exception
+    a: {title: "Discount Rules", text: "Discounts are capped at 10% of the fee unless the CEO approves a larger one."}
+    b: {title: "Charity Clients", text: "The CEO has approved a 20% discount for registered charities."}
+  - id: m20
+    conflict: false
+    kind: exception
+    a: {title: "Refund Policy", text: "Finance issues refunds. The one exception: when a session is cancelled on the day, the trainer may return a cash fee on the spot and tell finance."}
+    b: {title: "Cancelled Sessions", text: "If you cancel a session on the day, you may hand back the participant's cash fee there and then, as the refund policy allows, and email finance the details."}
+  - id: m21
+    conflict: false
+    kind: exception
+    a: {title: "Office Access", text: "The door code is for staff only. For evening events, the office manager may issue a one-time guest code."}
+    b: {title: "Evening Event Setup", text: "Ask the office manager for the one-time guest code and include it in the evening event invitation."}
+  - id: m22
+    conflict: false
+    kind: exception
+    a: {title: "Client Logos in Marketing", text: "Client logos need the client's written permission before they appear anywhere in our marketing."}
+    b: {title: "Updating the Client Wall", text: "Add logos to the website client wall only for clients who have returned the signed logo permission form."}
+  - id: m23
+    conflict: false
+    kind: long
+    a: {title: "Webinar Run Sheet", text: "Open the meeting 20 minutes early. Check the host's microphone and camera. Load the slides and test screen sharing. Start the recording at the scheduled time. Welcome attendees and explain how to ask questions. Keep an eye on the chat and pass questions to the speaker. End with the survey link."}
+    b: {title: "Webinar Moderator Role", text: "The moderator joins with the host before attendees arrive. They admit late attendees and mute background noise. They collect questions from the chat and read them out at the end. They post the survey link in the chat as the webinar closes. They note any technical problems for the debrief."}
+  - id: m24
+    conflict: false
+    kind: long
+    a: {title: "Petty Cash Box", text: "The petty cash box is kept locked in the office manager's drawer. It is for small purchases of up to $50, such as milk or stamps. Log every purchase in the petty cash book with the date and reason. Put the receipt in the envelope in the box. The box is counted on the first Monday of each month."}
+    b: {title: "Kitchen Supplies", text: "The office manager orders tea, coffee and snacks every second week. If milk runs out, anyone can buy some nearby and claim it from petty cash with the receipt. Wipe the counters after use. Empty the fridge every Friday afternoon. Don't leave dishes in the sink overnight."}
+  - id: m25
+    conflict: false
+    kind: long
+    a: {title: "Backups", text: "The shared drive is backed up automatically every night. A full copy is kept off site each week. The office manager checks the backup report every Monday. To restore a deleted file, ask the office manager with the file name and the folder. Restores from the last 30 days take less than a day."}
+    b: {title: "Saving Your Work", text: "Save all work in the shared drive, not on your laptop, so it is included in the nightly backup. Use the folder structure for each client. Name files with the date first. If you delete something by mistake, ask the office manager to restore it, giving the file name and folder."}
+  - id: m26
+    conflict: false
+    kind: long
+    a: {title: "Team Social Events", text: "We hold a team lunch on the last Friday of each month. The company pays for the meal; drinks are paid by each person. Suggest a venue in the team chat by the Wednesday before. Partners are welcome at the end-of-year party only. Let the office manager know about dietary needs."}
+    b: {title: "End-of-Year Party", text: "The end-of-year party is held in the first week of December. Staff may bring a partner. The office manager books the venue by October and collects dietary needs a month before. The company covers food; drinks are each person's own cost."}
+  - id: m27
+    conflict: false
+    kind: detail
+    a: {title: "Feedback Surveys", text: "Send the feedback survey within two days of the last session."}
+    b: {title: "Survey Questions", text: "The survey has eight rating questions and one free-text box, and goes out within two days of the final session."}
+  - id: m28
+    conflict: false
+    kind: detail
+    a: {title: "NDAs", text: "The CEO signs NDAs on the company's behalf."}
+    b: {title: "Filing Signed Agreements", text: "Once the CEO has signed an NDA, scan it and save it in the legal folder under the client's name."}
+  - id: m29
+    conflict: false
+    kind: detail
+    a: {title: "Venue Deposits", text: "Pay the venue deposit after the client signs the contract."}
+    b: {title: "Venue Payments", text: "Venue deposits are paid by bank transfer once the contract is signed; ask the venue for a receipt and save it in the client folder."}
+  - id: m30
+    conflict: false
+    kind: situation
+    a: {title: "Online Webinars", text: "Online webinars run on Zoom."}
+    b: {title: "In-Person Talks", text: "In-person talks at the office use the room microphone and the wall screen; nothing is streamed."}
+  - id: m31
+    conflict: false
+    kind: situation
+    a: {title: "Signature Programme Certificates", text: "Signature programme participants need 80% attendance for a certificate."}
+    b: {title: "One-Day Workshop Certificates", text: "One-day workshops give a certificate to everyone who attends the full day."}
+  - id: m32
+    conflict: false
+    kind: situation
+    a: {title: "Public Holidays", text: "The office is closed on public holidays."}
+    b: {title: "Weekend and Holiday Delivery", text: "Trainers who deliver a client programme on a public holiday get a day off in lieu, taken within a month."}
+  - id: m33
+    conflict: false
+    kind: reworded
+    a: {title: "Interns and Client Data", text: "Interns can't open client folders."}
+    b: {title: "Intern Induction", text: "Explain on day one that client folders are closed to interns; they work from the shared templates instead."}
+  - id: m34
+    conflict: false
+    kind: reworded
+    a: {title: "Cancellation Fees", text: "A workshop cancelled less than 14 days before it costs the client half the fee."}
+    b: {title: "Client Terms Summary", text: "Half the workshop fee is charged when the client cancels with under two weeks to go."}
+  - id: m35
+    conflict: false
+    kind: equivalent
+    a: {title: "Payment Terms", text: "Invoices are payable within 30 days."}
+    b: {title: "Chasing Payments", text: "Invoices are due one month after the invoice date; send a reminder a week after that."}
+  - id: m36
+    conflict: false
+    kind: equivalent
+    a: {title: "Laptop Updates", text: "Install system updates every Friday afternoon."}
+    b: {title: "IT Weekly Routine", text: "Once a week, at the end of the working week, install the latest system updates."}

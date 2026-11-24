@@ -1,0 +1,193 @@
+# Conflict-check eval, fourth HOLD-OUT set (written 2026-11-25). FICTIONAL data only.
+#
+# Written before the 14B-only judge was run (plan §7: can the 14B with thinking
+# be the only check on new pairs?). Never tune prompts, thresholds or models on
+# these items: tune on conflicts.yaml and the used hold-out sets. 18 conflicts,
+# 18 not, on topics no earlier set uses. Weighted towards the kinds the 8B
+# still misses (buried, implicit, owner), with long and exception pairs as the
+# matching hard negatives.
+
+items:
+  # --- conflicts ------------------------------------------------------------------
+  - id: n01
+    conflict: true
+    kind: buried
+    a: {title: "Freelance Trainers", text: "Freelance trainers sign the standard freelance agreement before their first programme. They use our workbooks and slides, not their own. They wear the company lanyard on client sites. Invoices are sent at the end of each month with the session dates listed. Freelancers are paid within 14 days of their invoice. They join the quarterly trainer meeting when they can."}
+    b: {title: "Paying Suppliers", text: "Supplier invoices go to the finance inbox. Check the purchase order number on each one. Finance pays suppliers, including freelance trainers, 45 days after the invoice date in the end-of-month payment run. Query any invoice without a purchase order before it is paid. Keep remittance advice in the supplier folder."}
+  - id: n02
+    conflict: true
+    kind: buried
+    a: {title: "Workshop Catering", text: "Order catering through the venue where possible. Ask participants about dietary needs in the joining form. Morning tea is at 10:30 and afternoon tea at 15:00. Lunch is served in the room so the group stays together. Budget up to $25 per person for lunch. Keep the catering receipt with the workshop file."}
+    b: {title: "Workshop Budgets", text: "Each workshop has a budget sheet in the client folder. Venue hire and printing are fixed costs. Catering is capped at $40 per person per day, covering lunch and both teas. Trainer travel is claimed separately through expenses. Send the budget sheet to finance when the workshop closes."}
+  - id: n03
+    conflict: true
+    kind: buried
+    a: {title: "Client Complaints", text: "Thank the client for raising the issue and write down what happened. Do not argue or promise a refund. Log the complaint in the complaints register the same day. The department lead replies to the client within three working days. If the client is still unhappy, the CEO reviews the complaint."}
+    b: {title: "Handling Feedback", text: "Most feedback comes through the end-of-programme survey. Share positive comments with the trainer. For a complaint, the trainer who ran the session replies to the client personally within a week, so the response comes from someone they know. Record the outcome in the survey summary."}
+  - id: n04
+    conflict: true
+    kind: buried
+    a: {title: "Fire Drills", text: "The office manager runs a fire drill twice a year. Everyone leaves by the stairs, never the lift. The assembly point is the park across the road. Wardens check the restrooms and meeting rooms before leaving. Visitors are guided out by the person hosting them. The office manager records how long the evacuation took."}
+    b: {title: "Hosting Visitors", text: "Collect your visitor from reception and sign them in. Stay with them in the office. Show them the kitchen and the restrooms. In a fire alarm, take your visitor down in the lift to the lobby and wait with them there. Sign them out when they leave and return the visitor card."}
+  - id: n05
+    conflict: true
+    kind: buried
+    a: {title: "Remote Working", text: "Staff can work from home up to two days a week. Agree your home days with your manager. Be reachable on the team chat from 9:00 to 17:30. Keep your camera on for client calls. Use the company laptop only, and connect through the VPN. Training days are always in person."}
+    b: {title: "Trainer Week Planning", text: "Trainers plan their week on Monday. Block preparation time for each session. Trainers may deliver online coaching sessions from home on any day without a session at the office. Update the shared calendar with your location. Book rooms for in-person sessions by Wednesday."}
+  - id: n06
+    conflict: true
+    kind: implicit
+    a: {title: "Music in Workshops", text: "Only play music from the licensed workshop playlist in client sessions."}
+    b: {title: "Energiser Activities", text: "For the dance energiser, let the group pick any song from a streaming app."}
+  - id: n07
+    conflict: true
+    kind: implicit
+    a: {title: "Client Gifts", text: "Staff may not accept gifts from clients worth more than $50."}
+    b: {title: "End of Programme", text: "Many clients thank their trainer with a gift such as a voucher or a bottle of champagne; accept it graciously and keep it."}
+  - id: n08
+    conflict: true
+    kind: implicit
+    a: {title: "Insurance for Outdoor Sessions", text: "Outdoor sessions are only run at venues on the insurer's approved list."}
+    b: {title: "Planning a Walking Workshop", text: "Choose any public park near the client's office for the walking workshop; no booking is needed."}
+  - id: n09
+    conflict: true
+    kind: implicit
+    a: {title: "Staff Profiles", text: "Staff profiles on the website show first names and photos only."}
+    b: {title: "Website Updates", text: "Each trainer page lists the trainer's full name, mobile number and personal social accounts so clients can reach them."}
+  - id: n10
+    conflict: true
+    kind: owner
+    a: {title: "Referral Bonuses", text: "The CEO approves every referral bonus before it is paid."}
+    b: {title: "Payroll Checklist", text: "Department leads approve referral bonuses for their own teams and send them to payroll."}
+  - id: n11
+    conflict: true
+    kind: owner
+    a: {title: "Lost Property", text: "Reception keeps lost property for one month and logs each item."}
+    b: {title: "After a Workshop", text: "The trainer keeps anything participants leave behind and returns it at the next session."}
+  - id: n12
+    conflict: true
+    kind: owner
+    a: {title: "Translation Requests", text: "The content lead arranges all translation of client materials."}
+    b: {title: "Overseas Clients", text: "Trainers working with overseas clients arrange translation of their workbooks directly with a translator they trust."}
+  - id: n13
+    conflict: true
+    kind: number
+    a: {title: "Appraisals", text: "Every staff member has one appraisal a year, in March."}
+    b: {title: "Performance Reviews", text: "Hold performance reviews twice a year, in March and September."}
+  - id: n14
+    conflict: true
+    kind: deadline
+    a: {title: "Sick Leave", text: "If you are sick, tell your manager before 9:00 on the first day."}
+    b: {title: "Trainer Absence", text: "A trainer who is sick on a training day tells the office manager by 7:00 so a replacement can be found."}
+  - id: n15
+    conflict: true
+    kind: deadline
+    a: {title: "Client Testimonials", text: "Ask the client for a testimonial within a week of the programme ending."}
+    b: {title: "Marketing Calendar", text: "Testimonials are requested three months after the programme, once the client has seen results."}
+  - id: n16
+    conflict: true
+    kind: rule
+    a: {title: "Dress Code", text: "Trainers wear business dress on client sites."}
+    b: {title: "Client Site Visits", text: "Smart casual is fine on client sites; business dress isn't needed."}
+  - id: n17
+    conflict: true
+    kind: order
+    a: {title: "Onboarding a Freelancer", text: "Brief the freelancer on the programme only after the signed agreement comes back."}
+    b: {title: "Freelancer Kick-Off", text: "Hold the programme briefing with the freelancer first, then send them the agreement to sign."}
+  - id: n18
+    conflict: true
+    kind: tool
+    a: {title: "Video Editing", text: "Edit session videos in the company's Descript account."}
+    b: {title: "Producing Highlight Reels", text: "Highlight reels are edited in Adobe Premiere on the studio computer."}
+
+  # --- not conflicts --------------------------------------------------------------
+  - id: n19
+    conflict: false
+    kind: exception
+    a: {title: "Gifts from Clients", text: "Gifts worth more than $50 can't be accepted, except flowers or food shared with the team."}
+    b: {title: "Thank-You Gifts", text: "A client hamper for the team can be accepted and shared in the kitchen, as the gifts rule allows."}
+  - id: n20
+    conflict: false
+    kind: exception
+    a: {title: "Workshop Music", text: "Use the licensed playlist in client sessions. The one exception is the dance energiser, where the group may choose a song."}
+    b: {title: "Dance Energiser", text: "Let the group pick a song for the dance energiser; it's the one time we step outside the licensed playlist."}
+  - id: n21
+    conflict: false
+    kind: exception
+    a: {title: "Outdoor Venues", text: "Outdoor sessions use venues on the insurer's list. Walking workshops in public parks are covered separately and need no booking."}
+    b: {title: "Walking Workshops", text: "Pick a public park close to the client for a walking workshop; the insurance covers public parks."}
+  - id: n22
+    conflict: false
+    kind: long
+    a: {title: "Freelancer Agreement", text: "Freelance trainers sign the standard agreement before their first programme. They use our workbooks and slides. They keep client information confidential and return materials at the end. They invoice at the end of each month with the session dates. Payment follows the supplier payment terms. They are welcome at the quarterly trainer meeting."}
+    b: {title: "Freelancer Induction", text: "Send the freelancer the trainer handbook and the brand method notes. Book them to observe one session before they deliver. Give them access to the workbook folder only. Remind them that invoices go to the finance inbox at the end of the month. Introduce them in the team chat."}
+  - id: n23
+    conflict: false
+    kind: long
+    a: {title: "Fire Safety", text: "The office manager runs fire drills twice a year and records the evacuation time. Use the stairs, never the lift. Meet at the park across the road. Wardens check the meeting rooms and restrooms before they leave. Hosts guide their visitors out."}
+    b: {title: "Fire Wardens", text: "Two fire wardens are named for each floor. Wardens wear the orange vest during a drill. They sweep their area, including the restrooms, then go to the assembly point in the park. They report to the office manager that their area is clear."}
+  - id: n24
+    conflict: false
+    kind: long
+    a: {title: "Catering for Workshops", text: "Order catering through the venue when you can. Collect dietary needs in the joining form. Morning tea is at 10:30, lunch at 12:30 and afternoon tea at 15:00. Keep the receipt with the workshop file. Lunch is served in the room."}
+    b: {title: "Workshop Day Timetable", text: "Start at 9:00 with introductions. Take morning tea at 10:30 for fifteen minutes. Break for lunch at 12:30; it is served in the room. Afternoon tea is at 15:00. Close at 17:00 with the action plan."}
+  - id: n25
+    conflict: false
+    kind: long
+    a: {title: "Working from Home", text: "Staff can work from home up to two days a week, agreed with their manager. Be on the team chat from 9:00 to 17:30. Use the company laptop and the VPN. Training days are in person."}
+    b: {title: "Home Office Setup", text: "Set up a quiet space with a plain background for calls. Use a headset for client calls. Lock the laptop when you step away. Keep client papers in a closed drawer. Tell your manager if your internet is down and come into the office instead."}
+  - id: n26
+    conflict: false
+    kind: detail
+    a: {title: "Referral Bonus", text: "The CEO approves referral bonuses."}
+    b: {title: "Referral Process", text: "Send the referral form to the CEO for approval; once approved, payroll adds the bonus to the next pay run."}
+  - id: n27
+    conflict: false
+    kind: detail
+    a: {title: "Client Complaints Log", text: "Log every complaint in the complaints register the same day."}
+    b: {title: "Complaints Register", text: "The register records the date, client, what happened and who is handling it; add each complaint on the day you hear about it."}
+  - id: n28
+    conflict: false
+    kind: detail
+    a: {title: "Lost and Found", text: "Reception keeps lost property for one month."}
+    b: {title: "Unclaimed Items", text: "Items unclaimed after a month at reception are donated to charity, and the log is updated."}
+  - id: n29
+    conflict: false
+    kind: situation
+    a: {title: "Dress for Client Sites", text: "Trainers wear business dress on client sites."}
+    b: {title: "Office Dress", text: "In the office, on days without clients, smart casual is fine."}
+  - id: n30
+    conflict: false
+    kind: situation
+    a: {title: "Sick Days for Office Staff", text: "Office staff who are sick tell their manager before 9:00."}
+    b: {title: "Sick on a Training Day", text: "Trainers who are sick on a training day call the office manager by 7:00 so the session can be covered."}
+  - id: n31
+    conflict: false
+    kind: situation
+    a: {title: "Editing Session Recordings", text: "Session recordings are edited in Descript."}
+    b: {title: "Brand Film", text: "The yearly brand film is made by an external studio, which edits it in its own software."}
+  - id: n32
+    conflict: false
+    kind: reworded
+    a: {title: "Profile Photos", text: "Website staff profiles show a first name and a photo, nothing more."}
+    b: {title: "Website Team Page", text: "On the team page, each person appears with their photo and first name only."}
+  - id: n33
+    conflict: false
+    kind: reworded
+    a: {title: "Translation", text: "The content lead arranges translation of client materials."}
+    b: {title: "Materials in Other Languages", text: "Ask the content lead when a client needs workbooks in another language; they organise the translator."}
+  - id: n34
+    conflict: false
+    kind: equivalent
+    a: {title: "Appraisal Cycle", text: "Appraisals happen once a year."}
+    b: {title: "Annual Review", text: "Each staff member has an annual review."}
+  - id: n35
+    conflict: false
+    kind: equivalent
+    a: {title: "Freelancer Payment", text: "Freelancers are paid within 14 days of their invoice."}
+    b: {title: "Freelancer Invoices", text: "Pay freelance invoices within two weeks of receiving them."}
+  - id: n36
+    conflict: false
+    kind: equivalent
+    a: {title: "Testimonial Timing", text: "Ask for a testimonial within a week of the programme ending."}
+    b: {title: "Closing a Programme", text: "In the seven days after the last session, request the client's testimonial."}

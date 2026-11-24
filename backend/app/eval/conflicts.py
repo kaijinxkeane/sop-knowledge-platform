@@ -42,6 +42,8 @@ SETS = {
     "dev": "conflicts.yaml",
     "holdout": "conflicts-holdout.yaml",
     "holdout2": "conflicts-holdout2.yaml",
+    "holdout3": "conflicts-holdout3.yaml",
+    "holdout4": "conflicts-holdout4.yaml",
 }
 
 
@@ -141,6 +143,9 @@ async def evaluate(
     repeats: int = 1,
     tier: str = "background",
     units: bool = False,
+    strict: bool = False,
+    screen: bool = False,
+    embed=None,
     only: set[tuple[str, int]] | None = None,
     progress: Callable[[Trial], None] | None = None,
 ) -> Result:
@@ -163,6 +168,9 @@ async def evaluate(
                     scope=ContentScope.unclassified(),
                     tier=tier,
                     units=units,
+                    strict=strict,
+                    screen=screen,
+                    embed=embed,
                 )
                 got, explanation = verdict.conflict, verdict.explanation
             except Exception:  # noqa: BLE001 - counted as an error, the run goes on

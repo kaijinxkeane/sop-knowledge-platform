@@ -231,6 +231,9 @@ async def cmd_eval_conflicts(
     think: bool = False,
     units: bool = False,
     only_flagged: str | None = None,
+    strict: bool = False,
+    screen: bool = False,
+    focus: bool = False,
 ) -> None:
     import dataclasses
     import json
@@ -253,6 +256,8 @@ async def cmd_eval_conflicts(
         if out:
             Path(out).write_text(json.dumps(rows, indent=2))  # noqa: ASYNC240 - CLI only
         return
+
+    from app.retrieval.embed import embed_documents
 
     gateway = build_gateway()
     if model:
@@ -282,11 +287,25 @@ async def cmd_eval_conflicts(
     result = await evaluate(
         gateway,
         items,
-        model=used.model + (" +think" if think else "") + (" +units" if units else ""),
+        model=used.model
+        + "".join(
+            f" +{n}"
+            for n, on in (
+                ("think", think),
+                ("units", units),
+                ("strict", strict),
+                ("screen", screen),
+                ("focus", focus),
+            )
+            if on
+        ),
         set_name=set_name,
         repeats=repeats,
         tier=tier,
         units=units,
+        strict=strict,
+        screen=screen,
+        embed=embed_documents if focus else None,
         only=only,
         progress=progress,
     )
@@ -469,7 +488,12 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--only", default=None)
     p = sub.add_parser("eval-conflicts")
     p.add_argument("--stage", choices=["judge", "search"], default="judge")
-    p.add_argument("--set", dest="set_name", choices=["dev", "holdout", "holdout2"], default="dev")
+    p.add_argument(
+        "--set",
+        dest="set_name",
+        choices=["dev", "holdout", "holdout2", "holdout3", "holdout4"],
+        default="dev",
+    )
     p.add_argument("--model", default=None)
     p.add_argument("--tier", default="background")
     p.add_argument("--repeats", type=int, default=1)
@@ -477,6 +501,9 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--think", action="store_true", help="leave the model's thinking on")
     p.add_argument("--units", action="store_true", help="add unit conversions first")
     p.add_argument("--only-flagged", default=None, help="saved run: check only its flags")
+    p.add_argument("--strict", action="store_true", help="unstated group overrides count")
+    p.add_argument("--screen", action="store_true", help="first-stage wording: flag if unsure")
+    p.add_argument("--focus", action="store_true", help="show the most alike sentences first")
     p = sub.add_parser("eval-conflicts-cascade")
     p.add_argument("first")
     p.add_argument("confirm")
@@ -534,6 +561,9 @@ def main(argv: list[str] | None = None) -> None:
                     args.think,
                     args.units,
                     args.only_flagged,
+                    args.strict,
+                    args.screen,
+                    args.focus,
                 )
             elif args.cmd == "compare-evals":
                 cmd_compare_evals(args.a, args.b)

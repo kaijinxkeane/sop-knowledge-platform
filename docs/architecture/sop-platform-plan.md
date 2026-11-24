@@ -1631,6 +1631,37 @@ Phase 5 *backend* done (2026-11-21):
     thinking on the 8B's flags (`conflict-confirm` tier, at most 60 a night).
     A live check on demo passages from the worker: 8 s per 8B check, 50-80 s
     per 14B check; the one pair the 8B flagged, the 14B cleared.
+  - **Missed conflicts, three fixes tried 2026-11-24** (8B → 14B pipeline, 3
+    runs each). Fix 1: a rule for one group that differs from a general rule
+    is a conflict unless a passage says it's an allowed exception (both
+    stages), and the 8B is told it is a screen ("flag if unsure"). Fix 2:
+    sentence focus (`app/retention/focus.py`): the three most alike sentence
+    pairs, found with the embedding model, shown before the passages. Fix 3:
+    both. Holdout2 was used as a second tuning set (its misses had been read);
+    `conflicts-holdout3.yaml` was written before any fix ran.
+
+    | Accuracy (caught / false alarms) | Dev | Holdout2 | Holdout3 (once) |
+    |---|---|---|---|
+    | Current: 8B → 14B thinking | 93.8% (91.7 / 4.2) | 83.3% (72.2 / 5.6) | 80.6% (61.1 / 0.0) |
+    | Fix 1 | 93.8% (91.7 / 4.2) | 88.0% (79.6 / 3.7) | 83.3% (66.7 / 0.0) |
+    | Fix 2 | 95.1% (95.8 / 5.6) | 80.6%* (68.5 / 3.7) | — |
+    | Fix 3 | 93.1% (91.7 / 5.6) | 88.9% (79.6 / 1.9) | — |
+
+    \* 6 errors: Ollama's Metal backend crashed twice (17:25, 21:17), both
+    times in a 14B stage with focus, which swaps the embedding model and the
+    14B on every pair. Focus didn't help buried conflicts reliably (dev 6 → 9
+    of 12, holdout2 3 → 1-2 of 9), so it stays an eval option (`--focus`).
+    Fix 1 helped unstated group overrides (deadline, implicit) without new
+    false alarms (explicit exceptions 12/12) or more 14B work (47 vs 45 flags).
+    Held out it gained 5 checks and lost 2 (p = 0.45; holdout2 +5/−0): small
+    but consistent, so it is on in the nightly job. Without the confirm tier
+    the 8B gets the strict rule but not the screening wording.
+  - **What's left:** recall is now limited by the 8B first stage (the 14B
+    kept every conflict it was given). Held out, buried (3/12), implicit
+    (3/9) and owner (3/6) conflicts are still mostly missed. Next to try: the
+    14B with thinking as the *only* judge on new pairs. After the first full
+    run, a night's new pairs are only those from edited SOPs, so 40 s a pair
+    may fit; measure its recall on dev first.
 - **Retract** (`POST /retractions`, `manage_users`): a document, or a value
   plus its common encodings (llm-wiki's `retract_patterns`).
   - What it purges: the index, answers that cited the document, chat text,
@@ -1762,10 +1793,11 @@ is unchanged), Slack/Teams adapters, the dashboard app, ticketing integrations
   (`MAX_CONFIRMS`, 30-80 s each); a flag over the cap or a failed second check
   is not stored and is checked again the next night. The job limit is 2 hours.
   Without the tier in `config/models.yaml` the job is the 8B alone. Unit notes
-  are built but off. `conflicts-holdout2.yaml` has now been used once; write a
-  fresh set before the next comparison.
-  Next: misses (held out 72% caught): buried and implicit conflicts, smaller
-  passages for the check.
+  and sentence focus are built but off. Strict exceptions + screening (fix 1)
+  are on. All three held-out sets are now used; write a fresh one before the
+  next comparison.
+  Next: misses (held out 67% caught, limited by the 8B first stage): try the
+  14B with thinking as the only judge on new pairs (§7).
 
 ## 13. Open questions for the owner
 
