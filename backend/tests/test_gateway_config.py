@@ -24,6 +24,9 @@ def test_reads_every_note_tiers_are_local():
     # Background writing (Librarian, review summaries, handover checks) stays local.
     assert cfg.tier("background").location == "local"
     assert cfg.tier("classifier").base_url == "http://localhost:11434/v1"
+    # The conflict second opinion reads SOP passages too: local, thinking on.
+    assert cfg.tier("conflict-confirm").location == "local"
+    assert cfg.tier("conflict-confirm").think is None
 
 
 def test_cloud_tiers_use_current_models():

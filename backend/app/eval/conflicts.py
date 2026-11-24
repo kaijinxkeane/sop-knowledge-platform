@@ -140,11 +140,16 @@ async def evaluate(
     set_name: str,
     repeats: int = 1,
     tier: str = "background",
+    units: bool = False,
+    only: set[tuple[str, int]] | None = None,
     progress: Callable[[Trial], None] | None = None,
 ) -> Result:
+    """`only`: (item, run) pairs to check, e.g. those a first stage flagged."""
     trials: list[Trial] = []
     for run in range(repeats):
         for item in items:
+            if only is not None and (item.id, run) not in only:
+                continue
             start = time.perf_counter()
             got, explanation = None, ""
             try:
@@ -157,6 +162,7 @@ async def evaluate(
                     # Fictional eval text: unclassified, so no cloud tier may take it.
                     scope=ContentScope.unclassified(),
                     tier=tier,
+                    units=units,
                 )
                 got, explanation = verdict.conflict, verdict.explanation
             except Exception:  # noqa: BLE001 - counted as an error, the run goes on

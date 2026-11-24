@@ -228,6 +228,9 @@ async def cmd_eval_conflicts(
     repeats: int,
     out: str | None,
     stage: str = "judge",
+    think: bool = False,
+    units: bool = False,
+    only_flagged: str | None = None,
 ) -> None:
     import dataclasses
     import json
@@ -255,10 +258,21 @@ async def cmd_eval_conflicts(
     if model:
         cfg = gateway.config.tier(tier)
         gateway.config.tiers[tier] = dataclasses.replace(cfg, model=model)
+    if think:  # the model's own default (thinking on), with room for the reasoning
+        cfg = gateway.config.tier(tier)
+        gateway.config.tiers[tier] = dataclasses.replace(
+            cfg, think=None, max_tokens=max(cfg.max_tokens, 8192)
+        )
     used = gateway.config.tier(tier)
     if used.location != "local":
         sys.exit("the conflict eval runs on local tiers only")
     items = load_items(get_settings().config_dir / "eval" / SETS[set_name])
+    only = None
+    if only_flagged:  # a confirm stage: check only what the first stage flagged
+        first = json.loads(Path(only_flagged).read_text())  # noqa: ASYNC240 - CLI only
+        if first["kind"] != f"conflicts-{set_name}":
+            sys.exit("--only-flagged must come from a run on the same set")
+        only = {(t["item"], t["run"]) for t in first["trials"] if t["got"]}
 
     def progress(t):
         if not t.correct:
@@ -268,10 +282,12 @@ async def cmd_eval_conflicts(
     result = await evaluate(
         gateway,
         items,
-        model=used.model,
+        model=used.model + (" +think" if think else "") + (" +units" if units else ""),
         set_name=set_name,
         repeats=repeats,
         tier=tier,
+        units=units,
+        only=only,
         progress=progress,
     )
     if all(t.got is None for t in result.trials):
@@ -458,6 +474,9 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--tier", default="background")
     p.add_argument("--repeats", type=int, default=1)
     p.add_argument("--out", default=None)
+    p.add_argument("--think", action="store_true", help="leave the model's thinking on")
+    p.add_argument("--units", action="store_true", help="add unit conversions first")
+    p.add_argument("--only-flagged", default=None, help="saved run: check only its flags")
     p = sub.add_parser("eval-conflicts-cascade")
     p.add_argument("first")
     p.add_argument("confirm")
@@ -512,6 +531,9 @@ def main(argv: list[str] | None = None) -> None:
                     args.repeats,
                     args.out,
                     args.stage,
+                    args.think,
+                    args.units,
+                    args.only_flagged,
                 )
             elif args.cmd == "compare-evals":
                 cmd_compare_evals(args.a, args.b)

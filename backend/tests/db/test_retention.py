@@ -534,6 +534,44 @@ async def test_opened_results_but_used_none_is_a_personal_gap(
         assert (ev.opened, ev.used) == (4, True)
 
 
+class TwoModels:
+    """8B flags every pair; the 14B (confirm tier) clears, flags or fails by turn."""
+
+    def __init__(self, confirm_answers):
+        self.config = type("C", (), {"tiers": {"background": None, "conflict-confirm": None}})()
+        self.answers, self.calls = list(confirm_answers), []
+
+    async def chat(self, tier, *, system, messages, scope, json_mode=False, **_):
+        self.calls.append(tier)
+        if tier == "background":
+            text, model = '{"conflict": true, "explanation": "8B says so."}', "fake-8b"
+        else:
+            text, model = self.answers.pop(0), "fake-14b"
+            if text is None:
+                raise RuntimeError("14B not available")
+        return ChatResult(text, tier, "fake", model, "stop", Usage(), 1)
+
+
+async def test_conflicts_need_the_second_opinion_too(indexed, sessions):
+    gw = TwoModels(
+        ['{"conflict": false}', '{"conflict": true, "explanation": "Different owners."}', None]
+    )
+    report = await detect_conflicts(sessions, gw, max_pairs=3, maxd=0.95)
+    # All 8B checks first, then the 14B on its flags: each model loads once.
+    assert gw.calls == ["background"] * 3 + ["conflict-confirm"] * 3
+    assert report == {"checked": 2, "conflicts": 1, "unconfirmed": 1}
+    async with sessions() as s:
+        q = select(Conflict.conflict, Conflict.model, Conflict.explanation)
+        rows = (await s.execute(q)).all()
+    assert sorted(rows) == [
+        (False, "fake-8b → fake-14b", ""),
+        (True, "fake-8b → fake-14b", "Different owners."),
+    ]  # the failed second check is not stored, so the pair is tried again next night
+    gw.answers = ['{"conflict": false}']
+    again = await detect_conflicts(sessions, gw, max_pairs=1, maxd=0.95, max_confirms=0)
+    assert again == {"checked": 0, "conflicts": 0, "unconfirmed": 1}  # over the cap: wait
+
+
 async def test_checked_pairs_never_crowd_out_new_ones(indexed, sessions):
     # A tiny row limit: before the fix the closest (already checked) pairs filled
     # it on every run, so later pairs were never reached.

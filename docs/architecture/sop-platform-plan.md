@@ -1204,7 +1204,7 @@ repo on the company device, mounted at deploy time via `VAULT_PATH`.
 | 6. Company deployment | Not started | Playwright end-to-end suite and accessibility pass not started; nothing tried in a real browser yet |
 | 7. Local models | Model choice settled (`qwen3:8b`, held-out evals); improvement loop not started | — |
 
-Tried 2026-11-24: a `qwen3:14b` confirm stage for the nightly conflict check made no difference (see "Deferred work"); not used.
+Tried 2026-11-24 (§7): a `qwen3:14b` confirm stage with thinking on cuts conflict-check false alarms (dev 12.5% → 4.2%, held out 13.0% → 5.6%) with no lost catches. In the nightly job since 2026-11-24 (`conflict-confirm` tier).
 
 **Progress:** Phase 0 *backend* done (2026-11-20): the gateway with its data
 boundary, the Docker stack, migrations, the demo vault, CI and a content-free
@@ -1606,6 +1606,31 @@ Phase 5 *backend* done (2026-11-21):
     the next candidate. Both models treat "two weeks" vs "10 working days" or
     "6 months" vs "180 days" as contradictions, so this is unit reasoning, not
     model size.
+  - **Second round, 2026-11-24 (dev set, 3 runs each; 8B alone: 89.6%,
+    false alarms 12.5%):**
+
+    | Setup | Caught | False alarms | Accuracy | vs 8B |
+    |---|---|---|---|---|
+    | 8B + unit notes (`app/retention/units.py`) | 91.7% | 8.3% | 91.7% | p = 0.25 |
+    | 8B → 14B, thinking on | 91.7% | 4.2% | 93.8% | p = 0.03 |
+    | 8B + units → 14B thinking + units | 90.3% | 4.2% | 93.1% | — |
+
+    Unit notes write a conversion after each duration, time or frequency
+    ("two weeks [= 14 days, 10 working days]"). They help on their own but not
+    on top of the 14B, which then reads "three months [≈ 13 weeks]" against
+    "12 weekly sessions" as a mismatch. They stay an eval option
+    (`--units`), off in the nightly job. The 14B with thinking takes about
+    30 s per flagged pair, versus 6 s without.
+  - **Held out once (`conflicts-holdout2.yaml`, 3 runs):** 8B alone caught
+    72.2% (39/54) with 13.0% false alarms; 8B → 14B thinking caught the same
+    39 with 5.6% false alarms (83.3% vs 79.6% accuracy, p = 0.125: two
+    pairs, same direction as dev). The 14B never cleared a real conflict. The
+    bigger gap is now misses, which a confirm stage can't fix: a deadline, an
+    owner, buried and implicit conflicts the 8B cleared.
+  - **In the nightly job (2026-11-24):** 8B on every pair, then the 14B with
+    thinking on the 8B's flags (`conflict-confirm` tier, at most 60 a night).
+    A live check on demo passages from the worker: 8 s per 8B check, 50-80 s
+    per 14B check; the one pair the 8B flagged, the 14B cleared.
 - **Retract** (`POST /retractions`, `manage_users`): a document, or a value
   plus its common encodings (llm-wiki's `retract_patterns`).
   - What it purges: the index, answers that cited the document, chat text,
@@ -1730,13 +1755,17 @@ is unchanged), Slack/Teams adapters, the dashboard app, ticketing integrations
 
 ### Deferred work (to do)
 
-- **Conflict check, second stage:** the 14B confirm stage was tried on
-  2026-11-24 and made no difference (§7). Next candidates, in order: the 14B
-  with thinking on, run only on pairs the 8B flags; a rule-based check that
-  turns durations and times into the same units before the model sees them.
-  AirLLM or a larger model only if those fail. Compare each on the dev set
-  first and run the winner once on `conflicts-holdout2.yaml` (unused).
-  Separately, look at buried conflicts (smaller passages for the check).
+- **Conflict check, second stage:** done 2026-11-24 (§7). The nightly job
+  runs every 8B check first, then the `conflict-confirm` tier (`qwen3:14b`,
+  thinking on) on the 8B's flags, so each model loads once; only pairs both
+  flag are stored as conflicts. At most 60 second checks a night
+  (`MAX_CONFIRMS`, 30-80 s each); a flag over the cap or a failed second check
+  is not stored and is checked again the next night. The job limit is 2 hours.
+  Without the tier in `config/models.yaml` the job is the 8B alone. Unit notes
+  are built but off. `conflicts-holdout2.yaml` has now been used once; write a
+  fresh set before the next comparison.
+  Next: misses (held out 72% caught): buried and implicit conflicts, smaller
+  passages for the check.
 
 ## 13. Open questions for the owner
 

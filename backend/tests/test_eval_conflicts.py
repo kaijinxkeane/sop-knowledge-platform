@@ -136,3 +136,37 @@ async def test_search_recall_reports_missed_conflicts():
     [row] = await search_recall(items, embed, cutoffs=[0.1], ks=[3])
     assert row["missed"] == ["p2"]
     assert row["conflicts reaching the model"].startswith("50.0% (1/2")
+
+
+async def test_units_and_only_flagged_reach_the_model():
+    items = [_item("p1", True), _item("n1", False)]
+    items[0] = Item("p1", True, "number", "p1", "Request leave two weeks ahead.", "p1-b", "b")
+    gw = Scripted({"p1": '{"conflict": false}', "n1": '{"conflict": false}'})
+    result = await evaluate(gw, items, model="m", set_name="dev", units=True, only={("p1", 0)})
+    assert [t.item for t in result.trials] == ["p1"]  # n1 was not flagged: never asked
+    _, system, _ = gw.calls[0]
+    assert "Bracketed notes" in system
+
+
+def test_units_add_conversions_and_keep_the_wording():
+    from app.retention.units import annotate
+
+    cases = {
+        "two weeks before": "two weeks [= 14 days, 10 working days] before",
+        "10 working days' notice": "10 working days [= 2 weeks, about 14 calendar days]' notice",
+        "every 6 months": "every 6 months [= about 180 days, about 26 weeks]",
+        "180 days": "180 days [= about 6 months]",
+        "finish at 17:00.": "finish at 17:00 [= 5:00 pm].",
+        "leave at 5 pm": "leave at 5 pm [= 17:00]",
+        "twice a year": "twice a year [= every 6 months]",  # not "a year = 12 months"
+        "audit quarterly": "audit quarterly [= every 3 months]",
+        "3 days, 2.50 hours, version 1.30": "3 days, 2.50 hours, version 1.30",
+    }
+    for text, want in cases.items():
+        assert annotate(text) == want
+
+
+def test_judge_marks_unit_notes_as_system_added():
+    from app.retention.conflicts import UNITS_NOTE
+
+    assert "added by the system" in UNITS_NOTE and "not a contradiction" in UNITS_NOTE
