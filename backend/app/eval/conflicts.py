@@ -10,6 +10,12 @@ each verdict is compared with its label.
 
     python -m app.cli eval-conflicts --stage search [--set dev|holdout]
 
+    python -m app.cli eval-conflicts-cascade FIRST.json CONFIRM.json [--out F]
+
+scores a two-stage check from two saved runs on the same set: a pair is a
+conflict only if the first model flags it *and* the confirm model agrees (the
+confirm model runs only on flagged pairs, so its other verdicts are ignored).
+
 checks the step before the model: would the nightly vector search even pick
 each conflicting pair? Every passage is embedded like an indexed chunk and
 treated as its own document; each finds its k nearest others within the
@@ -31,7 +37,12 @@ from app.eval.stats import rate
 from app.models.types import ContentScope
 from app.retention.conflicts import judge_pair
 
-SETS = {"dev": "conflicts.yaml", "holdout": "conflicts-holdout.yaml"}
+# holdout2 (2026-11-24): written before the 14B confirm-stage runs; holdout was used once.
+SETS = {
+    "dev": "conflicts.yaml",
+    "holdout": "conflicts-holdout.yaml",
+    "holdout2": "conflicts-holdout2.yaml",
+}
 
 
 @dataclass(frozen=True)
@@ -156,6 +167,27 @@ async def evaluate(
             if progress:
                 progress(trial)
     return Result(model, set_name, trials)
+
+
+def cascade(first: dict, confirm: dict) -> Result:
+    """Two saved runs (`Result.to_json()`) on the same set → the two-stage result.
+    Run i of the first stage is paired with run i of the confirm stage."""
+    if first["kind"] != confirm["kind"]:
+        raise ValueError("both runs must be on the same set")
+    second = {(t["item"], t["run"]): t for t in confirm["trials"]}
+    trials = []
+    for t in first["trials"]:
+        got, seconds, why = t["got"], t["seconds"], t["explanation"]
+        if got:
+            c = second.get((t["item"], t["run"]))
+            if c is None:
+                raise ValueError(f"confirm run has no trial for {t['item']} run {t['run']}")
+            got = c["got"]  # None (model failed) stays an error
+            seconds += c["seconds"]
+            why = c["explanation"]
+        trials.append(Trial(t["item"], t["run"], t["kind"], t["want"], got, seconds, why))
+    name = f"{first['summary']['model']} → {confirm['summary']['model']}"
+    return Result(name, first["kind"].removeprefix("conflicts-"), trials)
 
 
 # --- search stage ---------------------------------------------------------------

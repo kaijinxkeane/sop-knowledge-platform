@@ -1,0 +1,191 @@
+# Conflict-check eval, second HOLD-OUT set (written 2026-11-24). FICTIONAL data only.
+#
+# Written before any 14B result was seen, for the confirm-stage comparison
+# (plan §12, Deferred work). Never tune prompts, thresholds or models on these
+# items: tune on conflicts.yaml. Same format and kind mix as
+# conflicts-holdout.yaml (18 conflicts, 18 not), on topics neither earlier set uses.
+
+items:
+  # --- conflicts ------------------------------------------------------------------
+  - id: k01
+    conflict: true
+    kind: number
+    a: {title: "Coaching Session Guide", text: "Each one-to-one coaching session lasts 60 minutes, including a 5-minute recap at the end."}
+    b: {title: "Coaching Packages", text: "A coaching session is 90 minutes; the package price assumes one and a half hours per session."}
+  - id: k02
+    conflict: true
+    kind: number
+    a: {title: "Workshop Group Size", text: "Cap each Voice and Story workshop at 12 participants so everyone gets time to present."}
+    b: {title: "Selling Group Workshops", text: "Voice and Story workshops can take up to 20 participants; quote a single group fee up to that size."}
+  - id: k03
+    conflict: true
+    kind: number
+    a: {title: "Client Recording Retention", text: "Delete session video recordings 90 days after the programme ends."}
+    b: {title: "Video Feedback Exercise", text: "Delete session video recordings 30 days after the programme ends."}
+  - id: k04
+    conflict: true
+    kind: deadline
+    a: {title: "Post-Workshop Follow-Up", text: "Send the follow-up email with the slides and action plan within 24 hours of the workshop."}
+    b: {title: "Client Communications Calendar", text: "Follow-up emails go out on the Monday after a workshop, never on the day after, so clients have the weekend to reflect."}
+  - id: k05
+    conflict: true
+    kind: deadline
+    a: {title: "Annual Leave Requests", text: "Request annual leave at least four weeks before the first day off."}
+    b: {title: "Trainer Scheduling", text: "Trainers can request leave up to one week ahead, as long as no programme is booked that week."}
+  - id: k06
+    conflict: true
+    kind: deadline
+    a: {title: "Participant Feedback Survey", text: "Close the feedback survey seven days after it is sent, then compile the results."}
+    b: {title: "Quarterly Quality Report", text: "Keep each feedback survey open for a full month so late responses are included."}
+  - id: k07
+    conflict: true
+    kind: owner
+    a: {title: "Client Cancellations", text: "Only the CEO can agree to refund a cancelled programme."}
+    b: {title: "Handling Client Complaints", text: "The programme coordinator may refund a cancelled programme in full if the client asks politely."}
+  - id: k08
+    conflict: true
+    kind: owner
+    a: {title: "Social Media Posts", text: "The marketing lead approves every post that mentions a client before it is published."}
+    b: {title: "Celebrating Client Wins", text: "Trainers may post a client's success story on the company account themselves once the client agrees."}
+  - id: k09
+    conflict: true
+    kind: rule
+    a: {title: "Client Photos and Consent", text: "Never photograph participants without their written consent on the consent form."}
+    b: {title: "Workshop Wrap-Up", text: "Take a group photo at the end of every workshop for the newsletter; verbal agreement in the room is enough."}
+  - id: k10
+    conflict: true
+    kind: rule
+    a: {title: "Confidential Client Notes", text: "Coaching notes stay in the client folder on the shared drive and are never emailed."}
+    b: {title: "Coach Handover Between Sessions", text: "When another coach takes over a client, email them your coaching notes so they can prepare."}
+  - id: k11
+    conflict: true
+    kind: order
+    a: {title: "Onboarding a New Coaching Client", text: "Sign the coaching agreement first; only then send the intake questionnaire."}
+    b: {title: "Coaching Intake Process", text: "Send the intake questionnaire as soon as the client enquires, and send the agreement after you have read their answers."}
+  - id: k12
+    conflict: true
+    kind: tool
+    a: {title: "Travel Bookings", text: "Book trainers' flights and hotels through the company travel portal."}
+    b: {title: "Trainer Expenses", text: "Trainers book their own flights and hotels on any website and claim the cost back afterwards."}
+  - id: k13
+    conflict: true
+    kind: buried
+    a: {title: "Preparing Workshop Materials", text: "Two weeks before a workshop, confirm the participant list with the client. Print one workbook per participant plus two spares. Pack name badges, markers and sticky notes in the materials box. Check the projector adaptor is in the box. Bring the attendance sheet and the consent forms. Label the box with the venue and date, and leave it by the office door the day before."}
+    b: {title: "Venue Day Checklist", text: "Arrive an hour before the start to set up. Test the projector and the sound. Lay out workbooks, name badges and markers on each table. Participants don't sign an attendance sheet; we record attendance from the booking list instead. Put the welcome slide up and the timer on the trainer's table. Open the windows for ten minutes if the room is stuffy."}
+  - id: k14
+    conflict: true
+    kind: buried
+    a: {title: "New Trainer Onboarding", text: "In their first month, new trainers observe two full programmes. They read the Signature and Executive Presence SOPs and the brand method notes. They meet each department lead for half an hour. They shadow a coaching session with the client's permission. At the end of the month they co-deliver one workshop with a senior trainer, who gives written feedback."}
+    b: {title: "Trainer Development Plan", text: "Each trainer has a development plan reviewed every six months. New trainers set goals with their manager in week one. They join the monthly practice circle. New trainers deliver their first workshop alone in week two, so they get confident quickly. Senior trainers mentor one new trainer at a time. Training budgets are agreed each January."}
+  - id: k15
+    conflict: true
+    kind: buried
+    a: {title: "Office Opening and Closing", text: "The first person in turns off the alarm with their access card and switches on the lights and the coffee machine. Check the meeting rooms are tidy. The last person out closes the windows, turns off the coffee machine and sets the alarm. Return visitor access cards to the reception drawer. Keep the reception drawer locked overnight."}
+    b: {title: "Visitors and Access Cards", text: "Sign visitors in at reception and give them a visitor access card. Visitors must be accompanied in the training rooms. Visitors may keep their access card until the end of their programme so they can come and go. Ask visitors to wear the lanyard where it can be seen. Report a lost card to the office manager the same day."}
+  - id: k16
+    conflict: true
+    kind: implicit
+    a: {title: "Workshop Workbooks", text: "Participants receive their workbook one week before the workshop so they can prepare."}
+    b: {title: "Printing Workbooks", text: "Workbooks are printed only once the final participant list is confirmed, which is three days before the workshop."}
+  - id: k17
+    conflict: true
+    kind: implicit
+    a: {title: "Outdoor Activities", text: "Only staff with a current first-aid certificate may lead outdoor activities."}
+    b: {title: "Energiser Exercises", text: "New trainers lead the outdoor energiser on their first programme; first-aid training is booked in their third month."}
+  - id: k18
+    conflict: true
+    kind: implicit
+    a: {title: "Client Recording Retention", text: "Delete client video recordings 90 days after the session."}
+    b: {title: "Six-Month Check-In", text: "At the six-month check-in, play the client's first-session video next to a new recording so they can see their progress."}
+
+  # --- not conflicts --------------------------------------------------------------
+  - id: k19
+    conflict: false
+    kind: detail
+    a: {title: "Name Badges", text: "Print a name badge for every participant."}
+    b: {title: "Badge Printing", text: "Badges use the template in Shared Templates. Print them on the label printer in the store room, first names only, in large type."}
+  - id: k20
+    conflict: false
+    kind: detail
+    a: {title: "Coaching Session Guide", text: "End every coaching session by agreeing one action for the client."}
+    b: {title: "Coaching Notes", text: "Write the agreed action at the top of your session notes, with a date for checking progress."}
+  - id: k21
+    conflict: false
+    kind: detail
+    a: {title: "Travel Bookings", text: "Book trainers' travel through the company travel portal."}
+    b: {title: "Travel Portal Tips", text: "In the portal, pick the 'training delivery' trip type and add the programme code so finance can match the cost."}
+  - id: k22
+    conflict: false
+    kind: detail
+    a: {title: "First Aid", text: "The first-aid kit is in the kitchen."}
+    b: {title: "Office Safety", text: "Check the first-aid kit in the kitchen on the first Monday of each month and reorder anything used."}
+  - id: k23
+    conflict: false
+    kind: situation
+    a: {title: "Signature Programme - Cancellations", text: "Signature clients who cancel more than 14 days before the start get a full refund."}
+    b: {title: "Corporate Workshop Terms", text: "Corporate workshop bookings cancelled less than 30 days before the date are charged in full."}
+  - id: k24
+    conflict: false
+    kind: situation
+    a: {title: "Coaching Session Guide", text: "In-person coaching sessions take place in the small meeting room."}
+    b: {title: "Remote Coaching", text: "Remote coaching sessions run on the company video account, never a personal one."}
+  - id: k25
+    conflict: false
+    kind: situation
+    a: {title: "Annual Leave Requests", text: "Office staff request leave four weeks ahead."}
+    b: {title: "Sick Leave", text: "If you are ill, tell your manager before 9 am on the day; no notice period applies."}
+  - id: k26
+    conflict: false
+    kind: reworded
+    a: {title: "Post-Workshop Follow-Up", text: "Within one working day of the workshop, email participants the slides and their action plan."}
+    b: {title: "Client Communications Calendar", text: "Participants should have the slides and their action plan in their inbox by the end of the next working day."}
+  - id: k27
+    conflict: false
+    kind: reworded
+    a: {title: "Client Photos and Consent", text: "Only photograph participants who have signed the consent form."}
+    b: {title: "Workshop Wrap-Up", text: "Before the group photo, check the consent forms; anyone who hasn't signed one stands out of the picture."}
+  - id: k28
+    conflict: false
+    kind: reworded
+    a: {title: "Social Media Posts", text: "The marketing lead signs off any post that names a client."}
+    b: {title: "Celebrating Client Wins", text: "Draft the client story and send it to the marketing lead; it goes live once they approve it."}
+  - id: k29
+    conflict: false
+    kind: exception
+    a: {title: "Confidential Client Notes", text: "Coaching notes are never emailed. They stay in the client folder."}
+    b: {title: "Coach Handover Between Sessions", text: "When another coach takes over, give them access to the client folder; don't send the notes themselves."}
+  - id: k30
+    conflict: false
+    kind: exception
+    a: {title: "Travel Bookings", text: "All flights are booked through the travel portal."}
+    b: {title: "Last-Minute Travel", text: "If the portal is down and the trip is within 48 hours, the office manager may book by phone and add the booking to the portal afterwards, as the travel policy allows."}
+  - id: k31
+    conflict: false
+    kind: long
+    a: {title: "Preparing Workshop Materials", text: "Two weeks before a workshop, confirm the participant list with the client. Print one workbook per participant plus two spares. Pack name badges, markers and sticky notes in the materials box. Check the projector adaptor is in the box. Bring the attendance sheet and the consent forms. Label the box with the venue and date."}
+    b: {title: "Venue Day Checklist", text: "Arrive an hour before the start to set up. Test the projector and the sound. Lay out workbooks, name badges and markers on each table. Ask each participant to sign the attendance sheet as they arrive. Put the welcome slide up and the timer on the trainer's table. Open the windows for ten minutes if the room is stuffy."}
+  - id: k32
+    conflict: false
+    kind: long
+    a: {title: "New Trainer Onboarding", text: "In their first month, new trainers observe two full programmes. They read the Signature and Executive Presence SOPs and the brand method notes. They meet each department lead for half an hour. They shadow a coaching session with the client's permission. At the end of the month they co-deliver one workshop with a senior trainer."}
+    b: {title: "Trainer Development Plan", text: "Each trainer has a development plan reviewed every six months. New trainers set goals with their manager in week one. They join the monthly practice circle. After co-delivering with a senior trainer, they lead their first workshop alone in their second month. Senior trainers mentor one new trainer at a time."}
+  - id: k33
+    conflict: false
+    kind: long
+    a: {title: "Office Opening and Closing", text: "The first person in turns off the alarm and switches on the lights and the coffee machine. Check the meeting rooms are tidy. The last person out closes the windows, turns off the coffee machine and sets the alarm. Collect visitor access cards from the reception tray at the end of the day."}
+    b: {title: "Visitors and Access Cards", text: "Sign visitors in at reception and give them a visitor access card. Visitors must be accompanied in the training rooms. Ask visitors to leave their card in the reception tray when they leave each day. Ask visitors to wear the lanyard where it can be seen. Report a lost card to the office manager the same day."}
+  - id: k34
+    conflict: false
+    kind: equivalent
+    a: {title: "Practice Circle", text: "Trainers meet for the practice circle every two weeks."}
+    b: {title: "Trainer Development Plan", text: "The practice circle is fortnightly, on alternate Thursdays."}
+  - id: k35
+    conflict: false
+    kind: equivalent
+    a: {title: "Client Recording Retention", text: "Delete session recordings 12 months after the programme ends."}
+    b: {title: "Video Feedback Exercise", text: "Recordings are kept for one year after the programme finishes, then deleted."}
+  - id: k36
+    conflict: false
+    kind: equivalent
+    a: {title: "Coaching Session Guide", text: "Leave a 30-minute gap between coaching sessions."}
+    b: {title: "Coach Calendar Rules", text: "Block half an hour after each coaching session for notes before the next client."}

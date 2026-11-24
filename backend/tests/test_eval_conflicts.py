@@ -44,10 +44,37 @@ def test_sets_are_balanced_and_fictional(name):
             assert not REAL_DATA.search(text), f"{i.id} looks like real data"
 
 
-def test_dev_and_holdout_do_not_overlap():
-    dev, hold = (load_items(EVAL_DIR / n) for n in SETS.values())
-    assert not {i.id for i in dev} & {i.id for i in hold}
-    assert not {(i.text_a, i.text_b) for i in dev} & {(i.text_a, i.text_b) for i in hold}
+def test_sets_do_not_overlap():
+    sets = [load_items(EVAL_DIR / n) for n in SETS.values()]
+    for x, a in enumerate(sets):
+        for b in sets[x + 1 :]:
+            assert not {i.id for i in a} & {i.id for i in b}
+            assert not {(i.text_a, i.text_b) for i in a} & {(i.text_a, i.text_b) for i in b}
+
+
+def test_cascade_needs_both_stages_to_flag():
+    from app.eval.conflicts import Result, Trial, cascade
+
+    def run(model, verdicts):
+        trials = [
+            Trial(item, 0, "number" if want else "detail", want, got, 1.0, model)
+            for item, (want, got) in verdicts.items()
+        ]
+        return Result(model, "dev", trials).to_json()
+
+    first = run(
+        "8b", {"c1": (True, True), "c2": (True, True), "n1": (False, True), "n2": (False, False)}
+    )
+    confirm = run(
+        "14b", {"c1": (True, True), "c2": (True, False), "n1": (False, False), "n2": (False, True)}
+    )
+    result = cascade(first, confirm)
+    got = {t.item: t.got for t in result.trials}
+    # n2: cleared by the first stage, so the confirm model's flag is never asked for
+    assert got == {"c1": True, "c2": False, "n1": False, "n2": False}
+    assert result.model == "8b → 14b"
+    flagged = next(t for t in result.trials if t.item == "c1")
+    assert flagged.seconds == 2.0 and flagged.explanation == "14b"
 
 
 class Scripted:

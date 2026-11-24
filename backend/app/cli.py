@@ -274,9 +274,26 @@ async def cmd_eval_conflicts(
         tier=tier,
         progress=progress,
     )
+    if all(t.got is None for t in result.trials):
+        sys.exit("every model call failed: is Ollama reachable at OLLAMA_BASE_URL?")
     print(json.dumps(result.summary(), indent=2))
     if out:
         Path(out).write_text(json.dumps(result.to_json(), indent=2))  # noqa: ASYNC240 - CLI only
+
+
+def cmd_eval_conflicts_cascade(first: str, confirm: str, out: str | None) -> None:
+    import json
+
+    from app.eval.conflicts import cascade
+    from app.eval.stats import paired
+
+    one, two = (json.loads(Path(x).read_text()) for x in (first, confirm))
+    result = cascade(one, two)
+    print(json.dumps(result.summary(), indent=2))
+    print("first stage alone vs two stages:")
+    print(json.dumps(paired(one["per_item_correct"], result.per_item_correct()), indent=2))
+    if out:
+        Path(out).write_text(json.dumps(result.to_json(), indent=2))
 
 
 def cmd_compare_evals(a: str, b: str) -> None:
@@ -436,10 +453,14 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--only", default=None)
     p = sub.add_parser("eval-conflicts")
     p.add_argument("--stage", choices=["judge", "search"], default="judge")
-    p.add_argument("--set", dest="set_name", choices=["dev", "holdout"], default="dev")
+    p.add_argument("--set", dest="set_name", choices=["dev", "holdout", "holdout2"], default="dev")
     p.add_argument("--model", default=None)
     p.add_argument("--tier", default="background")
     p.add_argument("--repeats", type=int, default=1)
+    p.add_argument("--out", default=None)
+    p = sub.add_parser("eval-conflicts-cascade")
+    p.add_argument("first")
+    p.add_argument("confirm")
     p.add_argument("--out", default=None)
     p = sub.add_parser("compare-evals")
     p.add_argument("a")
@@ -494,6 +515,8 @@ def main(argv: list[str] | None = None) -> None:
                 )
             elif args.cmd == "compare-evals":
                 cmd_compare_evals(args.a, args.b)
+            elif args.cmd == "eval-conflicts-cascade":
+                cmd_eval_conflicts_cascade(args.first, args.confirm, args.out)
             elif args.cmd == "eval-answers":
                 await cmd_eval_answers(
                     args.model, args.only, args.out, args.repeats, args.questions

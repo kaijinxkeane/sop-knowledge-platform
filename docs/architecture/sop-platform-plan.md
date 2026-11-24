@@ -1204,7 +1204,7 @@ repo on the company device, mounted at deploy time via `VAULT_PATH`.
 | 6. Company deployment | Not started | Playwright end-to-end suite and accessibility pass not started; nothing tried in a real browser yet |
 | 7. Local models | Model choice settled (`qwen3:8b`, held-out evals); improvement loop not started | — |
 
-Deferred: the 14B confirm stage for the nightly conflict check (see "Deferred work").
+Tried 2026-11-24: a `qwen3:14b` confirm stage for the nightly conflict check made no difference (see "Deferred work"); not used.
 
 **Progress:** Phase 0 *backend* done (2026-11-20): the gateway with its data
 boundary, the Docker stack, migrations, the demo vault, CI and a content-free
@@ -1596,6 +1596,16 @@ Phase 5 *backend* done (2026-11-21):
     overnight on the dev set before AirLLM. Buried conflicts are misses, so a
     confirm stage can't fix them; smaller passages or a stronger first stage
     could. Listed under "Deferred work" below.
+  - **14B confirm stage, tried 2026-11-24 (dev set, 3 runs, thinking off):**
+    `qwen3:14b` alone: recall 95.8% (69/72), false alarms 16.7% (12/72),
+    accuracy 89.6%, 6.1 s per pair. It catches more buried conflicts (9/12 vs
+    6/12) but flags *every* equivalent pair (0/12 vs 3/12). As a confirm stage
+    after the 8B it agreed with every 8B flag, so the two-stage result equals
+    the 8B alone (129/144 both, no item differs, McNemar p = 1.0) and only adds
+    time. Not used; `conflicts-holdout2.yaml` (36 fresh pairs) stays unread for
+    the next candidate. Both models treat "two weeks" vs "10 working days" or
+    "6 months" vs "180 days" as contradictions, so this is unit reasoning, not
+    model size.
 - **Retract** (`POST /retractions`, `manage_users`): a document, or a value
   plus its common encodings (llm-wiki's `retract_patterns`).
   - What it purges: the index, answers that cited the document, chat text,
@@ -1720,12 +1730,13 @@ is unchanged), Slack/Teams adapters, the dashboard app, ticketing integrations
 
 ### Deferred work (to do)
 
-- **Conflict check, second stage** (deferred 2026-11-23, frontend first): test
-  a 14B in Ollama as a confirm stage after the 8B, overnight, on
-  `config/eval/conflicts.yaml`, aimed at the 8B's false alarms on rules written
-  in other words or units. Write fresh held-out pairs first: `conflicts-holdout.yaml`
-  has been used once. Try AirLLM only if a 14B (or 32B on a 32 GB host) isn't
-  enough. Separately, look at buried conflicts (smaller passages for the check).
+- **Conflict check, second stage:** the 14B confirm stage was tried on
+  2026-11-24 and made no difference (§7). Next candidates, in order: the 14B
+  with thinking on, run only on pairs the 8B flags; a rule-based check that
+  turns durations and times into the same units before the model sees them.
+  AirLLM or a larger model only if those fail. Compare each on the dev set
+  first and run the winner once on `conflicts-holdout2.yaml` (unused).
+  Separately, look at buried conflicts (smaller passages for the check).
 
 ## 13. Open questions for the owner
 
