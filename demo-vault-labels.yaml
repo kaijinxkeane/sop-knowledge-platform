@@ -42,6 +42,26 @@ notes:
     {space: core, sensitivity: public, doc_type: sop, label_source: frontmatter}
   "Public/Training Day Dress Code.md":
     {space: core, sensitivity: public, doc_type: guide, label_source: frontmatter}
+  "Help/Access Levels and Spaces.md":
+    {space: core, sensitivity: public, doc_type: guide, label_source: frontmatter}
+  "Help/Admin Guide.md":
+    {space: core, sensitivity: public, doc_type: guide, label_source: frontmatter}
+  "Help/Asking Questions.md":
+    {space: core, sensitivity: public, doc_type: guide, label_source: frontmatter}
+  "Help/Finding Documents in the Library.md":
+    {space: core, sensitivity: public, doc_type: guide, label_source: frontmatter}
+  "Help/Getting Started with the SOP Assistant.md":
+    {space: core, sensitivity: public, doc_type: guide, label_source: frontmatter}
+  "Help/Handover Notes and Keeping Knowledge.md":
+    {space: core, sensitivity: public, doc_type: guide, label_source: frontmatter}
+  "Help/Required Reading and Onboarding Paths.md":
+    {space: core, sensitivity: public, doc_type: guide, label_source: frontmatter}
+  "Help/Reviewing and Approving Changes.md":
+    {space: core, sensitivity: public, doc_type: guide, label_source: frontmatter}
+  "Help/Working in Projects.md":
+    {space: core, sensitivity: public, doc_type: guide, label_source: frontmatter}
+  "Help/Writing and Editing Notes.md":
+    {space: core, sensitivity: public, doc_type: guide, label_source: frontmatter}
   "IT/Laptop Setup for New Staff.md":
     {space: it, sensitivity: internal, doc_type: sop, label_source: inferred}
   "IT/Password Manager Policy.md":

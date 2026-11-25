@@ -20,6 +20,7 @@ folder_rules:
   - {path: "Training Content/", space: core, sensitivity: internal}
   - {path: "Commercial/", space: core, sensitivity: restricted}
   - {path: "Public/", space: core, sensitivity: public}
+  - {path: "Help/", space: core, sensitivity: public}    # how to use the system, for all staff
   - {path: "IT/", space: it, sensitivity: internal}
   - {path: "HR/", space: hr, sensitivity: internal}
 
@@ -37,6 +38,11 @@ known_names:   # the company's own names, programme and method names: never flag
   - Brand Pillars
   - Brand Foundations
   - Story Method
+  - SOP Assistant           # the product itself, and tools the user guide (Help/) names
+  - Obsidian
+  - Chrome
+  - Edge
+  - Mac
 
 # Notes the Classifier can't place go to their author (app creator, or the
 # first commit's author), otherwise to the leads (`approve`) of this space.
