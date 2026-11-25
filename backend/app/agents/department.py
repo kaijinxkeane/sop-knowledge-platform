@@ -208,7 +208,7 @@ def answer_tiers(gateway: ModelGateway, profile: SpaceProfile) -> list[str]:
         and gateway.is_configured("answer")
         and gateway.is_configured("reasoning")
     ):
-        tiers.append("reasoning")  # escalation only when Claude is really there
+        tiers.append("reasoning")  # escalation only when that tier can run
     return tiers
 
 

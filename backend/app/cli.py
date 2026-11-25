@@ -367,7 +367,7 @@ async def cmd_eval_answers(
 
     gateway = build_gateway()
     tiers = gateway.config.tiers
-    if model:  # measure one local candidate on its own: no Claude, no escalation
+    if model:  # measure one local candidate on its own, without escalation
         local = dataclasses.replace(tiers["answer-local"], model=model)
         tiers["answer-local"] = local
         tiers["answer"] = dataclasses.replace(local, name="answer")

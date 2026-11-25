@@ -72,6 +72,8 @@ async def test_hidden_document_is_404_on_every_endpoint(
         ("GET", f"/documents/{rate}/reading", None),
         ("POST", f"/documents/{rate}/acknowledge", None),
         ("POST", "/exports", {"document_id": rate}),
+        ("GET", f"/documents/{rate}/slides/1", None),
+        ("GET", f"/documents/{rate}/slides/1?commit={'0' * 40}", None),
         ("POST", "/reading-assignments", {"document_id": rate, "roles": ["core-staff"]}),
     ]
     odd = {}

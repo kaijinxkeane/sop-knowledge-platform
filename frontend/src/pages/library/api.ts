@@ -192,3 +192,31 @@ export async function exportPdf(
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
+
+/**
+ * A picture of one slide (rendered on the server with LibreOffice), as a
+ * short-lived blob: URL. `unavailable` when pictures can't be made (503) or
+ * the slide has none: the viewer shows the slide's text instead.
+ */
+export function useSlidePicture(id: string, number: number, commit?: string | null) {
+  const pic = useQuery({
+    queryKey: ["document", id, "slide", number, commit ?? null],
+    queryFn: async () => {
+      const { data, response } = await api.GET("/api/v1/documents/{document_id}/slides/{number}", {
+        params: { path: { document_id: id, number }, query: commit ? { commit } : {} },
+        parseAs: "blob",
+      });
+      if (!response.ok || !data) throw new ApiError(response.status);
+      return data as Blob;
+    },
+    gcTime: 60_000,
+    staleTime: Infinity, // a version's slides never change
+    retry: false,
+  });
+  const url = useMemo(
+    () => (pic.data ? URL.createObjectURL(new Blob([pic.data], { type: "image/png" })) : null),
+    [pic.data],
+  );
+  useEffect(() => () => void (url && URL.revokeObjectURL(url)), [url]);
+  return { url, loading: pic.isPending, unavailable: pic.isError };
+}

@@ -2,6 +2,11 @@
 
 Status: proposal (architecture + plan only, no code yet) · updated 2026-11-20
 
+> **Since 2026-11-25 the platform runs fully local.** The owner removed Claude:
+> every tier (answering included) runs on local Ollama models and the Anthropic
+> connector is gone from the code. Where this plan describes Claude tiers,
+> API keys or cloud costs, read it as design history; see the status table (§12).
+
 ## 1. Goal
 
 Turn llm-wiki (today an agent plugin that runs inside Claude Code, Codex and
@@ -1195,14 +1200,14 @@ repo on the company device, mounted at deploy time via `VAULT_PATH`.
 |---|---|---|
 | 0. Foundations | Done | Done |
 | 1. Identity and RBAC | Done | Done (sign-in, two-factor, notice, Admin users/roles/grants) |
-| 2. Indexing and retrieval | Done, incl. local OCR | Done: Library, editor, upload, merge, versions (notes, decks, PDFs), bookmarks, Ctrl+K, images in notes. To do: slide pictures (needs headless LibreOffice in the worker) |
+| 2. Indexing and retrieval | Done, incl. local OCR | Done: Library, editor, upload, merge, versions (notes, decks, PDFs), bookmarks, Ctrl+K, images in notes, slide pictures (headless LibreOffice, rendered once per deck version, cached; text fallback without it) |
 | 2b. AI Classifier | Done | Done: Review → AI label suggestions (grouped, bulk approve, edit, plain-words widening warning), unplaced notes |
 | 3. Agents | Done | Done: Ask (streaming, citations panel, filters, follow-ups, no-answer actions, feedback, history) and Home |
 | 4. SOP governance | Done (approvals, reviews, notifications, governance report, webhooks, required reading and sign-off with append-only acknowledgements, material-change flag, PDF export with watermark and audit, per-space `pdf_export` switch) | Done: Review → SOP changes (side-by-side, material-change option), governance report, notifications bell, reader sign-off banner and "Assign reading", Export PDF (note or programme stage), print CSS |
 | 5. Retention | Done (handovers, gaps, coverage, stale, bus factor, conflicts, retract, retention job, onboarding paths, cost and usage: daily `model_usage` totals priced from `config/models.yaml`) | Done: Retain (gaps incl. HR view, coverage, review due, required-reading status with CSV export, bus factor, conflicts), handover notes, onboarding paths (learner, lead editor, HR completion), Admin → audit log and cost and usage, Home cards (CEO cost, leads, HR, required reading, onboarding) |
 | Project spaces | Done | Done: project list and detail, members, share requests and lead approval |
 | 6. Company deployment | Not started | Playwright end-to-end suite and accessibility pass not started; nothing tried in a real browser yet |
-| 7. Local models | Model choice settled (`qwen3:8b`, held-out evals); improvement loop not started | — |
+| 7. Local models | **Fully local since 2026-11-25** (owner's decision): every tier, answering included, runs on `qwen3:8b` / `qwen3:14b` / `qwen3-embedding`; no Claude. Improvement loop not started | Cost dashboard reads $0 |
 
 Tried 2026-11-24 (§7): a `qwen3:14b` confirm stage with thinking on cuts conflict-check false alarms (dev 12.5% → 4.2%, held out 13.0% → 5.6%) with no lost catches. In the nightly job since 2026-11-24 (`conflict-confirm` tier). Since 2026-11-25 the 14B judges a night's pairs on its own when there are at most 100 (fresh held-out set: 85.2% vs 81.5% accurate, 75.9% vs 63.0% of conflicts caught).
 

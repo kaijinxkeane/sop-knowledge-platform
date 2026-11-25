@@ -14,7 +14,6 @@ import os
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import replace
 
-from app.models.adapters.anthropic_adapter import AnthropicAdapter
 from app.models.adapters.base import ChatAdapter, EmbedAdapter
 from app.models.adapters.openai_compat import OpenAICompatAdapter
 from app.models.config import GatewayConfig, TierConfig
@@ -40,13 +39,11 @@ class ModelGateway:
         config: GatewayConfig,
         *,
         adapters: dict[str, ChatAdapter] | None = None,
-        anthropic_api_key: str | None = None,
         on_usage: Callable[[UsageEvent], Awaitable[None]] | None = None,
     ):
         self.config = config
         self.on_usage = on_usage
         self._adapters: dict[str, object] = adapters or {
-            "anthropic": AnthropicAdapter(anthropic_api_key),
             "openai_compat": OpenAICompatAdapter(),
         }
 
@@ -247,13 +244,11 @@ def build_gateway() -> ModelGateway:
     settings = get_settings()
     env = dict(os.environ)
     env["OLLAMA_BASE_URL"] = settings.ollama_base_url.rstrip("/")
-    key = settings.anthropic_api_key.get_secret_value() if settings.anthropic_api_key else None
     from app.db.session import get_sessionmaker
     from app.models.usage import recorder
 
     return ModelGateway(
         load_gateway_config(settings.config_dir, env),
-        anthropic_api_key=key,
         on_usage=recorder(get_sessionmaker()),
     )
 

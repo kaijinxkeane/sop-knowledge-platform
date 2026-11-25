@@ -5,7 +5,7 @@
    two -> both (unless one clearly leads).
 3. Unclear (3+ spaces with no leader, or nothing strong): the local `router`
    tier picks, seeing only the question and one-line space descriptions,
-   never vault content. Claude is never used to route.
+   never vault content. Routing never uses a cloud tier.
 4. Model unavailable: every permitted space in the results (or all of them).
 
 Every decision carries a reason (single_space | search | model | fallback)

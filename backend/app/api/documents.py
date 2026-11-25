@@ -365,6 +365,50 @@ async def get_file(
     return _file_response(doc, data)
 
 
+@router.get(
+    "/{document_id}/slides/{number}",
+    response_class=Response,
+    responses={200: {"content": {"image/png": {}}}},
+)
+async def get_slide_picture(
+    document_id: uuid.UUID,
+    number: int = Path(ge=1, le=2000),
+    commit: str | None = Query(default=None, pattern=r"^[0-9a-f]{40}$"),
+    me: CurrentUser = Depends(current_user),
+    session: AsyncSession = Depends(get_db),
+    git: GitVault = Depends(get_git),
+) -> Response:
+    """A picture of one slide of a deck (the current file, or one readable
+    version), only to users who may read it. 503 if LibreOffice isn't installed:
+    the viewer then shows the slide's text instead."""
+    from app.api.notes import read_for
+    from app.vault.slides import SlidesUnavailable, slide_png
+
+    if commit:
+        doc, _, data = await _readable_version(session, me, git, document_id, commit)
+    else:
+        doc = await _visible(session, me, document_id)
+        try:
+            data = read_for(me, doc, git)
+        except (OSError, ValueError):
+            raise NOT_FOUND from None
+    if not doc.vault_path.lower().endswith(".pptx"):
+        raise NOT_FOUND
+    try:
+        png = await slide_png(data, number)
+    except SlidesUnavailable:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "slide pictures aren't available"
+        ) from None
+    if png is None:
+        raise NOT_FOUND
+    return Response(
+        png,
+        media_type="image/png",
+        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+    )
+
+
 def _file_response(doc: Document, data: bytes) -> Response:
     media = mimetypes.guess_type(doc.vault_path)[0] or "application/octet-stream"
     name = doc.vault_path.rsplit("/", 1)[-1].replace('"', "")

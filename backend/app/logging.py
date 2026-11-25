@@ -48,5 +48,5 @@ def configure_logging(level: str = "INFO") -> None:
     root.addHandler(handler)
     root.setLevel(level.upper())
     # Third-party HTTP clients can log request bodies at DEBUG; keep them quiet.
-    for noisy in ("httpx", "httpcore", "httpx2", "anthropic"):
+    for noisy in ("httpx", "httpcore", "httpx2"):
         logging.getLogger(noisy).setLevel(logging.WARNING)

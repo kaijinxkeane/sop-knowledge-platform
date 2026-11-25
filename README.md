@@ -14,7 +14,7 @@ frontend spec: [docs/architecture/frontend-spec.md](docs/architecture/frontend-s
 Needs Docker Desktop, [uv](https://docs.astral.sh/uv/) and [Ollama](https://ollama.com).
 
 ```bash
-make env                 # creates .env; add ANTHROPIC_API_KEY for the Claude tiers
+make env                 # creates .env (all models run locally on Ollama)
 make demo-vault          # creates the dev vault repo from demo-vault/ (fictional data)
 make up                  # postgres + redis + api + worker
 curl -s localhost:8000/api/v1/health

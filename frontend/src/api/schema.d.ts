@@ -682,6 +682,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/slides/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Slide Picture
+         * @description A picture of one slide of a deck (the current file, or one readable
+         *     version), only to users who may read it. 503 if LibreOffice isn't installed:
+         *     the viewer then shows the slide's text instead.
+         */
+        get: operations["get_slide_picture_api_v1_documents__document_id__slides__number__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/versions": {
         parameters: {
             query?: never;
@@ -5184,6 +5206,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_slide_picture_api_v1_documents__document_id__slides__number__get: {
+        parameters: {
+            query?: {
+                commit?: string | null;
+            };
+            header?: never;
+            path: {
+                document_id: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": unknown;
                 };
             };
             /** @description Validation Error */

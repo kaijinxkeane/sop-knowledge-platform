@@ -33,14 +33,14 @@ class Settings(BaseSettings):
     vault_path: Path = Field(default=REPO_ROOT / "deploy" / "data" / "vault", alias="VAULT_PATH")
     config_dir: Path = Field(default=REPO_ROOT / "config", alias="SOP_CONFIG_DIR")
 
-    # Model providers. The Anthropic key is optional so the stack can run fully
-    # local; tiers that need it fail closed with a clear error.
-    anthropic_api_key: SecretStr | None = Field(default=None, alias="ANTHROPIC_API_KEY")
-    # Expected Anthropic organisation for production; a mismatch is reported at startup.
-    anthropic_expected_org: str | None = Field(default=None, alias="ANTHROPIC_EXPECTED_ORG")
+    # Models run locally (Ollama); nothing is sent to a cloud provider.
     ollama_base_url: str = Field(default="http://localhost:11434", alias="OLLAMA_BASE_URL")
 
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+
+    # Slide pictures (app/vault/slides.py): rendered once per deck version.
+    cache_dir: Path = Field(default=REPO_ROOT / "deploy" / "data" / "cache", alias="SOP_CACHE_DIR")
+    soffice_path: str | None = Field(default=None, alias="SOFFICE_PATH")
 
     # Signs tokens and encrypts TOTP secrets. Required outside development.
     secret_key: SecretStr | None = Field(default=None, alias="SOP_SECRET_KEY")

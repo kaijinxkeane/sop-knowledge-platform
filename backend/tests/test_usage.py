@@ -32,7 +32,7 @@ def gateway(events):
     cfg = GatewayConfig(
         tiers={
             "answer": TierConfig(
-                "answer", "anthropic", "claude-haiku-5-5", "cloud", price=(0.1, 0.5, 0.01)
+                "answer", "cloud_api", "hosted-model", "cloud", price=(0.1, 0.5, 0.01)
             ),
             "embedding": TierConfig(
                 "embedding", "openai_compat", "e", "local", base_url="http://x/v1"
@@ -45,7 +45,7 @@ def gateway(events):
         events.append(e)
 
     a = Adapter()
-    return ModelGateway(cfg, adapters={"anthropic": a, "openai_compat": a}, on_usage=sink)
+    return ModelGateway(cfg, adapters={"cloud_api": a, "openai_compat": a}, on_usage=sink)
 
 
 async def test_each_call_is_counted_without_content():
@@ -68,7 +68,7 @@ async def test_a_failing_recorder_never_breaks_the_call():
             raise RuntimeError("db down")
 
     record = recorder(Broken())
-    await record(UsageEvent("answer", "m", "anthropic", "cloud", 1, 1))  # logs, no raise
+    await record(UsageEvent("answer", "m", "cloud_api", "cloud", 1, 1))  # logs, no raise
 
 
 def test_cost_and_config_prices():

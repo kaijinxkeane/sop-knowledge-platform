@@ -15,7 +15,8 @@ import yaml
 
 from app.models.types import UNCLASSIFIED, Location
 
-KNOWN_PROVIDERS = {"anthropic", "openai_compat"}
+# Local models only (2026-11-25): any OpenAI-compatible server, e.g. Ollama.
+KNOWN_PROVIDERS = {"openai_compat"}
 _ENV_RE = re.compile(r"\$\{([A-Z0-9_]+)\}")
 
 
@@ -26,10 +27,7 @@ class TierConfig:
     model: str
     location: Location
     base_url: str | None = None
-    effort: str | None = None
     max_tokens: int = 4096
-    fallbacks: str | None = None  # Anthropic server-side refusal fallback ("default")
-    cache: bool = True
     think: bool | None = None  # False: switch off a local model's thinking (Qwen3 /no_think)
     fallback_tier: str | None = None  # used when this tier's provider is unavailable
     # USD per million tokens (input, output, cache read), for the cost dashboard.
@@ -77,16 +75,11 @@ def _tier_from_dict(name: str, raw: dict, env: dict[str, str]) -> TierConfig:
     if not raw.get("model"):
         raise ValueError(f"tier {name!r}: model is required")
 
-    if provider == "anthropic":
-        location: Location = "cloud"
-        if raw.get("location", "cloud") != "cloud":
-            raise ValueError(f"tier {name!r}: the anthropic provider is always location: cloud")
-    else:
-        # Fail closed: an OpenAI-compatible endpoint counts as cloud unless the
-        # config explicitly says it runs on this machine.
-        location = "local" if raw.get("location") == "local" else "cloud"
-        if not raw.get("base_url"):
-            raise ValueError(f"tier {name!r}: openai_compat requires base_url")
+    # Fail closed: an endpoint counts as cloud (and gets no local-only or
+    # unclassified content) unless the config says it runs on this machine.
+    location: Location = "local" if raw.get("location") == "local" else "cloud"
+    if not raw.get("base_url"):
+        raise ValueError(f"tier {name!r}: openai_compat requires base_url")
 
     price = None
     if raw.get("price") is not None:
@@ -103,10 +96,7 @@ def _tier_from_dict(name: str, raw: dict, env: dict[str, str]) -> TierConfig:
         model=str(raw["model"]),
         location=location,
         base_url=raw.get("base_url"),
-        effort=raw.get("effort"),
         max_tokens=int(raw.get("max_tokens", 4096)),
-        fallbacks=raw.get("fallbacks"),
-        cache=bool(raw.get("cache", True)),
         think=None if raw.get("think") is None else bool(raw.get("think")),
         fallback_tier=raw.get("fallback_tier"),
         price=price,

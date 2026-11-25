@@ -8,7 +8,7 @@ from tests.conftest import CONFIG_DIR
 CANDIDATES = yaml.safe_load((CONFIG_DIR / "eval" / "answer-candidates.yaml").read_text())
 
 
-def test_references_are_the_live_claude_tiers():
+def test_references_are_the_live_answering_tiers():
     cfg = load_gateway_config(CONFIG_DIR, {"OLLAMA_BASE_URL": "http://localhost:11434"})
     for tier, model in CANDIDATES["references"].items():
         assert cfg.tier(tier).model == model

@@ -23,7 +23,8 @@ describe("audit log viewer", () => {
     });
     const { router } = renderApp("/admin");
     await waitFor(() => expect(router.state.location.pathname).toBe("/admin/audit"));
-    expect(await screen.findByText("sop_approved")).toBeInTheDocument();
+    expect(await screen.findByText("Approved an SOP version")).toBeInTheDocument();
+    expect(screen.getByText("Approved after review")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Users" })).toBeNull();
     // Without manage_users the user list isn't requested; actors show as short ids.
     expect(calls.some((c) => new URL(c.url).pathname === "/api/v1/admin/users")).toBe(false);
@@ -36,6 +37,38 @@ describe("audit log viewer", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: "Verify the chain" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("first broken event is #77");
+  });
+
+  it("shows details in plain words, with people's names when the admin can list users", async () => {
+    session.signIn("t");
+    const pat = "bbbbbbbb-0000-0000-0000-000000000000";
+    mockFetch({
+      "GET /api/v1/me": () => json(makeMe({ global_actions: ["view_audit", "manage_users"] })),
+      "GET /api/v1/notifications": () => json([]),
+      "GET /api/v1/admin/users": () => json([{ id: pat, display_name: "Pat Lim" }]),
+      "GET /api/v1/admin/audit": () =>
+        json([
+          {
+            id: 7, ts: "2026-11-25T09:00:00Z", actor_id: pat, action: "pdf_exported", target_type: "document", target_id: "c0ffee00-0000-0000-0000-000000000000",
+            details: { documents: ["c0ffee00-0000-0000-0000-000000000000"], restricted: true },
+          },
+          {
+            id: 8, ts: "2026-11-25T10:00:00Z", actor_id: pat, action: "note_saved", target_type: "document", target_id: null,
+            details: { commit: "0123456789abcdef0123456789abcdef01234567", bytes: 20480, review: null },
+          },
+        ]),
+    });
+    renderApp("/admin/audit");
+    expect(await screen.findByText("Exported a PDF")).toBeInTheDocument();
+    expect(screen.getAllByText("Pat Lim").length).toBeGreaterThan(0);
+    expect(screen.getByText("Restricted content")).toBeInTheDocument();
+    expect(screen.getByText("Yes")).toBeInTheDocument();
+    expect(screen.getByText("1 (c0ffee00)")).toBeInTheDocument();
+    expect(screen.getByText("version 0123456")).toBeInTheDocument();
+    expect(screen.getByText("20 KB")).toBeInTheDocument();
+    // Empty values are left out; the raw record is still one click away.
+    expect(screen.queryByText("Review")).toBeNull();
+    expect(screen.getAllByText("Raw").length).toBe(2);
   });
 
   it("exports CSV that a spreadsheet can't run as formulas", () => {

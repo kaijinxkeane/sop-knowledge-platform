@@ -131,6 +131,46 @@ async def project_reminders(ctx: dict) -> dict:
         return {"reminded": await ending_reminders(s, vault_config().project_reminder_days)}
 
 
+async def render_slides(ctx: dict) -> dict:
+    """Render slide pictures for the current and approved version of every deck
+    not rendered yet, so the reader doesn't wait for LibreOffice."""
+    from sqlalchemy import select
+
+    from app.db.models import Document
+    from app.vault.git import GitError, GitVault
+    from app.vault.slides import SlidesUnavailable, cached_count, ensure_rendered, soffice
+
+    if soffice() is None:
+        return {"skipped": "no LibreOffice"}
+    git = GitVault(get_settings().vault_path)
+    async with get_sessionmaker()() as s:
+        decks = (
+            await s.execute(
+                select(Document.vault_path, Document.approved_commit).where(
+                    Document.vault_path.ilike("%.pptx")
+                )
+            )
+        ).all()
+    rendered = failed = 0
+    for path, approved in decks:
+        versions = []
+        try:
+            versions.append(git.safe_path(path).read_bytes())
+            if approved:
+                versions.append(git.show(path, approved))
+        except (OSError, ValueError, GitError):
+            continue
+        for data in versions:
+            if cached_count(data) is not None:
+                continue
+            try:
+                await ensure_rendered(data)
+                rendered += 1
+            except SlidesUnavailable:
+                failed += 1
+    return {"rendered": rendered, "failed": failed}
+
+
 async def startup(ctx: dict) -> None:
     configure_logging(get_settings().log_level)
     log.info("worker_started")
@@ -149,6 +189,7 @@ class WorkerSettings:
         detect_conflicts,
         apply_retention,
         project_reminders,
+        render_slides,
     ]
     cron_jobs = [
         cron(heartbeat, minute={0, 15, 30, 45}),
@@ -162,6 +203,7 @@ class WorkerSettings:
         cron(detect_conflicts, hour=3, minute=0, unique=True, timeout=10800),
         cron(apply_retention, hour=3, minute=30, unique=True, timeout=1800),
         cron(project_reminders, hour=7, minute=10, unique=True, timeout=300),
+        cron(render_slides, minute=set(range(5, 60, 10)), unique=True, timeout=1800),
     ]
     on_startup = startup
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)

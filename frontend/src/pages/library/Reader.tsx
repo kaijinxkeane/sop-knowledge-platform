@@ -205,7 +205,7 @@ function OldVersion({ doc, commit }: { doc: Doc; commit: string }) {
       {doc.kind === "note" ? (
         <NoteView text={v.data.content} docs={docs.data ?? []} />
       ) : ext(doc) === "pptx" ? (
-        <DeckViewer doc={doc} versionParts={v.data.parts ?? []} />
+        <DeckViewer doc={doc} versionParts={v.data.parts ?? []} commit={commit} />
       ) : ext(doc) === "pdf" ? (
         <PdfViewer doc={doc} commit={commit} />
       ) : (

@@ -1,7 +1,6 @@
 # Model tiers (plan §5.1, §5.2). Agents request a tier, never a model name.
-# Moving a tier to a local model is a change to this file only.
+# Every tier runs locally on Ollama; nothing is sent to a cloud provider.
 #
-#   provider: anthropic      -> Claude API (always location: cloud)
 #   provider: openai_compat  -> any OpenAI-compatible server (Ollama, vLLM, ...).
 #                               Counts as cloud unless `location: local` is set.
 #
@@ -11,7 +10,7 @@
 tiers:
   # Routing is permissions + search with no model (plan §5, Routing). This
   # tier is used only when search is unclear, and for nightly gap-topic labels.
-  # Local; never falls back to Claude. Uses the 8B like answering and the
+  # Local. Uses the 8B like answering and the
   # Classifier, so only one chat model stays loaded (eval 2026-11-21: routing
   # 100% either way, answers 94.2% vs 94.7% with the 4B, p=1.0; faster overall).
   router:
@@ -24,25 +23,22 @@ tiers:
 
   # Default answering tier (most questions).
   answer:
-    provider: anthropic
-    model: claude-haiku-5-5
-    effort: medium
-    max_tokens: 8000
-    # USD per million tokens, Anthropic list price (checked 2026-11-25) for
-    # prompts up to 100K tokens. Cache read is an estimate (0.1x input).
-    price: {input: 0.10, output: 0.50, cache_read: 0.01}
-    # No API key yet, or Claude unreachable: answer locally instead of failing.
-    fallback_tier: answer-local
+    provider: openai_compat
+    location: local
+    base_url: ${OLLAMA_BASE_URL}/v1
+    model: qwen3:8b  # one resident chat model on 16 GB (see router)
+    max_tokens: 2048
+    think: false
 
-  # Escalation for questions that need real reasoning.
+  # Escalation for questions that need more reasoning: the same local model
+  # with room for a longer answer.
   reasoning:
-    provider: anthropic
-    model: claude-sonnet-5-5
-    effort: medium
-    max_tokens: 16000
-    price: {input: 2.00, output: 10.00, cache_read: 0.10}  # USD per million tokens (2026-11-25)
-    fallbacks: default
-    fallback_tier: answer-local
+    provider: openai_compat
+    location: local
+    base_url: ${OLLAMA_BASE_URL}/v1
+    model: qwen3:8b
+    max_tokens: 4096
+    think: false
 
   # Reads every note to propose access labels -> local from day one.
   classifier:
@@ -80,8 +76,8 @@ tiers:
     model: qwen3:14b
     max_tokens: 8192
 
-  # Local answering: the fallback for answer/reasoning, and the first local
-  # candidate in the answering eval (config/eval/answer-candidates.yaml).
+  # Answering for local-only spaces, and the baseline candidate in the
+  # answering eval (config/eval/answer-candidates.yaml).
   answer-local:
     provider: openai_compat
     location: local

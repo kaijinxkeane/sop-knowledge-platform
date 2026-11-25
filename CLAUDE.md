@@ -9,7 +9,7 @@ before making structural changes.
 
 ```bash
 make up && make test               # ruff lint + format check + pytest (no network, no LLM)
-make smoke                         # call each model tier once (needs Ollama; Claude if key set)
+make smoke                         # call each model tier once (needs Ollama)
 SOP_LIVE_TESTS=1 uv run pytest -m live   # from backend/: opt-in real-provider tests
 ```
 
@@ -88,7 +88,7 @@ backend/                 — FastAPI app (uv project, Python 3.12)
   app/policy/            — policy engine (scopes, actions, fail-closed sensitivity)
   app/security/          — passwords (Argon2), TOTP, tokens, key derivation
   app/identity.py, app/audit.py, app/cli.py — users/roles, hash-chained audit log, admin CLI
-  app/models/            — model gateway: tiers, data boundary, anthropic + openai_compat adapters
+  app/models/            — model gateway: tiers, data boundary, openai_compat (Ollama) adapter, usage
   app/db/                — SQLAlchemy models, Alembic migrations (incl. RLS), scoped reader
   app/vault/             — parsers (md/pptx/pdf/docx/images), local OCR, rule labels + safeguards, git layer, indexer, write rules
   app/retrieval/         — local embeddings, hybrid search (RLS + policy engine, distance cutoff), small-to-big expansion of hits
@@ -121,8 +121,14 @@ claude-plugin/           — inherited llm-wiki workflow specs, reused as agent 
 tests/                   — structural tests, fixtures (golden-wiki, defects), promptfoo evals
 ```
 
-Planned (see the status table in plan §12): slide pictures; TLS, Headscale,
-Playwright and the accessibility pass in Phase 6.
+Planned (see the status table in plan §12): TLS, Headscale, Playwright and
+the accessibility pass in Phase 6 (on hold).
+
+**Fully local (since 2026-11-25):** every tier in `config/models.yaml` is a local
+Ollama model and the Claude connector has been removed (no `anthropic` provider,
+SDK or API-key setting). `test_gateway_config.py::test_every_tier_is_local` and
+`test_cloud_providers_are_refused` enforce it. Don't add a cloud provider back
+without the owner's decision.
 
 ## Security rules for platform code
 
@@ -164,6 +170,9 @@ Playwright and the accessibility pass in Phase 6.
   a title to someone who can't read the document: unreadable path items are counted but have no
   title, link or type. Acknowledgements are append-only (DB trigger); a material change on
   approve makes older ones stop counting. A required path item is done only by sign-off.
+- Slide pictures (`app/vault/slides.py`, `GET /documents/{id}/slides/{n}`) are rendered by
+  LibreOffice into the shared cache, keyed by content hash; served only after the same checks
+  as the file. Retractions clear the cache (`slides.forget_all`).
 - PDF export (`app/api/exports.py`) reads under RLS like the reader, watermarks restricted
   content with the reader's name and date, and audits every export (ids only).
 - Cost and usage (`model_usage`, `app/models/usage.py`) stores daily totals per tier and model:
@@ -182,6 +191,9 @@ Playwright and the accessibility pass in Phase 6.
 - Project shares need the department lead's approval, checked on their own roles
   (`principal_for`), never on project access. Partial shares are checked in both
   `sop_doc_visible()` (v4) and `can_view_document(..., path=, doc_id=)`: keep them in sync.
+- Installable web app (`frontend/public/sw.js`, `src/app/pwa.ts`): the service worker never
+  caches `/api` responses or pages, only the offline page, its CSS and icon, so nothing readable
+  stays on a device. Keep it that way.
 - The frontend keeps the access token in memory only (never localStorage or
   sessionStorage); the refresh token is the httpOnly `sop_refresh` cookie. Hiding
   a menu is cosmetic: every check stays in the backend. Hidden pages look like 404s.
@@ -189,8 +201,6 @@ Playwright and the accessibility pass in Phase 6.
 - Never commit secrets (`.env`, API keys, `.claude/settings.local.json`).
 - Every model call goes through `ModelGateway` with an explicit `ContentScope`;
   never call a provider SDK directly from agents.
-- The developer's API key is for demo data only; the company key replaces it
-  before any real vault is connected.
 
 ## Git and publishing
 

@@ -146,7 +146,7 @@ describe("Home and Admin", () => {
     month: "2026-11",
     days: [{ day: "2026-11-24", calls: 40, cloud_calls: 30, cost_usd: 0.42 }],
     tiers: [
-      { tier: "answer", model: "claude-haiku-5-5", provider: "anthropic", location: "cloud", calls: 30, fallbacks: 0, input_tokens: 900000, output_tokens: 100000, cache_read_tokens: 0, cost_usd: 0.14 },
+      { tier: "answer", model: "hosted-model", provider: "cloud_api", location: "cloud", calls: 30, fallbacks: 0, input_tokens: 900000, output_tokens: 100000, cache_read_tokens: 0, cost_usd: 0.14 },
       { tier: "router", model: "qwen3:8b", provider: "openai_compat", location: "local", calls: 10, fallbacks: 2, input_tokens: 5000, output_tokens: 500, cache_read_tokens: 0, cost_usd: 0 },
     ],
     total_cost_usd: 0.42,
@@ -186,7 +186,7 @@ describe("Home and Admin", () => {
     renderApp("/");
     expect(await screen.findByRole("link", { name: "$0.42" })).toHaveAttribute("href", "/admin/usage");
     renderApp("/admin/usage");
-    expect(await screen.findByRole("cell", { name: "claude-haiku-5-5" })).toBeInTheDocument();
-    expect(screen.getByText(/fell back to the local model/)).toBeInTheDocument();
+    expect(await screen.findByRole("cell", { name: "hosted-model" })).toBeInTheDocument();
+    expect(screen.getByText(/answered by a fallback model/)).toBeInTheDocument();
   });
 });

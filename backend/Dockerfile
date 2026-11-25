@@ -8,8 +8,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
     PATH="/opt/venv/bin:$PATH"
 
+# LibreOffice Impress (headless) renders slide pictures; fonts so slides look right.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git \
+    && apt-get install -y --no-install-recommends git libreoffice-impress-nogui \
+       fonts-dejavu-core fonts-liberation2 fonts-noto-core \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
@@ -22,7 +24,7 @@ RUN uv sync --frozen --no-dev
 # One copy of the llm-wiki helpers, loaded by wiki_core.
 COPY scripts/llm-wiki /app/vendor/llm-wiki
 
-RUN useradd --system --uid 10001 --home /app sop && chown -R sop /app
+RUN useradd --system --uid 10001 --home /app sop && mkdir -p /cache && chown -R sop /app /cache
 USER sop
 
 EXPOSE 8000

@@ -10,7 +10,7 @@
 	encode zstd gzip
 
 	header {
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; frame-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; frame-src 'self' blob:; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"
 		Referrer-Policy "no-referrer"
@@ -34,6 +34,11 @@
 		header @assets Cache-Control "public, max-age=31536000, immutable"
 		@pages not path /assets/*
 		header @pages Cache-Control "no-cache"
+		# The service worker must always be fresh and may control the whole site.
+		@sw path /sw.js
+		header @sw Service-Worker-Allowed "/"
+		@manifest path /manifest.webmanifest
+		header @manifest Content-Type "application/manifest+json"
 		try_files {path} /index.html
 		file_server
 	}

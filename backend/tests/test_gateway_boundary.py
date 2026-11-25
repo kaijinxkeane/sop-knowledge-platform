@@ -32,7 +32,7 @@ class RecordingAdapter:
 def gateway():
     cfg = GatewayConfig(
         tiers={
-            "cloud": TierConfig("cloud", "anthropic", "claude-haiku-5-5", "cloud", max_tokens=100),
+            "cloud": TierConfig("cloud", "cloud_api", "hosted-model", "cloud", max_tokens=100),
             "local": TierConfig(
                 "local", "openai_compat", "qwen3:4b", "local", base_url="http://x/v1"
             ),
@@ -50,7 +50,7 @@ def gateway():
         },
     )
     adapter = RecordingAdapter()
-    gw = ModelGateway(cfg, adapters={"anthropic": adapter, "openai_compat": adapter})
+    gw = ModelGateway(cfg, adapters={"cloud_api": adapter, "openai_compat": adapter})
     gw.recorder = adapter
     return gw
 
@@ -127,7 +127,7 @@ def _fallback_gateway(local_only=False):
     cfg = GatewayConfig(
         tiers={
             "cloud": TierConfig(
-                "cloud", "anthropic", "claude-haiku-5-5", "cloud", fallback_tier="local"
+                "cloud", "cloud_api", "hosted-model", "cloud", fallback_tier="local"
             ),
             "local": TierConfig(
                 "local", "openai_compat", "qwen3:8b", "local", base_url="http://x/v1"
@@ -136,7 +136,7 @@ def _fallback_gateway(local_only=False):
         spaces={"core": SpaceConfig("core", "Core", local_only=local_only)},
     )
     local = _Local()
-    return ModelGateway(cfg, adapters={"anthropic": _NoKey(), "openai_compat": local}), local
+    return ModelGateway(cfg, adapters={"cloud_api": _NoKey(), "openai_compat": local}), local
 
 
 async def test_missing_key_falls_back_to_local():

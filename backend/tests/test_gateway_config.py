@@ -29,14 +29,13 @@ def test_reads_every_note_tiers_are_local():
     assert cfg.tier("conflict-confirm").think is None
 
 
-def test_cloud_tiers_use_current_models():
+def test_every_tier_is_local():
+    """This system runs without Claude (decided 2026-11-25): nothing leaves the machine."""
     cfg = load_gateway_config(CONFIG_DIR, ENV)
-    assert cfg.tier("answer").model == "claude-haiku-5-5"
-    assert cfg.tier("reasoning").model == "claude-sonnet-5-5"
-    # Claude answers questions and nothing else; people write SOPs (no AI drafting).
-    assert {n for n, t in cfg.tiers.items() if t.location == "cloud"} == {"answer", "reasoning"}
-    # Routing is local: questions never go to Claude just to be routed.
-    assert cfg.tier("router").location == "local"
+    assert {n for n, t in cfg.tiers.items() if t.location == "cloud"} == set()
+    assert {t.provider for t in cfg.tiers.values()} == {"openai_compat"}
+    for name in ("answer", "reasoning", "router"):
+        assert cfg.tier(name).location == "local"
 
 
 def _write(tmp_path: Path, models: str, spaces: dict[str, str] | None = None) -> Path:
@@ -55,9 +54,10 @@ def test_openai_compat_without_explicit_local_is_cloud(tmp_path):
     assert load_gateway_config(d, {}).tier("x").location == "cloud"
 
 
-def test_anthropic_cannot_claim_local(tmp_path):
-    d = _write(tmp_path, "tiers:\n  x: {provider: anthropic, model: m, location: local}\n")
-    with pytest.raises(ValueError, match="always location: cloud"):
+def test_cloud_providers_are_refused(tmp_path):
+    """The Claude connector was removed (2026-11-25): its provider name is unknown."""
+    d = _write(tmp_path, "tiers:\n  x: {provider: anthropic, model: m}\n")
+    with pytest.raises(ValueError, match="provider must be one of"):
         load_gateway_config(d, {})
 
 
@@ -78,7 +78,10 @@ def test_unknown_provider_rejected(tmp_path):
 
 
 def test_unknown_tier_lookup(tmp_path):
-    d = _write(tmp_path, "tiers:\n  x: {provider: anthropic, model: m}\n")
+    d = _write(
+        tmp_path,
+        "tiers:\n  x: {provider: openai_compat, base_url: http://example.com/v1, model: m}\n",
+    )
     with pytest.raises(KeyError, match="unknown model tier"):
         load_gateway_config(d, {}).tier("missing")
 
@@ -86,18 +89,19 @@ def test_unknown_tier_lookup(tmp_path):
 def test_reserved_space_name_rejected(tmp_path):
     d = _write(
         tmp_path,
-        "tiers:\n  x: {provider: anthropic, model: m}\n",
+        "tiers:\n  x: {provider: openai_compat, base_url: http://example.com/v1, model: m}\n",
         {"bad": "name: __unclassified__\n"},
     )
     with pytest.raises(ValueError, match="reserved"):
         load_gateway_config(d, {})
 
 
-def test_cloud_answering_falls_back_to_a_local_tier():
+def test_any_fallback_is_local_and_final():
     cfg = load_gateway_config(CONFIG_DIR, {"OLLAMA_BASE_URL": "http://localhost:11434"})
-    for name in ("answer", "reasoning"):
-        fb = cfg.tier(cfg.tier(name).fallback_tier)
-        assert fb.location == "local" and fb.fallback_tier is None
+    for t in cfg.tiers.values():
+        if t.fallback_tier:
+            fb = cfg.tier(t.fallback_tier)
+            assert fb.location == "local" and fb.fallback_tier is None
 
 
 @pytest.mark.parametrize("fb", ["missing", "cloud2"])
@@ -105,8 +109,8 @@ def test_fallback_must_exist_and_be_local(tmp_path, fb):
     d = _write(
         tmp_path,
         "tiers:\n"
-        f"  x: {{provider: anthropic, model: m, fallback_tier: {fb}}}\n"
-        "  cloud2: {provider: anthropic, model: m}\n",
+        f"  x: {{provider: openai_compat, base_url: http://e/v1, model: m, fallback_tier: {fb}}}\n"
+        "  cloud2: {provider: openai_compat, base_url: http://e/v1, model: m}\n",
     )
     with pytest.raises(ValueError, match="fallback_tier"):
         load_gateway_config(d, {})

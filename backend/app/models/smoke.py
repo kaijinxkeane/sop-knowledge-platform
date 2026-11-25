@@ -4,7 +4,7 @@
     uv run python -m app.models.smoke router classifier
     uv run python -m app.models.smoke --local-model llama3.2   # override local chat model
 
-Cloud tiers are skipped (not failed) when ANTHROPIC_API_KEY is unset.
+Every tier is local (Ollama), so a failure usually means a model isn't pulled.
 """
 
 from __future__ import annotations
@@ -44,9 +44,6 @@ async def run(tiers: list[str], local_model: str | None) -> int:
                     f"({result.latency_ms} ms, {u.input_tokens}+{u.output_tokens} tok)"
                 )
         except ProviderConfigError as exc:
-            if tier.provider == "anthropic" and "not set" in str(exc):
-                print(f"SKIP {label} -> {exc}")
-                continue
             failures += 1
             print(f"FAIL {label} -> {exc}")
         except GatewayError as exc:

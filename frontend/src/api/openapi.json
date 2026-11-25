@@ -7380,6 +7380,79 @@
         ]
       }
     },
+    "/api/v1/documents/{document_id}/slides/{number}": {
+      "get": {
+        "description": "A picture of one slide of a deck (the current file, or one readable\nversion), only to users who may read it. 503 if LibreOffice isn't installed:\nthe viewer then shows the slide's text instead.",
+        "operationId": "get_slide_picture_api_v1_documents__document_id__slides__number__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "maximum": 2000,
+              "minimum": 1,
+              "title": "Number",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "commit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9a-f]{40}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Commit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/png": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Slide Picture",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
     "/api/v1/documents/{document_id}/versions": {
       "get": {
         "description": "Versions this person may read: approved ones (all versions for the\nnote's editors), each judged by the labels it had (app.governance.history).",

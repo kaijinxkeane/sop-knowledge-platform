@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { _offerForTest } from "@/app/pwa";
 import { session } from "@/auth/session";
 import { json, makeMe, mockFetch, renderApp } from "@/test/utils";
 
@@ -77,5 +78,20 @@ describe("app shell", () => {
     const { refreshSession } = await import("@/auth/session");
     await refreshSession();
     await waitFor(() => expect(router.state.location.pathname).toBe("/sign-in"));
+  });
+});
+
+describe("install app", () => {
+  it("shows Install app only when the browser offers it, and hides it after", async () => {
+    session.signIn("t");
+    mockFetch({ "GET /api/v1/me": () => json(makeMe()), "GET /api/v1/notifications": () => json([]) });
+    renderApp("/");
+    await screen.findByRole("navigation", { name: "Main" });
+    expect(screen.queryByRole("button", { name: "Install app" })).toBeNull();
+    const prompt = vi.fn(async () => undefined);
+    _offerForTest(Object.assign(new Event("beforeinstallprompt"), { prompt, userChoice: Promise.resolve({ outcome: "accepted" }) }));
+    await userEvent.click(await screen.findByRole("button", { name: "Install app" }));
+    expect(prompt).toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Install app" })).toBeNull());
   });
 });

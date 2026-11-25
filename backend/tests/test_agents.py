@@ -80,7 +80,7 @@ class Scripted:
 
 def gateway(replies, cloud_configured=True):
     tiers = {
-        n: TierConfig(n, "anthropic", "claude-x", "cloud", fallback_tier="answer-local")
+        n: TierConfig(n, "cloud_api", "hosted-model", "cloud", fallback_tier="answer-local")
         for n in ("answer", "reasoning")
     }
     tiers |= {
@@ -97,7 +97,7 @@ def gateway(replies, cloud_configured=True):
     )
     cloud, local = Scripted(replies, cloud_configured), Scripted(replies)
     local.replies = cloud.replies  # share one script
-    return ModelGateway(cfg, adapters={"anthropic": cloud, "openai_compat": local}), cloud, local
+    return ModelGateway(cfg, adapters={"cloud_api": cloud, "openai_compat": local}), cloud, local
 
 
 async def run(gw, space, passages, question="How long is it?"):
@@ -169,7 +169,7 @@ async def test_low_confidence_escalates_to_reasoning():
     assert cloud.calls == ["answer", "reasoning"] and sec.escalated and text == "3 hours [1]."
 
 
-async def test_no_escalation_without_claude():
+async def test_no_escalation_when_the_reasoning_tier_cannot_run():
     gw, cloud, local = gateway(["CONFIDENCE: low\nMaybe 2 hours [1]."], cloud_configured=False)
     text, sec = await run(gw, "core", [hit()])
     assert local.calls == ["answer-local"] and not sec.escalated and sec.confidence == "low"

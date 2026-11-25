@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { t } from "@/i18n";
 import { useUsers } from "./api";
+import { actionText, detailRows, targetText } from "./auditText";
 
 type Event = Schemas["AuditOut"];
 type Filter = { action: string; since: string; until: string; target: string; limit: number };
@@ -75,6 +76,27 @@ function download(text: string, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
+function AuditDetails({ details, nameOf }: { details: Record<string, unknown>; nameOf: (id: string) => string | undefined }) {
+  const rows = detailRows(details, nameOf);
+  if (!rows.length) return null;
+  return (
+    <div className="space-y-1">
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+        {rows.map((r) => (
+          <div key={r.label} className="contents">
+            <dt className="text-muted-foreground">{r.label}</dt>
+            <dd className="break-words">{r.value}</dd>
+          </div>
+        ))}
+      </dl>
+      <details className="text-xs text-muted-foreground">
+        <summary className="cursor-pointer">{t("audit.raw")}</summary>
+        <code className="block break-all font-mono">{JSON.stringify(details)}</code>
+      </details>
+    </div>
+  );
+}
+
 /** Admin → Audit log: search, export and chain verification (view_audit). */
 export default function Audit() {
   const me = useMe();
@@ -87,6 +109,7 @@ export default function Audit() {
   const [error, setError] = useState<string | null>(null);
   const names = new Map((users.data ?? []).map((u) => [u.id, u.display_name]));
   const name = (id: string | null | undefined) => (id ? (names.get(id) ?? id.slice(0, 8)) : t("audit.system"));
+  const nameOf = (id: string) => names.get(id);
 
   const search = (e: FormEvent) => {
     e.preventDefault();
@@ -100,7 +123,7 @@ export default function Audit() {
         <div className="space-y-1">
           <Label htmlFor="audit-action">{t("audit.action")}</Label>
           <Input id="audit-action" list="audit-actions" placeholder={t("audit.anyAction")} maxLength={64} value={draft.action} onChange={(e) => setDraft({ ...draft, action: e.target.value.trim() })} />
-          <datalist id="audit-actions">{ACTIONS.map((a) => <option key={a} value={a} />)}</datalist>
+          <datalist id="audit-actions">{ACTIONS.map((a) => <option key={a} value={a} label={actionText(a)} />)}</datalist>
         </div>
         <div className="space-y-1">
           <Label htmlFor="audit-since">{t("audit.since")}</Label>
@@ -176,11 +199,13 @@ export default function Audit() {
                   <td className="whitespace-nowrap px-3 py-1.5">{new Date(e.ts).toLocaleString([], { dateStyle: "medium", timeStyle: "medium" })}</td>
                   <td className="px-3 py-1.5">{name(e.actor_id)}</td>
                   <td className="px-3 py-1.5">
-                    <span className="font-medium">{e.action}</span>
-                    {e.target_type && <span className="block text-xs text-muted-foreground">{e.target_type} {e.target_id?.slice(0, 8)}</span>}
+                    <span className="font-medium" title={e.action}>{actionText(e.action)}</span>
+                    {(e.target_type || e.target_id) && (
+                      <span className="block text-xs text-muted-foreground">{targetText(e.target_type, e.target_id, nameOf)}</span>
+                    )}
                   </td>
-                  <td className="px-3 py-1.5 font-mono text-xs break-all">
-                    {Object.keys(e.details ?? {}).length ? JSON.stringify(e.details) : ""}
+                  <td className="px-3 py-1.5">
+                    <AuditDetails details={e.details} nameOf={nameOf} />
                   </td>
                 </tr>
               ))}

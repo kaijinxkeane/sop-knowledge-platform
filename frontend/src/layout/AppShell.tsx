@@ -1,6 +1,7 @@
-import { LogOut } from "lucide-react";
+import { Download, LogOut } from "lucide-react";
 import { lazy, Suspense } from "react";
 import { Link, NavLink, Outlet } from "react-router";
+import { useInstallOffer } from "@/app/pwa";
 import { brand, Logo } from "@/app/theme/brand";
 import { useMe, useSignOut } from "@/auth/hooks";
 import { visibleSections, type Section } from "@/auth/permissions";
@@ -26,6 +27,7 @@ export const SECTION_PATHS: Record<Section, string> = {
 export function AppShell() {
   const me = useMe();
   const signOut = useSignOut();
+  const install = useInstallOffer();
 
   if (me.isPending) {
     return <p className="p-6 text-sm text-muted-foreground">{t("app.loading")}</p>;
@@ -81,6 +83,12 @@ export function AppShell() {
               >
                 {me.data.display_name}
               </Link>
+            )}
+            {install && (
+              <Button variant="outline" size="sm" onClick={() => void install()} title={t("app.installHint")}>
+                <Download />
+                {t("app.install")}
+              </Button>
             )}
             <Button
               variant="ghost"

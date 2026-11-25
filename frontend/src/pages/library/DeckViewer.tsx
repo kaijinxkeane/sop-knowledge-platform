@@ -5,14 +5,34 @@ import { Button } from "@/components/ui/button";
 import { t } from "@/i18n";
 import { BookmarkButton } from "./BookmarkButton";
 import { cn } from "@/lib/utils";
-import { useParts, type Doc, type Part } from "./api";
+import { useParts, useSlidePicture, type Doc, type Part } from "./api";
+
+function SlideFace({ doc, slide, total, commit }: { doc: Doc; slide: Part; total: number; commit?: string | null }) {
+  const pic = useSlidePicture(doc.id, slide.number, commit);
+  if (pic.url) {
+    return (
+      <img
+        src={pic.url}
+        alt={t("doc.slidePicture", { n: slide.number, title: slide.title || "—" })}
+        className="aspect-video w-full rounded-lg border bg-white object-contain"
+      />
+    );
+  }
+  return (
+    <div className="flex aspect-video flex-col justify-center rounded-lg border bg-muted/30 p-10">
+      <p className="text-xs text-muted-foreground">{t("doc.slideOf", { n: slide.number, total })}</p>
+      <h2 className="mt-2 text-2xl font-semibold">{slide.title || "—"}</h2>
+      {pic.loading && <p className="mt-4 text-xs text-muted-foreground">{t("doc.slideRendering")}</p>}
+    </div>
+  );
+}
 
 /**
- * Slide by slide: each slide's text and speaker notes. ?slide=N (from a
- * citation or search hit) opens that slide. Slide pictures need server-side
- * rendering, which isn't built yet.
+ * Slide by slide: a picture of each slide (rendered on the server), its text
+ * and speaker notes. ?slide=N (from a citation or search hit) opens that slide.
+ * Without LibreOffice on the server, the slide's title stands in.
  */
-export function DeckViewer({ doc, versionParts }: { doc: Doc; versionParts?: Part[] }) {
+export function DeckViewer({ doc, versionParts, commit }: { doc: Doc; versionParts?: Part[]; commit?: string | null }) {
   // An older version brings its own slides; otherwise the current ones.
   const current = useParts(doc.id, !versionParts);
   const parts = versionParts ? { data: versionParts, isPending: false, isError: false } : current;
@@ -62,10 +82,7 @@ export function DeckViewer({ doc, versionParts }: { doc: Doc; versionParts?: Par
         ))}
       </ol>
       <div className="space-y-4">
-        <div className="flex aspect-video flex-col justify-center rounded-lg border bg-muted/30 p-10">
-          <p className="text-xs text-muted-foreground">{t("doc.slideOf", { n: slide.number, total })}</p>
-          <h2 className="mt-2 text-2xl font-semibold">{slide.title || "—"}</h2>
-        </div>
+        <SlideFace doc={doc} slide={slide} total={total} commit={commit} />
         <div className="flex items-center justify-between">
           <Button
             variant="outline"
@@ -96,7 +113,6 @@ export function DeckViewer({ doc, versionParts }: { doc: Doc; versionParts?: Par
             {slide.speaker_notes || <span className="text-muted-foreground">{t("doc.noNotes")}</span>}
           </p>
         </section>
-        <p className="text-xs text-muted-foreground">{t("doc.slideImagesLater")}</p>
       </div>
     </div>
   );

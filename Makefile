@@ -11,7 +11,7 @@ help:
 	@echo "make seed-demo    demo users (fictional) + demo document labels, dev only"
 	@echo "make admin EMAIL=you@company.com NAME='Your Name'   create the first admin"
 	@echo "make test         backend unit tests + lint (database tests need \`make up\`)"
-	@echo "make smoke        call every model tier once (Claude + local Ollama)"
+	@echo "make smoke        call every model tier once (local Ollama)"
 	@echo "make plugin-tests inherited llm-wiki structural tests"
 	@echo "make frontend-dev  web app with hot reload on :5173 (API from \`make up\`)"
 	@echo "make frontend-test frontend lint + types + tests + build + size budget"
