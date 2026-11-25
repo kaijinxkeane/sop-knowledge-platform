@@ -17,6 +17,7 @@ from __future__ import annotations
 import uuid
 from collections import defaultdict
 from datetime import UTC, datetime
+from pathlib import PurePosixPath
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -36,6 +37,7 @@ from app.db.models import (
     Space,
 )
 from app.policy.engine import Principal, Sensitivity, can_view_document, resolve_sensitivity
+from app.vault.folders import department_of
 from app.vault.labels import Labels, labels_from_rows, vault_config
 
 router = APIRouter(tags=["classification"])
@@ -68,6 +70,8 @@ class ProposalOut(BaseModel):
     decision: str
     needs: str  # review | approve
     stale: bool  # the note changed since this proposal
+    # where the trained sorter would file it: only for people who may file there
+    suggested_folder: str | None = None
 
 
 class GroupOut(BaseModel):
@@ -180,6 +184,14 @@ async def _load(session: AsyncSession, me: CurrentUser, proposal_id: uuid.UUID):
     return p, doc, author
 
 
+def _folder_for(me: CurrentUser, folder: str | None, path: str, config) -> str | None:
+    """A folder name shows only to people who can file documents in it."""
+    if not folder or str(PurePosixPath(path).parent) == folder:
+        return None
+    space = department_of(folder, config)
+    return folder if space and me.principal.can("contribute", space) else None
+
+
 @router.get("/classifications/queue", response_model=list[GroupOut])
 async def queue(
     me: CurrentUser = Depends(current_user), session: AsyncSession = Depends(get_db)
@@ -193,6 +205,7 @@ async def queue(
         )
     ).all()
     groups: dict[str, list[ProposalOut]] = defaultdict(list)
+    config = vault_config()
     for p, doc in rows:
         access = await _access(session, doc)
         if not _may_see(me.principal, p, doc, await _author(session, doc), access):
@@ -214,6 +227,7 @@ async def queue(
                 decision=p.decision,
                 needs=required_action(proposed) if proposed.space else "review",
                 stale=p.content_hash != doc.content_hash,
+                suggested_folder=_folder_for(me, p.suggested_folder, doc.vault_path, config),
             )
         )
     out = []

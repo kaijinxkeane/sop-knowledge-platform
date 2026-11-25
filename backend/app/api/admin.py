@@ -27,10 +27,12 @@ from app.identity import (
     roles_by_name,
 )
 from app.policy.engine import GLOBAL_ACTIONS, SPACE_ACTIONS, GrantError, validate_grant
+from app.vault.labels import vault_config
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 manage_users = require_global("manage_users")
 view_audit = require_global("view_audit")
+manage_spaces = require_global("manage_spaces")
 
 Sensitivity = Literal["public", "internal", "restricted"]
 ROLE_NAME = r"^[a-z][a-z0-9-]{1,63}$"
@@ -238,6 +240,81 @@ async def options(
         global_actions=sorted(GLOBAL_ACTIONS),
         sensitivities=["public", "internal", "restricted"],
     )
+
+
+# --- departments -------------------------------------------------------------
+
+
+class DepartmentOut(BaseModel):
+    name: str
+    title: str
+    description: str
+    contact: str
+    folders: list[str]
+    created_in_app: bool
+    roles: list[str]
+
+
+class DepartmentIn(BaseModel):
+    title: str = Field(min_length=2, max_length=80)
+    description: str = Field(min_length=10, max_length=1000)
+    contact: str = Field(default="", max_length=200)
+    name: str | None = Field(default=None, max_length=31)
+    folder: str | None = Field(default=None, max_length=60)
+
+
+async def _departments(session: AsyncSession) -> list[DepartmentOut]:
+    from app.spaces import space_files
+
+    rows = {sp.name: sp for sp in (await session.execute(select(Space))).scalars()}
+    roles = (await session.execute(select(Role))).scalars().all()
+    rules: dict[str, list[str]] = {}
+    for r in vault_config().folder_rules:
+        rules.setdefault(r.space, []).append(r.path.strip("/"))
+    out = []
+    for name, raw in space_files():
+        if name not in rows:
+            continue
+        out.append(
+            DepartmentOut(
+                name=name,
+                title=rows[name].title,
+                description=" ".join(str(raw.get("description") or "").split()),
+                contact=str(raw.get("contact") or ""),
+                folders=sorted(rules.get(name, [])),
+                created_in_app=bool(raw.get("created_in_app")),
+                roles=sorted(
+                    r.name
+                    for r in roles
+                    if r.name != "employee" and any(g.space == name for g in r.grants)
+                ),
+            )
+        )
+    return sorted(out, key=lambda d: d.title.lower())
+
+
+@router.get("/departments", response_model=list[DepartmentOut])
+async def list_departments(
+    _: CurrentUser = Depends(manage_spaces), session: AsyncSession = Depends(get_db)
+) -> list[DepartmentOut]:
+    return await _departments(session)
+
+
+@router.post("/departments", response_model=DepartmentOut, status_code=201)
+async def create_department_endpoint(
+    body: DepartmentIn,
+    me: CurrentUser = Depends(manage_spaces),
+    session: AsyncSession = Depends(get_db),
+) -> DepartmentOut:
+    """A new department with its staff and lead roles (nobody has them yet)."""
+    from app.departments import DepartmentError, create_department
+
+    try:
+        space = await create_department(session, actor_id=me.user.id, **body.model_dump())
+    except DepartmentError as exc:
+        code = status.HTTP_409_CONFLICT if exc.conflict else status.HTTP_422_UNPROCESSABLE_CONTENT
+        raise HTTPException(code, str(exc)) from None
+    return next(d for d in await _departments(session) if d.name == space.name)
 
 
 # --- users -------------------------------------------------------------------

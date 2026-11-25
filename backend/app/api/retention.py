@@ -25,6 +25,7 @@ from __future__ import annotations
 import uuid
 from collections import Counter, defaultdict
 from datetime import UTC, date, datetime, timedelta
+from pathlib import PurePosixPath
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field, model_validator
@@ -55,6 +56,7 @@ from app.governance.notify import notify, users_with
 from app.retention.gaps import MIN_PEOPLE_FOR_HR, personal_gaps, question_texts
 from app.retention.retract import retract_document, retract_term
 from app.retrieval.search import search
+from app.vault.folders import department_of
 from app.vault.git import GitVault
 from app.vault.labels import vault_config
 
@@ -485,6 +487,65 @@ async def coverage(
                 )
             )
     return out
+
+
+class FolderCoverageOut(BaseModel):
+    folder: str
+    documents: int
+    approved: int
+    stale: int  # approved, review date passed
+    open_gaps: int  # gap topics nearest this folder, not addressed
+    gap_questions: int
+
+
+@router.get("/spaces/{space}/folder-coverage", response_model=list[FolderCoverageOut])
+async def folder_coverage(
+    space: str,
+    me: CurrentUser = Depends(current_user),
+    session: AsyncSession = Depends(get_db),
+) -> list[FolderCoverageOut]:
+    """A department's Library folders for its leads: how much is written and
+    approved, how much is overdue for review, and how many unanswered question
+    topics sit closest to each folder. Counts only, over documents the lead can
+    read (RLS and the policy engine); gap topics only name folders shown here."""
+    if not _lead_of(me, space):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "only this space's leads")
+    config = vault_config()
+    today = date.today()
+    topics = (
+        (await session.execute(select(GapTopic).where(GapTopic.space == space))).scalars().all()
+    )
+    events = await _topic_events(session, [t.id for t in topics])
+    await session.commit()
+    await apply_reader_scope(session, me.principal)
+    docs = [
+        d
+        for d in (await session.execute(select(Document))).scalars().all()
+        if visible(me.principal, d)
+    ]
+    rows: dict[str, FolderCoverageOut] = {}
+    for d in docs:
+        owner = next((a.space for a in d.access if a.role == "owner"), None)
+        folder = str(PurePosixPath(d.vault_path).parent)
+        if owner != space or department_of(folder, config) != space or d.doc_type == "handover":
+            continue
+        row = rows.setdefault(
+            folder,
+            FolderCoverageOut(
+                folder=folder, documents=0, approved=0, stale=0, open_gaps=0, gap_questions=0
+            ),
+        )
+        row.documents += 1
+        if d.approved_hash is not None:
+            row.approved += 1
+            if d.review_due is not None and d.review_due < today:
+                row.stale += 1
+    await session.commit()
+    for t in topics:
+        if t.folder in rows and t.status != "addressed":
+            rows[t.folder].open_gaps += 1
+            rows[t.folder].gap_questions += len(events.get(t.id, []))
+    return sorted(rows.values(), key=lambda r: r.folder.lower())
 
 
 class StaleOut(BaseModel):

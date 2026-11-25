@@ -142,6 +142,7 @@ describe("admin: roles and grants", () => {
       "POST /api/v1/admin/roles/r2/grants": () => json(roles[1], 201),
     });
     renderApp("/admin/roles");
+    await userEvent.click(await screen.findByRole("button", { name: "Expand all" }));
     const form = await screen.findByRole("form", { name: "Add grant: core-staff" });
     const u = userEvent.setup();
     await u.selectOptions(within(form).getByLabelText("Applies to"), "Company-wide");
@@ -163,6 +164,7 @@ describe("admin: roles and grants", () => {
       "POST /api/v1/admin/roles/r2/grants": () => json(roles[1], 201),
     });
     renderApp("/admin/roles");
+    await userEvent.click(await screen.findByRole("button", { name: "Expand all" }));
     const form = await screen.findByRole("form", { name: "Add grant: core-staff" });
     const u = userEvent.setup();
     await u.selectOptions(within(form).getByLabelText("Can read up to"), "internal");
@@ -184,6 +186,7 @@ describe("admin: roles and grants", () => {
         json({ detail: "this would leave no active user who can manage users" }, 409),
     });
     renderApp("/admin/roles");
+    await userEvent.click(await screen.findByRole("button", { name: "Expand all" }));
     const u = userEvent.setup();
     await u.click(await screen.findByRole("button", { name: "Remove grant" }));
     const dialog = await screen.findByRole("dialog");
@@ -196,5 +199,62 @@ describe("admin: roles and grants", () => {
     mockFetch({ "GET /api/v1/me": () => json(makeMe()) });
     renderApp("/admin/roles");
     expect(await screen.findByRole("heading", { name: "Page not found" })).toBeInTheDocument();
+  });
+
+  it("shows roles collapsed with a summary, and opens one at a time", async () => {
+    adminApi();
+    renderApp("/admin/roles");
+    const u = userEvent.setup();
+    const toggle = await screen.findByRole("button", { name: /platform-admin/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveTextContent("1 people · 1 grants · Company-wide");
+    expect(screen.queryByRole("form", { name: "Add grant: platform-admin" })).not.toBeInTheDocument();
+    await u.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("form", { name: "Add grant: platform-admin" })).toBeInTheDocument();
+    expect(screen.queryByRole("form", { name: "Add grant: core-staff" })).not.toBeInTheDocument();
+    await u.click(screen.getByRole("button", { name: "Collapse all" }));
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+  });
+});
+
+describe("admin: departments", () => {
+  const hrLead = makeMe({ roles: ["employee", "hr-lead"], global_actions: ["manage_spaces"] });
+  const dep = (over: Record<string, unknown> = {}) => ({
+    name: "hr", title: "HR", description: "People policies.", contact: "Please contact HR.",
+    folders: ["HR"], created_in_app: false, roles: ["hr-lead", "hr-staff"], ...over,
+  });
+
+  it("lets HR's lead create a department, suggesting its short name and folder", async () => {
+    session.signIn("t");
+    let body: unknown = null;
+    mockFetch({
+      "GET /api/v1/me": () => json(hrLead),
+      "GET /api/v1/admin/departments": () => json([dep()]),
+      "POST /api/v1/admin/departments": async (req) => (
+        (body = await req.json()),
+        json(dep({ name: "marketing", title: "Marketing", folders: ["Marketing"], created_in_app: true, roles: ["marketing-lead", "marketing-staff"] }), 201)
+      ),
+    });
+    const { router } = renderApp("/admin");
+    await waitFor(() => expect(router.state.location.pathname).toBe("/admin/departments"));
+    expect(screen.queryByRole("link", { name: "Users" })).not.toBeInTheDocument();
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "New department" }));
+    await u.type(screen.getByLabelText("Department name"), "Marketing Team");
+    expect(screen.getByLabelText("Short name")).toHaveValue("marketing-team");
+    expect(screen.getByLabelText("Folder")).toHaveValue("Marketing Team");
+    await u.clear(screen.getByLabelText("Short name"));
+    await u.type(screen.getByLabelText("Short name"), "marketing");
+    await u.type(screen.getByLabelText("What it covers"), "Campaigns, brand and events.");
+    await u.click(screen.getByRole("button", { name: "Create department" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("marketing-staff");
+    expect(body).toEqual({
+      title: "Marketing Team",
+      description: "Campaigns, brand and events.",
+      contact: "",
+      name: "marketing",
+      folder: "Marketing Team",
+    });
   });
 });

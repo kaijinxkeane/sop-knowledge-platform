@@ -25,6 +25,15 @@ import { AssignReading, ReadingBanner } from "@/pages/reading/ReadingPanel";
 import { DeckViewer } from "./DeckViewer";
 import { NoteView } from "./NoteView";
 import { PdfViewer } from "./PdfViewer";
+import { backFromDocument, type Place } from "@/lib/places";
+
+/** "Library", "Ask", "Review"…: the page a document's back link returns to. */
+function backLabel(back: Place): string {
+  const known = ["ask", "library", "write", "review", "retain", "handovers", "projects", "admin"];
+  if (back.section === "" || back.section === "account" || back.section === "notice") return t("nav.home");
+  if (back.section === "paths") return t("paths.title");
+  return known.includes(back.section) ? t(`nav.${back.section}` as MessageKey) : t("doc.backToLibrary");
+}
 import { StatusDot } from "./StatusDot";
 
 const ext = (doc: Doc) => doc.vault_path.split(".").pop()?.toLowerCase() ?? "";
@@ -260,11 +269,12 @@ export default function Reader() {
   const canAssign =
     d.kind === "note" && d.approved && d.status !== "retired" &&
     d.access.some((a) => me.data?.space_actions[a.space]?.includes("approve"));
+  const back = backFromDocument();
   return (
     <div className="mx-auto max-w-6xl px-6 py-6">
-      <Link to="/library" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground print:hidden">
+      <Link to={back.to} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground print:hidden">
         <ArrowLeft className="size-4" />
-        {t("doc.backToLibrary")}
+        {backLabel(back)}
       </Link>
       <header className="mt-3 border-b pb-4">
         <div className="flex items-start justify-between gap-4">

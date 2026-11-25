@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router";
 import { api, type Schemas } from "@/api/client";
 import { call, messageOf } from "@/api/errors";
 import { Loading } from "@/app/routes";
@@ -15,6 +16,20 @@ import { actionText, detailRows, targetText } from "./auditText";
 
 type Event = Schemas["AuditOut"];
 type Filter = { action: string; since: string; until: string; target: string; limit: number };
+
+// The filter lives in the address, so leaving the log and coming back keeps it.
+// It holds event names, dates and ids only, never content.
+const filterFrom = (p: URLSearchParams): Filter => ({
+  action: p.get("action") ?? "",
+  since: p.get("since") ?? "",
+  until: p.get("until") ?? "",
+  target: p.get("target") ?? "",
+  limit: Number(p.get("limit")) || 100,
+});
+const paramsOf = (f: Filter) =>
+  Object.fromEntries(
+    Object.entries({ ...f, limit: f.limit === 100 ? "" : String(f.limit) }).filter(([, v]) => v !== ""),
+  ) as Record<string, string>;
 
 // Known event names, offered as suggestions (any name can still be typed).
 const ACTIONS = [
@@ -121,8 +136,9 @@ export default function Audit() {
   const me = useMe();
   const canManage = !!me.data?.global_actions.includes("manage_users");
   const users = useUsers(canManage);
-  const [draft, setDraft] = useState<Filter>({ action: "", since: "", until: "", target: "", limit: 100 });
-  const [filter, setFilter] = useState(draft);
+  const [params, setParams] = useSearchParams();
+  const filter = filterFrom(params);
+  const [draft, setDraft] = useState<Filter>(filter);
   const events = useAudit(filter);
   const [chain, setChain] = useState<Schemas["ChainOut"] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -132,7 +148,7 @@ export default function Audit() {
 
   const search = (e: FormEvent) => {
     e.preventDefault();
-    setFilter(draft);
+    setParams(paramsOf(draft), { replace: true });
   };
 
   return (

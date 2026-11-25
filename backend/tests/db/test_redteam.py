@@ -628,3 +628,63 @@ async def test_onboarding_paths_never_leak_titles(indexed, sessions, client, mak
     r = await client.get(f"{API}/me/paths", headers=hs)
     assert r.status_code == 200 and "Rate Card" not in r.text and not leaks(r)
     assert (await client.get(f"{API}/paths", headers=hs)).status_code == 403
+
+
+async def test_library_folders_never_leak_names_or_move_across_departments(
+    indexed, sessions, client, make_user, sign_in
+):
+    """A folder made in restricted Commercial/ isn't listed for anyone who
+    can't work in core or read something inside it; nobody outside a
+    department can add folders to it or pull its documents into their own."""
+    lead = await sign_in(await make_user(roles=("employee", "core-lead")))
+    body = {"space": "core", "parent": "Commercial", "name": "Acquisition Talks"}
+    assert (
+        await client.post("/api/v1/library/folders", json=body, headers=lead)
+    ).status_code == 201
+
+    for roles in (("employee",), ("employee", "hr-staff", "hr-lead"), ("employee", "it-lead")):
+        h = await sign_in(await make_user(roles=roles))
+        listed = (await client.get("/api/v1/library/folders", headers=h)).json()
+        assert not any("Acquisition" in f["path"] for f in listed), roles
+        assert not any(f["space"] == "core" for f in listed), roles
+        sneak = {"space": "core", "parent": "Programmes", "name": "Mine"}
+        assert (
+            await client.post("/api/v1/library/folders", json=sneak, headers=h)
+        ).status_code == 403
+
+    async with sessions() as s:
+        from app.db.models import Document
+
+        hr_doc = (
+            await s.execute(select(Document).where(Document.vault_path.like("HR/%")).limit(1))
+        ).scalar_one()
+    for folder in ("Programmes", "Commercial"):
+        r = await client.post(
+            f"/api/v1/library/documents/{hr_doc.id}/move", json={"folder": folder}, headers=lead
+        )
+        assert r.status_code in (404, 403, 422), folder
+
+
+async def test_similar_notes_and_folder_filters_never_reveal_hidden_documents(
+    indexed, client, make_user, sign_in, monkeypatch
+):
+    """Typing a hidden note's exact title, or narrowing search/Ask to a folder
+    the asker can't read, shows nothing of it: no title, no folder, no text."""
+    from app.api import notes as notes_api
+
+    monkeypatch.setattr(notes_api, "SIMILAR_DISTANCE", 2.0)  # match anything
+    hidden_titles = {"Rate Card 2026", "Disciplinary Process", "meeting notes 2026-10-14"}
+    for roles in (EMPLOYEE, STAFF, ("employee", "it-lead")):
+        h = await sign_in(await make_user(roles=roles))
+        for title in [*hidden_titles, "Floor price 7,500 written warning"]:
+            r = await client.post(f"{API}/notes/similar", json={"title": title}, headers=h)
+            assert r.status_code == 200
+            got = r.json()
+            assert not {g["title"] for g in got} & hidden_titles, (roles, title)
+            assert not any(g["folder"].startswith(("Commercial", "HR", "Inbox")) for g in got)
+        for folder in ("Commercial", "HR", "Inbox", "Handovers"):
+            r = await client.get(
+                f"{API}/search", params={"q": "price warning", "folder": folder}, headers=h
+            )
+            assert r.json()["results"] == [], (roles, folder)
+            assert not any(s in r.text for s in SECRETS)

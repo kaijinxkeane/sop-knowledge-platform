@@ -19,6 +19,7 @@ const AdminIndex = lazy(() =>
 const Users = lazy(() => import("@/pages/admin/Users"));
 const Roles = lazy(() => import("@/pages/admin/Roles"));
 const Audit = lazy(() => import("@/pages/admin/Audit"));
+const Departments = lazy(() => import("@/pages/admin/Departments"));
 const Usage = lazy(() => import("@/pages/admin/Usage"));
 const Library = lazy(() => import("@/pages/library/Library"));
 const Reader = lazy(() => import("@/pages/library/Reader"));
@@ -121,6 +122,7 @@ export const routes: RouteObject[] = [
               { index: true, element: suspend(<AdminIndex />) },
               { path: "users", element: suspend(<Users />) },
               { path: "roles", element: suspend(<Roles />) },
+              { path: "departments", element: suspend(<Departments />) },
               { path: "audit", element: suspend(<Audit />) },
               { path: "usage", element: suspend(<Usage />) },
             ],

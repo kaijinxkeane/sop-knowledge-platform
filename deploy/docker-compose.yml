@@ -23,6 +23,7 @@ x-backend: &backend
     REDIS_URL: redis://redis:6379/0
     VAULT_PATH: /vault
     SOP_CONFIG_DIR: /config
+    SOP_SPACES_DIR: /spaces
     SOP_CACHE_DIR: /cache
     OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
     # uvicorn trusts X-Forwarded-For only from Caddy (`web`), so the sign-in
@@ -31,6 +32,8 @@ x-backend: &backend
   volumes:
     - ${VAULT_HOST_PATH:-./data/vault}:/vault
     - ../config:/config:ro
+    # Departments created in the app (Admin → Departments), shared by the API and the worker.
+    - ${SPACES_HOST_PATH:-./data/spaces}:/spaces
     # Slide pictures, shared by the API and the worker (content: only served after access checks).
     - cache:/cache
   extra_hosts:

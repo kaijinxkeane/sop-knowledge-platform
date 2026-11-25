@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { useEffect, useState, type FormEvent } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { messageOf } from "@/api/errors";
 import { useMe } from "@/auth/hooks";
 import { Alert } from "@/components/ui/alert";
@@ -11,7 +11,7 @@ import { TEMPLATE_NAMES, templateBody, type Template } from "@/editor/templates"
 import { t } from "@/i18n";
 import { plainName } from "@/lib/obsidian";
 import { useDocuments, useStages } from "@/pages/library/api";
-import { createNote, useAfterSave } from "./api";
+import { createNote, useAfterSave, useSimilarNotes } from "./api";
 
 /**
  * A new note starts from its template. Started from a gap, the URL carries the
@@ -40,6 +40,12 @@ export default function NewNote() {
   const [busy, setBusy] = useState(false);
   const programmes = [...new Set((docs.data ?? []).map((d) => plainName(d.programme)).filter(Boolean))] as string[];
   const related = params.getAll("related").slice(0, 10);
+  const [settled, setSettled] = useState("");
+  useEffect(() => {
+    const id = window.setTimeout(() => setSettled(title.trim()), 600);
+    return () => window.clearTimeout(id);
+  }, [title]);
+  const similar = useSimilarNotes(settled);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -70,6 +76,20 @@ export default function NewNote() {
       <div className="space-y-1">
         <Label htmlFor="new-title">{t("write.titleField")}</Label>
         <Input id="new-title" required maxLength={150} value={title} onChange={(e) => setTitle(e.target.value)} />
+        {(similar.data?.length ?? 0) > 0 && (
+          <div role="status" className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+            <p className="font-medium">{t("write.similarTitle")}</p>
+            <ul className="mt-1 space-y-0.5">
+              {similar.data!.map((n) => (
+                <li key={n.id}>
+                  <Link to={`/library/${n.id}`} className="underline-offset-2 hover:underline">{n.title}</Link>
+                  <span className="text-xs text-muted-foreground"> · {n.folder}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1 text-xs text-muted-foreground">{t("write.similarHint")}</p>
+          </div>
+        )}
       </div>
       <div className="space-y-1">
         <Label htmlFor="new-template">{t("write.template")}</Label>

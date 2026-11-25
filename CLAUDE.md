@@ -24,6 +24,10 @@ SOP_LIVE_TESTS=1 uv run pytest -m live   # from backend/: opt-in real-provider t
   unclassified content off cloud tiers.
 - **Logs never contain content** (`backend/tests/test_logging.py`): don't log
   note text, questions, answers or raw URLs/query strings.
+- **The built-in user guide** (`config/help/*.md`) is added to every vault's `Help/`
+  folder once, by the worker (`app/vault/help.py`, a platform commit), and approved as
+  `baseline`. Guides people edited or deleted are never overwritten or put back.
+  Keep guides public, published and free of names and money terms (`tests/test_help_content.py`).
 - **The demo vault and `demo-vault-labels.yaml` must stay in sync**
   (`backend/tests/test_demo_vault.py`). Demo data is fictional only; never add
   real company data. Regenerate decks/worksheets with
@@ -46,6 +50,9 @@ make frontend-dev                  # Vite on :5173, /api forwarded to the API fr
   for byte, and unchanged blocks are restored from the original before saving
   (`src/editor/preserve.ts`). Obsidian syntax stays a verbatim atom
   (`src/editor/obsidian.ts`), except `==highlights==`, which are an editable mark saved back as `==text==`. Clashes merge by block, never by a model.
+- "Where you were" (tab, folder, search, selected item) is kept in memory only
+  (`src/lib/places.ts`, cleared on sign-out), never in browser storage: searches and
+  titles must not stay on the device. Keep page state in the address so it can be restored.
 - Sign-in tests must keep the access token out of browser storage
   (`src/pages/SignIn.test.tsx`). UI text goes through `t()` (`src/i18n/en.ts`).
 
@@ -201,6 +208,24 @@ without the owner's decision.
   sessionStorage); the refresh token is the httpOnly `sop_refresh` cookie. Hiding
   a menu is cosmetic: every check stays in the backend. Hidden pages look like 404s.
 - The API trusts `X-Forwarded-For` only from Caddy (`FORWARDED_ALLOW_IPS` = `WEB_IP`).
+- Departments created in the app (`app/departments.py`, `manage_spaces`: platform-admin and
+  hr-lead) are YAML files in `SOP_SPACES_DIR`, read with `config/spaces/` (`app/spaces.py`
+  `space_files`; caches key on `spaces_stamp()`). They never override a configured one.
+  New roles are created unassigned; the two-person rule still applies in Users.
+- Library folders (`app/api/folders.py`): a document moves only between folders of its own
+  department and only where its access stays identical; handover, project, Help, Inbox and
+  Drafts folders are closed. Moves keep the document's id; `GitVault.show` follows moves so
+  past versions still read. Folder names show only to the department or to readers inside.
+- The trained sorter (`app/classify/sorter.py`, trained nightly by `app/classify/training.py` from
+  documents people filed) stores average fingerprints only, never text. Its vote (`combine`) may only
+  make labels stricter or hold a note for review; `decide()` still applies the one-way rule. Suggested
+  folders show only to people who can file there (`contribute` in that department). Compare changes
+  on `config/eval/classifier-holdout.yaml` (`eval-classifier --cases holdout --sorter`), never tune on it.
+- Folder uses: search and Ask take a `folder` filter (`retrieval.search.folder_prefix`, LIKE
+  wildcards escaped) that only narrows what RLS allows. Routing may use the sorter's department
+  (`agents/router.py`, only among the asker's readable spaces; when it disagrees with search both
+  answer). `POST /notes/similar` returns titles the writer can already read and never stores the
+  title. `/spaces/{space}/folder-coverage` is counts only, for that space's leads.
 - Never commit secrets (`.env`, API keys, `.claude/settings.local.json`).
 - Every model call goes through `ModelGateway` with an explicit `ContentScope`;
   never call a provider SDK directly from agents.

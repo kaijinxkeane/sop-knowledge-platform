@@ -24,6 +24,8 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from app.agents import reuse
 from app.agents.department import Section, answer
 from app.agents.router import Route, route
+from app.classify.sorter import predict
+from app.classify.training import latest_sorter
 from app.db.models import DocumentAccess
 from app.db.scoped import apply_reader_scope
 from app.governance.approvals import provenance
@@ -49,11 +51,13 @@ async def retrieve(
     *,
     programme: str | None = None,
     stage: str | None = None,
+    folder: str | None = None,
 ) -> tuple[Route, dict[str, list[Hit]]]:
-    # Programme/stage filters narrow both searches; access still comes from RLS.
-    narrow = {"programme": programme, "stage": stage}
+    # Programme/stage/folder filters narrow both searches; access still comes from RLS.
+    narrow = {"programme": programme, "stage": stage, "folder": folder}
     # spaces shared with a project only in part (selected folders/SOPs) count too
     readable = sorted(set(principal.scopes()) | {p.space for p in principal.partial})
+    vote = await sorter_vote(sessions, vector)
     async with sessions() as s:
         await apply_reader_scope(s, principal)
         # Answers use approved text only (plan §6): live chunks, not retired.
@@ -66,7 +70,7 @@ async def retrieve(
             live_only=True,
             **narrow,
         )
-        chosen = await route(question, hits, readable, profiles, gateway)
+        chosen = await route(question, hits, readable, profiles, gateway, vote)
         per_space = {
             sp: await expand(
                 s,
@@ -92,6 +96,19 @@ async def retrieve(
         for h in all_hits:
             h.provenance = info.get(h.document_id)
     return chosen, per_space
+
+
+async def sorter_vote(sessions: async_sessionmaker, vector: list[float] | None):
+    """Which department the trained sorter thinks the question belongs to.
+    Only the department is used, and only among the asker's readable spaces."""
+    if vector is None:
+        return None
+    try:
+        async with sessions() as s:
+            model = await latest_sorter(s)
+        return predict(model, vector) if model else None
+    except Exception:  # noqa: BLE001 - routing never fails on the sorter
+        return None
 
 
 async def boundary_scope(sessions: async_sessionmaker, space: str, hits: list[Hit]) -> ContentScope:
@@ -136,6 +153,7 @@ async def ask(
     profiles: dict[str, SpaceProfile],
     programme: str | None = None,
     stage: str | None = None,
+    folder: str | None = None,
 ) -> AsyncIterator[dict]:
     """Yield events: routing, agent_dispatched, token, section_done, done."""
     try:
@@ -143,7 +161,15 @@ async def ask(
     except Exception:  # noqa: BLE001 - keyword search still works
         vector = None
     chosen, per_space = await retrieve(
-        sessions, principal, question, vector, profiles, gateway, programme=programme, stage=stage
+        sessions,
+        principal,
+        question,
+        vector,
+        profiles,
+        gateway,
+        programme=programme,
+        stage=stage,
+        folder=folder,
     )
     yield {
         "type": "routing",

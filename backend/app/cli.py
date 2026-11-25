@@ -5,6 +5,7 @@
     python -m app.cli accept-invite TOKEN           set a password for an invite (prompts)
     python -m app.cli index [--full] [--no-embed]   (re)index the vault now
     python -m app.cli classify [--limit N]          run the Classifier on pending notes
+    python -m app.cli train-sorter                  train the sorter from filed documents now
     python -m app.cli eval-classifier [--model TAG] Phase 2b eval on demo-vault/ (local model)
     python -m app.cli eval-answers [--model TAG]    Phase 3 answering eval (dev stack, demo vault)
     python -m app.cli compare-evals A.json B.json   paired comparison of two eval runs (--out)
@@ -111,10 +112,10 @@ async def cmd_index(full: bool, no_embed: bool) -> None:
     async with get_sessionmaker()() as s:
         await sync_spaces(s)
         await s.commit()
-    report = await Indexer(git, get_sessionmaker(), None if no_embed else embed_documents).sync(
-        full=full
-    )
-    print(report.summary())
+    indexer = Indexer(git, get_sessionmaker(), None if no_embed else embed_documents)
+    from app.vault.help import sync_with_help
+
+    print(await sync_with_help(indexer, full=full))
 
 
 async def cmd_classify(limit: int, model: str | None = None) -> None:
@@ -148,6 +149,8 @@ async def cmd_eval_classifier(
     blind: bool,
     out: str | None,
     example_pool: int | None = None,
+    sorter: bool = False,
+    cases: str = "dev",
 ) -> None:
     import dataclasses
     import json
@@ -167,11 +170,29 @@ async def cmd_eval_classifier(
     if used.location != "local":
         sys.exit("the classifier eval runs on local tiers only")
     spaces = space_profiles()
+    eval_dir = get_settings().config_dir / "eval"
     items = load_items(
         REPO_ROOT / "demo-vault",
         REPO_ROOT / "demo-vault-labels.yaml",
-        get_settings().config_dir / "eval" / "classifier-cases.yaml",
+        eval_dir / "classifier-cases.yaml",
     )
+    train_items = None
+    if cases == "holdout":
+        # Test on the held-out notes; everything else plays "already filed by people".
+        train_items, items = (
+            items,
+            [
+                i
+                for i in load_items(
+                    REPO_ROOT / "demo-vault",
+                    REPO_ROOT / "demo-vault-labels.yaml",
+                    eval_dir / "classifier-holdout.yaml",
+                )
+                if i.source == "case"
+            ],
+        )
+        if example_pool:
+            example_pool = len(train_items)
 
     def progress(t):
         if t.outcome != "exact":
@@ -189,6 +210,9 @@ async def cmd_eval_classifier(
         progress=progress,
         example_pool=example_pool,
         embed=embed_documents,
+        sorter=sorter,
+        train_items=train_items,
+        cases=cases,
     )
     print(json.dumps(result.summary(), indent=2))
     if out:
@@ -198,6 +222,9 @@ async def cmd_eval_classifier(
                     "kind": "classifier",
                     "summary": result.summary(),
                     "per_item_correct": result.per_item_correct(),
+                    "per_item_correct_with_sorter": result.per_item_correct(True)
+                    if sorter
+                    else None,
                     "trials": [dataclasses.asdict(t) for t in result.trials],
                 },
                 indent=2,
@@ -460,12 +487,15 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("classify")
     p.add_argument("--limit", type=int, default=20)
     p.add_argument("--model", default=None)
+    sub.add_parser("train-sorter")
     p = sub.add_parser("eval-classifier")
     p.add_argument("--model", default=None)
     p.add_argument("--tier", default="classifier")
     p.add_argument("--repeats", type=int, default=1)
     p.add_argument("--show-folders", action="store_true", help="not blind: show real paths")
     p.add_argument("--example-pool", type=int, default=None, help="N human-labelled notes")
+    p.add_argument("--sorter", action="store_true", help="also score with the trained sorter")
+    p.add_argument("--cases", choices=["dev", "holdout"], default="dev")
     p.add_argument("--out", default=None)
     p = sub.add_parser("eval-retrieval")
     p.add_argument("--questions", default="questions.yaml")
@@ -523,6 +553,10 @@ def main(argv: list[str] | None = None) -> None:
                 await cmd_index(args.full, args.no_embed)
             elif args.cmd == "classify":
                 await cmd_classify(args.limit, args.model)
+            elif args.cmd == "train-sorter":
+                from app.classify.training import train_sorter
+
+                print(await train_sorter(get_sessionmaker()))
             elif args.cmd == "eval-classifier":
                 await cmd_eval_classifier(
                     args.model,
@@ -531,6 +565,8 @@ def main(argv: list[str] | None = None) -> None:
                     not args.show_folders,
                     args.out,
                     args.example_pool,
+                    args.sorter,
+                    args.cases,
                 )
             elif args.cmd == "eval-retrieval":
                 await cmd_eval_retrieval(args.questions, args.only)

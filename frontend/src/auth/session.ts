@@ -8,6 +8,8 @@
  * /auth/refresh (plan §11).
  */
 
+import { forgetPlaces } from "@/lib/places";
+
 export type SessionStatus = "unknown" | "signed-in" | "signed-out";
 
 type State = { status: SessionStatus; accessToken: string | null };
@@ -30,6 +32,7 @@ export const session = {
     set({ status: "signed-in", accessToken });
   },
   signOut() {
+    forgetPlaces();
     set({ status: "signed-out", accessToken: null });
   },
   /** Tests only. */

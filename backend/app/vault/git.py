@@ -144,6 +144,46 @@ class GitVault:
         return _parse_log(self._git("log", f"-{limit}", f"--format={fmt}", "--", rel, check=False))
 
     def show(self, rel: str, commit: str) -> bytes:
+        """The file at `commit`. A file moved since (Library → Move) is found
+        under the name it had then, so past versions keep working."""
+        out = self._show(rel, commit)
+        if out is None:
+            old = self.path_at(rel, commit)
+            if old and old != rel:
+                out = self._show(old, commit)
+        if out is None:
+            raise GitError("version not found")
+        return out
+
+    def path_at(self, rel: str, commit: str) -> str | None:
+        """The name the file now at `rel` had at `commit`, following moves."""
+        log = self._git(
+            "log", "--follow", "--format=%x1e%H", "--name-only", "HEAD", "--", rel, check=False
+        )
+        ancestors = set(self._git("rev-list", commit, check=False).split())
+        if not ancestors:
+            return None
+        for block in log.split("\x1e"):
+            lines = [x for x in block.strip().splitlines() if x.strip()]
+            if len(lines) >= 2 and lines[0] in ancestors:
+                return lines[-1].strip()
+        return None
+
+    def move(self, old: str, new: str) -> None:
+        """Move a file inside the vault (the caller commits both paths)."""
+        src, dst = self.safe_path(old), self.safe_path(new)
+        if not src.is_file():
+            raise VaultPathError("nothing to move")
+        if dst.exists():
+            raise VaultPathError("a file with that name is already there")
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        src.rename(dst)
+        try:
+            src.parent.rmdir()  # leave no empty folder behind (git doesn't track them)
+        except OSError:
+            pass
+
+    def _show(self, rel: str, commit: str) -> bytes | None:
         proc = subprocess.run(
             [
                 "git",
@@ -158,7 +198,7 @@ class GitVault:
             timeout=60,
         )
         if proc.returncode != 0:
-            raise GitError("version not found")
+            return None
         return proc.stdout
 
     def commit(

@@ -36,6 +36,7 @@ class Example:
     excerpt: str
     space: str
     sensitivity: str
+    folder: str | None = None  # the Library folder a person filed it in
 
 
 @dataclass(frozen=True)
@@ -106,6 +107,7 @@ def user_prompt(doc: ClassifyInput) -> str:
                 f"Title: {e.title}\n{e.excerpt[:EXAMPLE_CHARS]}",
                 space=e.space,
                 sensitivity=e.sensitivity,
+                **({"folder": e.folder} if e.folder else {}),
             )
             for e in doc.examples[:MAX_EXAMPLES]
         ]

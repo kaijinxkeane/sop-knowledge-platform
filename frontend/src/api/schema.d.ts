@@ -35,6 +35,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/departments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Departments */
+        get: operations["list_departments_api_v1_admin_departments_get"];
+        put?: never;
+        /**
+         * Create Department Endpoint
+         * @description A new department with its staff and lead roles (nobody has them yet).
+         */
+        post: operations["create_department_endpoint_api_v1_admin_departments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/grants/{grant_id}": {
         parameters: {
             query?: never;
@@ -940,6 +961,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/library/documents/{doc_id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move Document */
+        post: operations["move_document_api_v1_library_documents__doc_id__move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/library/folders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Folders */
+        get: operations["list_folders_api_v1_library_folders_get"];
+        put?: never;
+        /** Create Folder */
+        post: operations["create_folder_api_v1_library_folders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/library/folders/{folder_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Folder */
+        delete: operations["delete_folder_api_v1_library_folders__folder_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -1146,6 +1219,28 @@ export interface paths {
         put?: never;
         /** Create Note */
         post: operations["create_note_api_v1_notes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notes/similar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Similar Notes
+         * @description Before writing a new note: notes the writer can already read that look
+         *     like the same thing. Titles only, read under RLS and the policy engine like
+         *     the Library; the title typed is never stored or logged.
+         */
+        post: operations["similar_notes_api_v1_notes_similar_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2050,6 +2145,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/spaces/{space}/folder-coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Folder Coverage
+         * @description A department's Library folders for its leads: how much is written and
+         *     approved, how much is overdue for review, and how many unanswered question
+         *     topics sit closest to each folder. Counts only, over documents the lead can
+         *     read (RLS and the policy engine); gap topics only name folders shown here.
+         */
+        get: operations["folder_coverage_api_v1_spaces__space__folder_coverage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/spaces/{space}/gaps": {
         parameters: {
             query?: never;
@@ -2402,6 +2520,39 @@ export interface components {
              */
             comment: string;
         };
+        /** DepartmentIn */
+        DepartmentIn: {
+            /**
+             * Contact
+             * @default
+             */
+            contact: string;
+            /** Description */
+            description: string;
+            /** Folder */
+            folder?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Title */
+            title: string;
+        };
+        /** DepartmentOut */
+        DepartmentOut: {
+            /** Contact */
+            contact: string;
+            /** Created In App */
+            created_in_app: boolean;
+            /** Description */
+            description: string;
+            /** Folders */
+            folders: string[];
+            /** Name */
+            name: string;
+            /** Roles */
+            roles: string[];
+            /** Title */
+            title: string;
+        };
         /** DiffOut */
         DiffOut: {
             /** Added */
@@ -2475,6 +2626,8 @@ export interface components {
             programme: string | null;
             /** Review Due */
             review_due?: string | null;
+            /** Space */
+            space?: string | null;
             /** Stage */
             stage: string | null;
             /** Status */
@@ -2511,6 +2664,41 @@ export interface components {
             helpful: boolean;
             /** Reason */
             reason?: ("wrong" | "outdated" | "missing_steps" | "unclear" | "other") | null;
+        };
+        /** FolderCoverageOut */
+        FolderCoverageOut: {
+            /** Approved */
+            approved: number;
+            /** Documents */
+            documents: number;
+            /** Folder */
+            folder: string;
+            /** Gap Questions */
+            gap_questions: number;
+            /** Open Gaps */
+            open_gaps: number;
+            /** Stale */
+            stale: number;
+        };
+        /** FolderIn */
+        FolderIn: {
+            /** Name */
+            name: string;
+            /** Parent */
+            parent: string;
+            /** Space */
+            space: string;
+        };
+        /** FolderOut */
+        FolderOut: {
+            /** Can Edit */
+            can_edit: boolean;
+            /** Id */
+            id: string | null;
+            /** Path */
+            path: string;
+            /** Space */
+            space: string;
         };
         /** FollowUpOut */
         FollowUpOut: {
@@ -2895,6 +3083,8 @@ export interface components {
         MessageIn: {
             /** Content */
             content: string;
+            /** Folder */
+            folder?: string | null;
             /** Programme */
             programme?: string | null;
             /** Stage */
@@ -2922,6 +3112,18 @@ export interface components {
             sections: {
                 [key: string]: unknown;
             }[];
+        };
+        /** MoveIn */
+        MoveIn: {
+            /** Folder */
+            folder: string;
+        };
+        /** MovedOut */
+        MovedOut: {
+            /** Id */
+            id: string;
+            /** Vault Path */
+            vault_path: string;
         };
         /** NamesIn */
         NamesIn: {
@@ -3267,6 +3469,8 @@ export interface components {
             safeguards: string[];
             /** Stale */
             stale: boolean;
+            /** Suggested Folder */
+            suggested_folder?: string | null;
             /** Title */
             title: string;
             /** Vault Path */
@@ -3607,6 +3811,20 @@ export interface components {
             sensitivity: string;
             /** Space */
             space: string;
+        };
+        /** SimilarIn */
+        SimilarIn: {
+            /** Title */
+            title: string;
+        };
+        /** SimilarOut */
+        SimilarOut: {
+            /** Folder */
+            folder: string;
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
         };
         /** SourceOut */
         SourceOut: {
@@ -3972,6 +4190,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChainOut"];
+                };
+            };
+        };
+    };
+    list_departments_api_v1_admin_departments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepartmentOut"][];
+                };
+            };
+        };
+    };
+    create_department_endpoint_api_v1_admin_departments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DepartmentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepartmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5742,6 +6013,123 @@ export interface operations {
             };
         };
     };
+    move_document_api_v1_library_documents__doc_id__move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MovedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_folders_api_v1_library_folders_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FolderOut"][];
+                };
+            };
+        };
+    };
+    create_folder_api_v1_library_folders_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FolderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FolderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_folder_api_v1_library_folders__folder_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                folder_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_me_api_v1_me_get: {
         parameters: {
             query?: never;
@@ -6074,6 +6462,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SavedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    similar_notes_api_v1_notes_similar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimilarIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimilarOut"][];
                 };
             };
             /** @description Validation Error */
@@ -7613,6 +8034,7 @@ export interface operations {
                 stage?: string | null;
                 doc_type?: string | null;
                 kind?: string | null;
+                folder?: string | null;
                 limit?: number;
             };
             header?: never;
@@ -7690,6 +8112,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpaceOut"][];
+                };
+            };
+        };
+    };
+    folder_coverage_api_v1_spaces__space__folder_coverage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                space: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FolderCoverageOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -121,12 +121,12 @@ def load_gateway_config(config_dir: Path, env: dict[str, str] | None = None) -> 
                 f"tier {tier.name!r}: fallback_tier must be a local tier without its own fallback"
             )
 
+    from app.spaces import space_files
+
     spaces: dict[str, SpaceConfig] = {}
-    for path in sorted((config_dir / "spaces").glob("*.yaml")):
-        raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-        name = raw.get("name") or path.stem
+    for name, raw in space_files(config_dir):
         if name == UNCLASSIFIED:
-            raise ValueError(f"{path}: {UNCLASSIFIED!r} is reserved")
+            raise ValueError(f"space {UNCLASSIFIED!r} is reserved")
         spaces[name] = SpaceConfig(
             name=name, title=raw.get("title", name), local_only=bool(raw.get("local_only", False))
         )

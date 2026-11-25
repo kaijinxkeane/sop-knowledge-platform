@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import text
@@ -21,7 +21,7 @@ async def test_assign_acknowledge_and_reread_after_material_change(
     other = await make_user(roles=STAFF)
     hs, hl, ho = await sign_in(staff), await sign_in(lead), await sign_in(other)
     note = await doc_id(sessions)
-    due = (date.today() - timedelta(days=1)).isoformat()
+    due = (datetime.now(UTC).date() - timedelta(days=1)).isoformat()  # the server uses UTC
 
     roles = (await client.get(f"{API}/reading-assignments/roles", headers=hl)).json()
     assert "core-staff" in {r["name"] for r in roles} and set(roles[0]) == {"name", "description"}

@@ -72,3 +72,14 @@ export function useAfterSave() {
     void qc.invalidateQueries({ queryKey: ["document", id] });
   };
 }
+
+/** Notes you can already read that look like the one you're starting (titles only). */
+export const useSimilarNotes = (title: string) =>
+  useQuery({
+    queryKey: ["notes", "similar", title],
+    queryFn: () => unwrap(api.POST("/api/v1/notes/similar", { body: { title } })),
+    enabled: title.length >= 3,
+    staleTime: 60_000,
+    gcTime: 60_000, // the typed title isn't kept around
+    retry: false,
+  });

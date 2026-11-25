@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { messageOf } from "@/api/errors";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -197,18 +198,42 @@ function EditDescription({ role }: { role: Role }) {
   );
 }
 
-function RoleCard({ role, options }: { role: Role; options: Options }) {
+function RoleCard({
+  role,
+  options,
+  open,
+  onToggle,
+}: {
+  role: Role;
+  options: Options;
+  open: boolean;
+  onToggle: () => void;
+}) {
   const { remove } = useRoleActions(role.id);
+  const body = `role-${role.id}`;
+  const scopes = [...new Set(role.grants.map((g) => (g.space ? (options.spaces.find((s) => s.name === g.space)?.title ?? g.space) : t("roles.companyWide"))))];
   return (
     <Card>
       <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
-        <div>
-          <h3 className="font-semibold">{role.name}</h3>
-          <p className="text-sm text-muted-foreground">{role.description}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {t("roles.users", { count: role.user_count })}
-          </p>
-        </div>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          aria-controls={body}
+          className="flex flex-1 items-start gap-2 text-left"
+        >
+          {open ? <ChevronDown className="mt-0.5 size-4 shrink-0" aria-hidden /> : <ChevronRight className="mt-0.5 size-4 shrink-0" aria-hidden />}
+          <span>
+            <span className="block font-semibold">{role.name}</span>
+            <span className="block text-sm text-muted-foreground">{role.description}</span>
+            <span className="mt-1 block text-xs text-muted-foreground">
+              {t("roles.users", { count: role.user_count })}
+              {" · "}
+              {t("roles.grantCount", { count: role.grants.length })}
+              {scopes.length > 0 && ` · ${scopes.join(", ")}`}
+            </span>
+          </span>
+        </button>
         <div className="flex gap-1">
           <EditDescription role={role} />
           <ConfirmDialog
@@ -220,7 +245,8 @@ function RoleCard({ role, options }: { role: Role; options: Options }) {
           />
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      {open && (
+      <CardContent id={body} className="space-y-4">
         {role.grants.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t("roles.noGrants")}</p>
         ) : (
@@ -242,11 +268,12 @@ function RoleCard({ role, options }: { role: Role; options: Options }) {
         )}
         <AddGrant role={role} options={options} />
       </CardContent>
+      )}
     </Card>
   );
 }
 
-function CreateRole() {
+function CreateRole({ onCreated }: { onCreated: (id: string) => void }) {
   const create = useCreateRole();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -254,7 +281,8 @@ function CreateRole() {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    await create.mutateAsync({ name: name.trim(), description: description.trim(), grants: [] });
+    const out = await create.mutateAsync({ name: name.trim(), description: description.trim(), grants: [] });
+    onCreated(out.id);
     setOpen(false);
     setName("");
     setDescription("");
@@ -301,6 +329,13 @@ function CreateRole() {
 export default function Roles() {
   const roles = useRoles();
   const options = useOptions();
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const toggle = (id: string) =>
+    setOpen((o) => {
+      const next = new Set(o);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
   if (roles.isPending || options.isPending) {
     return <p className="text-sm text-muted-foreground">{t("app.loading")}</p>;
   }
@@ -310,10 +345,18 @@ export default function Roles() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">{t("admin.roles")}</h2>
-        <CreateRole />
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setOpen(new Set(roles.data.map((r) => r.id)))}>
+            {t("roles.expandAll")}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setOpen(new Set())}>
+            {t("roles.collapseAll")}
+          </Button>
+          <CreateRole onCreated={(id) => setOpen((o) => new Set(o).add(id))} />
+        </div>
       </div>
       {roles.data.map((r) => (
-        <RoleCard key={r.id} role={r} options={options.data} />
+        <RoleCard key={r.id} role={r} options={options.data} open={open.has(r.id)} onToggle={() => toggle(r.id)} />
       ))}
     </div>
   );

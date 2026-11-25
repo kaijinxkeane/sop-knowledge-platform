@@ -11,6 +11,7 @@ import { t, type MessageKey } from "@/i18n";
 import { useDocuments } from "@/pages/library/api";
 import { NoteView } from "@/pages/library/NoteView";
 import { NotFound } from "@/pages/NotFound";
+import { placeFor } from "@/lib/places";
 import { useComments, useHandover, useHandoverActions, useHandovers, type Handover, type Issue } from "./api";
 
 const day = (iso: string | null | undefined) =>
@@ -155,7 +156,7 @@ export function HandoverView() {
   return (
     <div className="mx-auto grid max-w-6xl grid-cols-[1fr_20rem] gap-6 px-6 py-6">
       <div className="space-y-4">
-        <Link to="/handovers" className="text-sm text-muted-foreground hover:text-foreground">← {t("handover.title")}</Link>
+        <Link to={placeFor("handovers", "/handovers")} className="text-sm text-muted-foreground hover:text-foreground">← {t("handover.title")}</Link>
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold">{d.title}</h1>
           <Badge variant={d.status === "draft" ? "outline" : "default"}>{statusLabel(d.status)}</Badge>

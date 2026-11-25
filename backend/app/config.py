@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     # Where the vault (Obsidian-format git repo) is mounted, and where config lives.
     vault_path: Path = Field(default=REPO_ROOT / "deploy" / "data" / "vault", alias="VAULT_PATH")
     config_dir: Path = Field(default=REPO_ROOT / "config", alias="SOP_CONFIG_DIR")
+    # Departments created in the app (Admin → Departments), one YAML file each,
+    # read together with config/spaces/ (app/spaces.py). Writable, unlike /config.
+    spaces_dir: Path = Field(
+        default=REPO_ROOT / "deploy" / "data" / "spaces", alias="SOP_SPACES_DIR"
+    )
 
     # Models run locally (Ollama); nothing is sent to a cloud provider.
     ollama_base_url: str = Field(default="http://localhost:11434", alias="OLLAMA_BASE_URL")

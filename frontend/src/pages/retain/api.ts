@@ -24,6 +24,13 @@ export const useHrGaps = (enabled: boolean) =>
 export const useCoverage = (enabled = true) =>
   useQuery({ queryKey: ["retain", "coverage"], queryFn: () => call(api.GET("/api/v1/reports/coverage")), enabled });
 
+export const useFolderCoverage = (space: string | null) =>
+  useQuery({
+    queryKey: ["retain", "folder-coverage", space],
+    queryFn: () => call(api.GET("/api/v1/spaces/{space}/folder-coverage", { params: { path: { space: space! } } })),
+    enabled: !!space,
+  });
+
 /** Review-due SOPs across several spaces (Home's lead card). */
 export const useStaleAll = (spaces: string[]) =>
   useQuery({

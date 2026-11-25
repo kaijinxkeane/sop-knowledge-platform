@@ -5,7 +5,7 @@ answer well, or an explicit "request an SOP") into a *gap topic* of similar
 questions in that space, using local embeddings. A topic's label is written
 by the local `router` tier from the questions only (never from SOP text), so
 it is safe to show HR. For each topic it also records:
-- programme/stage, from the nearest approved SOP's metadata (no text)
+- programme/stage and Library folder, from the nearest approved SOP (no text)
 - an *access gap*: a document that covers the topic but that the people
   asking couldn't read (shown to the space's leads only, never to askers)
 
@@ -20,6 +20,7 @@ import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from pathlib import PurePosixPath
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -29,6 +30,8 @@ from app.db.models import ChatMessage, Document, GapEvent, GapTopic, SearchEvent
 from app.identity import principal_for
 from app.models.types import ContentScope, Message
 from app.policy.engine import can_view_document
+from app.vault.folders import department_of
+from app.vault.labels import vault_config
 
 log = logging.getLogger("sop.gaps")
 TOPIC_DISTANCE = 0.35  # a question joins a topic if this close to its centre (cosine)
@@ -237,6 +240,8 @@ async def _describe(
     if near and near[0][1] <= META_DISTANCE:
         doc = await s.get(Document, near[0][0])
         t.programme, t.stage = doc.programme, doc.stage
+        folder = str(PurePosixPath(doc.vault_path).parent)
+        t.folder = folder if department_of(folder, vault_config()) == t.space else None
     # Access gap: unanswered questions near a document the askers couldn't read.
     t.access_gap_document_id = None
     askers = {e.user_id for e in evs if e.user_id and e.reason == "no_answer"}

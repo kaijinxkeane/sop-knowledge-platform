@@ -188,6 +188,52 @@ describe("Review → Unplaced notes", () => {
   });
 });
 
+describe("Review → filing in the suggested folder", () => {
+  const unplaced = (over: Record<string, unknown> = {}) => [
+    { ...QUEUE[1], items: [{ ...QUEUE[1]!.items[0], suggested_folder: "Commercial/Clients", ...over }] },
+  ];
+
+  it("approves, then files the note where the sorter suggests", async () => {
+    let moved: unknown = null;
+    reviewApi(lead, {
+      "GET /api/v1/classifications/queue": () => json(unplaced()),
+      "POST /api/v1/classifications/p3/approve": () => new Response(null, { status: 204 }),
+      "POST /api/v1/library/documents/d3/move": async (req) => ((moved = await req.json()), json({ id: "d3", vault_path: "x" })),
+    });
+    renderApp("/review?tab=unplaced");
+    const box = await screen.findByLabelText("File it in Commercial/Clients when I approve");
+    expect(box).not.toBeChecked(); // the reviewer opts in
+    await userEvent.click(box);
+    await userEvent.click(screen.getByRole("button", { name: "Approve" }));
+    expect(await screen.findByText("Approved and filed “Call notes” in Commercial/Clients.")).toBeInTheDocument();
+    expect(moved).toEqual({ folder: "Commercial/Clients" });
+  });
+
+  it("only approves when filing is unticked, and says so when filing is refused", async () => {
+    let moves = 0;
+    reviewApi(lead, {
+      "GET /api/v1/classifications/queue": () => json(unplaced()),
+      "POST /api/v1/classifications/p3/approve": () => new Response(null, { status: 204 }),
+      "POST /api/v1/library/documents/d3/move": () => (moves++, json({ detail: "moving it there would change who can read it" }, 409)),
+    });
+    renderApp("/review?tab=unplaced");
+    await screen.findByLabelText("File it in Commercial/Clients when I approve");
+    await userEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(moves).toBe(0));
+    await userEvent.click(screen.getByLabelText("File it in Commercial/Clients when I approve"));
+    await userEvent.click(screen.getByRole("button", { name: "Approve" }));
+    expect(await screen.findByText(/wasn't filed in Commercial\/Clients/)).toBeInTheDocument();
+    expect(moves).toBe(1);
+  });
+
+  it("shows no filing option without a suggestion", async () => {
+    reviewApi(lead, { "GET /api/v1/classifications/queue": () => json(unplaced({ suggested_folder: null })) });
+    renderApp("/review?tab=unplaced");
+    await screen.findByText("Call notes");
+    expect(screen.queryByText(/when I approve/)).toBeNull();
+  });
+});
+
 describe("Review → Governance", () => {
   it("shows titles only for documents the reader can open", async () => {
     const empty = { unattributed_edits: [], changes_awaiting_review: [], never_approved: [], published_outside_platform: [], self_approved: [], review_overdue: [], possible_instructions: [], access_changes: [] };

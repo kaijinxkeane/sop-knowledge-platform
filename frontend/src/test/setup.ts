@@ -9,3 +9,6 @@ afterEach(() => {
   localStorage.clear();
   sessionStorage.clear();
 });
+
+// jsdom has no scrolling; the app restores scroll positions (ScrollRestoration).
+window.scrollTo = () => {};

@@ -20,6 +20,11 @@ reported too. Outcomes (plan §4.1):
 - failure: the call or the reply failed
 `effective_over_exposed` counts what would actually reach readers after the
 one-way rule; it must be 0 whatever the model does.
+
+With `sorter=True` every AI reply is also scored after the trained sorter's
+vote (app.classify.sorter.combine), so one model run compares both. The sorter
+is trained leave-one-out on the other items, or on `train_items` (the dev
+items) when testing on the held-out cases.
 """
 
 from __future__ import annotations
@@ -35,6 +40,7 @@ import yaml
 
 from app.classify.model import EXAMPLE_CHARS, MAX_EXAMPLES, Classifier, ClassifyInput, Example
 from app.classify.rules import CONFIDENCE_THRESHOLD, decide
+from app.classify.sorter import Labelled, combine, predict, train
 from app.eval.stats import rate
 from app.policy.engine import Sensitivity
 from app.vault.parse import is_supported, parse_file
@@ -65,6 +71,10 @@ class Trial:
     effective_over_exposed: bool
     names: list[str]
     seconds: float
+    sorted_outcome: str | None = None  # the same reply after the sorter's vote
+    sorted_leaked: bool = False
+    vote: str | None = None  # "space/level" the sorter said, None = abstained
+    folder_ok: bool | None = None  # suggested folder right (vault items only)
 
 
 @dataclass
@@ -73,15 +83,47 @@ class EvalResult:
     blind: bool
     repeats: int
     example_pool: int | None = None
+    sorter: bool = False
+    cases: str = "dev"
     items: list[Item] = field(default_factory=list)
     trials: list[Trial] = field(default_factory=list)
 
-    def per_item_correct(self) -> dict[str, bool]:
+    def per_item_correct(self, with_sorter: bool = False) -> dict[str, bool]:
         """An item counts as right only if every run was exact (for paired comparison)."""
         out: dict[str, bool] = {}
         for t in self.trials:
-            out[t.item] = out.get(t.item, True) and t.outcome == "exact"
+            got = t.sorted_outcome if with_sorter else t.outcome
+            out[t.item] = out.get(t.item, True) and got == "exact"
         return out
+
+    def _rates(self, outcomes: list[str], leaked: int) -> dict:
+        n = len(outcomes)
+        counts = Counter(outcomes)
+        return {
+            "placed_correctly": rate(counts["exact"], n),
+            "over_exposed": rate(counts["over_exposed"], n),
+            "misplaced": rate(counts["misplaced"], n),
+            "over_restricted": rate(counts["over_restricted"], n),
+            "unsure": rate(counts["unsure"], n),
+            "effective_over_exposed": leaked,
+        }
+
+    def sorter_summary(self) -> dict | None:
+        if not self.sorter:
+            return None
+        sources = {i.id: i for i in self.items}
+        votes = [t for t in self.trials if t.vote]
+        right = sum(t.vote.split("/")[0] == sources[t.item].space for t in votes)
+        folders = [t.folder_ok for t in self.trials if t.folder_ok is not None]
+        return {
+            **self._rates(
+                [t.sorted_outcome or "failure" for t in self.trials],
+                sum(t.sorted_leaked for t in self.trials),
+            ),
+            "sorter_voted": rate(len(votes), len(self.trials)),
+            "sorter_department_right_when_voting": rate(right, len(votes)),
+            "folder_suggestions_right": rate(sum(folders), len(folders)) if folders else None,
+        }
 
     def summary(self) -> dict:
         n = len(self.trials)
@@ -100,6 +142,8 @@ class EvalResult:
             "model": self.model,
             "blind": self.blind,
             "example_pool": self.example_pool,
+            "cases": self.cases,
+            "with_sorter": self.sorter_summary(),
             "items": len(self.items),
             "runs_per_item": self.repeats,
             "trials": n,
@@ -206,10 +250,32 @@ def pick_examples(
         key=lambda t: (t[0], t[1]),
     )
     return tuple(
-        Example(o.title, o.text[:EXAMPLE_CHARS], o.space, o.sensitivity.label)
+        Example(o.title, o.text[:EXAMPLE_CHARS], o.space, o.sensitivity.label, _folder(o))
         for d, _, o in near[:k]
         if d <= max_distance
     )
+
+
+def _folder(item: Item) -> str | None:
+    """Where a person filed it (vault items), the label the sorter learns folders from."""
+    if item.source != "vault":
+        return None
+    parent = str(PurePosixPath(item.path).parent)
+    return None if parent in (".", "Inbox") or parent.startswith(("Inbox/", "Help")) else parent
+
+
+def _sorter_vote(item: Item, pool: list[Item], vectors: dict[str, list[float]], cache: dict):
+    """Leave-one-out unless the pool doesn't contain the item (held-out mode)."""
+    key = item.id if any(o.id == item.id for o in pool) else "__all__"
+    if key not in cache:
+        cache[key] = train(
+            [
+                Labelled(vectors[o.id], o.space, o.sensitivity.label, _folder(o))
+                for o in pool
+                if o.id != item.id
+            ]
+        )
+    return predict(cache[key], vectors[item.id])
 
 
 async def evaluate(
@@ -224,18 +290,33 @@ async def evaluate(
     example_pool: int | None = None,
     embed=None,
     seed: int = 7,
+    sorter: bool = False,
+    train_items: list[Item] | None = None,
+    cases: str = "dev",
 ) -> EvalResult:
     """`example_pool`: simulate N notes already labelled by people (a random,
-    fixed subset of the items, never the item itself); None = no examples."""
+    fixed subset of the items, never the item itself); None = no examples.
+    `train_items`: the labelled notes examples and the sorter come from when
+    testing on held-out cases (then `example_pool` is all of them)."""
     result = EvalResult(
-        model=model, blind=blind, repeats=repeats, items=list(items), example_pool=example_pool
+        model=model,
+        blind=blind,
+        repeats=repeats,
+        items=list(items),
+        example_pool=example_pool,
+        sorter=sorter,
+        cases=cases,
     )
     vectors: dict[str, list[float]] = {}
     pool: list[Item] = []
+    known = list(items) + [t for t in (train_items or []) if t.id not in {i.id for i in items}]
+    if example_pool or sorter:
+        vecs = await embed([f"{i.title}\n\n{i.text[:2000]}" for i in known])
+        vectors = {i.id: v for i, v in zip(known, vecs, strict=True)}
+    labelled = list(train_items) if train_items else list(items)
     if example_pool:
-        vecs = await embed([f"{i.title}\n\n{i.text[:2000]}" for i in items])
-        vectors = {i.id: v for i, v in zip(items, vecs, strict=True)}
-        pool = random.Random(seed).sample(items, min(example_pool, len(items)))
+        pool = random.Random(seed).sample(labelled, min(example_pool, len(labelled)))
+    sorter_cache: dict = {}
     for run in range(repeats):
         for item in items:
             examples = pick_examples(item, pool, vectors) if pool else ()
@@ -265,6 +346,22 @@ async def evaluate(
                     list(p.names),
                     time.monotonic() - started,
                 )
+            if sorter and t.outcome != "failure":
+                vote = _sorter_vote(item, labelled, vectors, sorter_cache)
+                sorted_p, folder = combine(p, vote)
+                applied = decide(None, sorted_p, known_spaces=known_spaces).apply
+                t.sorted_outcome = outcome(sorted_p, item)
+                t.sorted_leaked = (
+                    applied is not None
+                    and item.sensitivity is not Sensitivity.PUBLIC
+                    and (applied.space != item.space or applied.sensitivity < item.sensitivity)
+                )
+                if vote is not None:
+                    t.vote = f"{vote.space}/{vote.sensitivity.label if vote.sensitivity else '-'}"
+                if _folder(item) and vote is not None and vote.space == item.space:
+                    t.folder_ok = folder == _folder(item)
+            elif sorter:
+                t.sorted_outcome = "failure"
             result.trials.append(t)
             if progress:
                 progress(t)

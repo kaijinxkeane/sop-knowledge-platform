@@ -19,6 +19,15 @@ The **Library** lists every document you are allowed to open: SOPs, guides, slid
 - Press Ctrl+K (Cmd+K on a Mac) anywhere to jump straight to a document by its title.
 - Select the star on a document to bookmark it. Bookmarks appear on Home.
 
+## Folders
+
+Choose **Folders** as the view to browse a department's documents like a file explorer. Each department has its own folders, and documents from different departments never mix.
+
+- Open a folder to see its subfolders and documents. The path at the top takes you back up.
+- If you can write in a department, choose **New folder** inside one of its folders to make a subfolder.
+- Choose **Move** next to a document to put it in another folder of the same department. A move never changes who can read the document. If it would, for example moving into a restricted folder, change the document's access in the editor first.
+- An empty folder you made can be removed with **Remove empty folder**.
+
 ## Reading a document
 
 - Links to other notes open them directly. A link to a document you can't open shows as "not available".

@@ -19,9 +19,15 @@ The **Admin** page is for administrators. What you see depends on your role.
 - **Unlock** an account after too many failed sign-ins, or **reset two-factor** if someone lost their phone.
 - For safety, administrators can't give extra roles to themselves; another administrator must do it.
 
+## Departments
+
+The CEO's admin role and HR's lead can create a department under **Departments**, for example when a new marketing team needs its own SOPs. Give it a name, what it covers (the assistant uses this to route questions) and who to contact.
+
+The new department comes with two roles, `<name>-staff` and `<name>-lead`, and a folder of its own. Every member of staff can read its public documents. Nobody gets the new roles automatically: give them to people under **Users**.
+
 ## Roles
 
-Each role lists, per space, the highest sensitivity level its members can read and what they can do there: ask, contribute, review, approve or administer.
+Each role lists, per space, the highest sensitivity level its members can read and what they can do there: ask, contribute, review, approve or administer. Role cards start collapsed: select one to see and change its grants, or use **Expand all**.
 
 ## Audit log
 

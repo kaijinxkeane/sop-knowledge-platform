@@ -65,8 +65,18 @@ def _version_filter(live_only: bool) -> str:
     return LIVE if live_only else LIBRARY
 
 
-def _filters(space, programme, stage, doc_type, kind) -> tuple[str, dict]:
+def folder_prefix(folder: str) -> str:
+    """A LIKE pattern for everything inside a vault folder (wildcards escaped)."""
+    clean = folder.strip().strip("/")
+    return clean.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "/%"
+
+
+def _filters(space, programme, stage, doc_type, kind, folder=None) -> tuple[str, dict]:
     where, params = [], {}
+    if folder and folder.strip().strip("/"):
+        # Only narrows: RLS and the policy engine still decide what's readable.
+        where.append("d.vault_path LIKE :folder ESCAPE '\\'")
+        params["folder"] = folder_prefix(folder)
     if space:
         where.append(
             "EXISTS (SELECT 1 FROM document_access a WHERE a.document_id = d.id "
@@ -99,8 +109,9 @@ async def search(
     limit: int = 10,
     max_distance: float = MAX_DISTANCE,
     live_only: bool = False,
+    folder: str | None = None,
 ) -> list[Hit]:
-    extra, params = _filters(space, programme, stage, doc_type, kind)
+    extra, params = _filters(space, programme, stage, doc_type, kind, folder)
     extra += " AND " + _version_filter(live_only)
     params |= {"q": query, "n": CANDIDATES}
     tsquery = (

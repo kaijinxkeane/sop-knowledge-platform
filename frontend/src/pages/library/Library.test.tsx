@@ -2,6 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { session } from "@/auth/session";
+import { forgetPlaces, placeFor, recordPlace } from "@/lib/places";
 import { json, makeMe, mockFetch, renderApp, type Handler } from "@/test/utils";
 
 const doc = (over: Record<string, unknown>) => ({
@@ -99,6 +100,73 @@ describe("library: browse", () => {
     expect(await screen.findByRole("link", { name: "Leave Policy" })).toBeInTheDocument();
     // An editor sees that changes are waiting.
     expect(screen.getByText("Changes waiting for review")).toBeInTheDocument();
+  });
+});
+
+describe("library: help", () => {
+  it("puts the user guide in its own Help group, reached from the header", async () => {
+    const guide = doc({ id: "g1", title: "Asking Questions", vault_path: "Help/Asking Questions.md", doc_type: "guide", access: [{ space: "core", sensitivity: "public" }] });
+    libraryApi({ "GET /api/v1/documents": () => json([...DOCS, guide]) });
+    renderApp("/library");
+    const u = userEvent.setup();
+    await screen.findByRole("button", { name: "Help: using the SOP Assistant" });
+    const groups = screen.getByRole("navigation", { name: "Programmes, stages or departments" });
+    expect(within(groups).getAllByRole("button").at(-1)).toHaveTextContent("Help: using the SOP Assistant");
+    await u.click(within(groups).getByRole("button", { name: "Other documents" }));
+    expect(await screen.findByRole("link", { name: "Leave Policy" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Asking Questions" })).not.toBeInTheDocument();
+    await u.click(screen.getByRole("link", { name: "Help" }));
+    expect(await screen.findByRole("heading", { name: "Help: using the SOP Assistant" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Asking Questions" })).toHaveAttribute("href", "/library/g1");
+  });
+});
+
+describe("library: remembers where you were", () => {
+  beforeEach(() => forgetPlaces());
+
+  it("brings you back to the search results after opening a document", async () => {
+    libraryApi({
+      "GET /api/v1/search": () =>
+        json({ search_id: "s1", semantic: true, results: [{ document_id: "d1", title: "Discovery Workshop SOP", vault_path: "a.md", doc_type: "sop", kind: "note", programme: null, stage: null, heading: null, part: null, part_number: null, snippet: "the workshop", score: 1, matched: [] }] }),
+      "POST /api/v1/search/s1/outcome": () => new Response(null, { status: 204 }),
+    });
+    const { router } = renderApp("/library");
+    const u = userEvent.setup();
+    await u.type(await screen.findByLabelText("Search the library"), "workshop");
+    await u.click(screen.getByRole("button", { name: "Search" }));
+    await u.click(await screen.findByRole("link", { name: "Discovery Workshop SOP" }));
+    await u.click(await screen.findByRole("link", { name: "Library" , current: false }));
+    await waitFor(() => expect(router.state.location.search).toBe("?q=workshop"));
+    expect(await screen.findByRole("link", { name: "Discovery Workshop SOP" })).toBeInTheDocument();
+  });
+
+  it("keeps the view and folder for the back link and the menu", async () => {
+    libraryApi();
+    const { router } = renderApp("/library?view=department&group=hr");
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("link", { name: "Leave Policy" }));
+    await screen.findByRole("heading", { name: "Leave Policy" });
+    const back = screen.getAllByRole("link", { name: "Library" }).find((l) => l.closest("main"))!;
+    expect(back).toHaveAttribute("href", "/library?view=department&group=hr");
+    const menu = within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "Library" });
+    expect(menu).toHaveAttribute("href", "/library?view=department&group=hr");
+    await u.click(back);
+    expect(router.state.location.search).toBe("?view=department&group=hr");
+    expect(await screen.findByRole("link", { name: "Leave Policy" })).toBeInTheDocument();
+  });
+
+  it("returns a document opened from Ask to the conversation", async () => {
+    recordPlace("/ask", "?conversation=c1");
+    libraryApi();
+    renderApp("/library/d1");
+    const back = await screen.findByRole("link", { name: "Ask" , current: false });
+    expect(back.getAttribute("href")).toBe("/ask?conversation=c1");
+  });
+
+  it("forgets everything on sign-out", () => {
+    recordPlace("/library", "?q=secret");
+    session.signOut();
+    expect(placeFor("library", "/library")).toBe("/library");
   });
 });
 

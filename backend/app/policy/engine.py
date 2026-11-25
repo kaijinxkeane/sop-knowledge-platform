@@ -28,7 +28,7 @@ _BY_LABEL = {s.label: s for s in Sensitivity}
 # Actions inside one space. `admin` implies every other space action.
 SPACE_ACTIONS = frozenset({"ask", "contribute", "review", "approve", "admin"})
 # Company-wide actions; only allowed on grants without a space.
-GLOBAL_ACTIONS = frozenset({"manage_users", "view_audit", "view_gap_reports"})
+GLOBAL_ACTIONS = frozenset({"manage_users", "manage_spaces", "view_audit", "view_gap_reports"})
 # Any of these lets the holder read content in the space.
 _READ_ACTIONS = SPACE_ACTIONS
 

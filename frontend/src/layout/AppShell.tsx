@@ -1,6 +1,6 @@
-import { Download, LogOut } from "lucide-react";
-import { lazy, Suspense } from "react";
-import { Link, NavLink, Outlet } from "react-router";
+import { CircleHelp, Download, LogOut } from "lucide-react";
+import { lazy, Suspense, useEffect } from "react";
+import { Link, NavLink, Outlet, ScrollRestoration, useLocation } from "react-router";
 import { useInstallOffer } from "@/app/pwa";
 import { brand, Logo } from "@/app/theme/brand";
 import { useMe, useSignOut } from "@/auth/hooks";
@@ -9,6 +9,8 @@ import { CommandPalette } from "@/components/CommandPalette";
 import { NotificationBell } from "@/components/NotificationBell";
 import { Button } from "@/components/ui/button";
 import { t, type MessageKey } from "@/i18n";
+import { HELP_URL } from "@/lib/help";
+import { isLandingPage, placeFor, recordPlace } from "@/lib/places";
 import { cn } from "@/lib/utils";
 
 const Notice = lazy(() => import("@/pages/Notice"));
@@ -24,8 +26,15 @@ export const SECTION_PATHS: Record<Section, string> = {
   admin: "/admin",
 };
 
+/** Landing pages keep their scroll position per address (tab, folder, search);
+ * documents and other pages start at the top unless you went Back to them. */
+const scrollKey = (loc: { pathname: string; search: string; key: string }) =>
+  isLandingPage(loc.pathname) ? loc.pathname + loc.search : loc.key;
+
 export function AppShell() {
   const me = useMe();
+  const location = useLocation();
+  useEffect(() => recordPlace(location.pathname, location.search), [location.pathname, location.search]);
   const signOut = useSignOut();
   const install = useInstallOffer();
 
@@ -46,6 +55,7 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-full flex-col">
+      <ScrollRestoration getKey={scrollKey} />
       <header className="border-b bg-background print:hidden">
         <div className="flex h-14 items-center gap-6 px-6">
           <NavLink to="/" className="flex items-center gap-2 font-semibold">
@@ -57,7 +67,7 @@ export function AppShell() {
             {sections.map((s) => (
               <NavLink
                 key={s}
-                to={SECTION_PATHS[s]}
+                to={placeFor(s, SECTION_PATHS[s])}
                 className={({ isActive }) =>
                   cn(
                     "rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground",
@@ -73,6 +83,15 @@ export function AppShell() {
           <div className="ml-auto flex items-center gap-3">
             {!gated && <CommandPalette sections={sections} />}
             {!gated && <NotificationBell />}
+            {!gated && (
+              <Link
+                to={HELP_URL}
+                className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+              >
+                <CircleHelp className="size-4" aria-hidden />
+                {t("nav.help")}
+              </Link>
+            )}
             {gated ? (
               <span className="text-sm text-muted-foreground">{me.data.display_name}</span>
             ) : (

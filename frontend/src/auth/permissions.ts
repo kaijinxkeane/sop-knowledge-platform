@@ -19,6 +19,6 @@ export function visibleSections(me: Me): Section[] {
   if (spaceActions.has("approve") || spaceActions.has("review") || global.has("view_gap_reports")) sections.push("retain");
   if (spaceActions.has("contribute")) sections.push("handovers");
   if (spaceActions.has("contribute") || spaceActions.has("approve")) sections.push("projects");
-  if (global.has("manage_users") || global.has("view_audit")) sections.push("admin");
+  if (global.has("manage_users") || global.has("view_audit") || global.has("manage_spaces")) sections.push("admin");
   return sections;
 }

@@ -27,11 +27,13 @@ from app.api.deps import (
     get_db,
     get_embedder,
     get_git,
+    get_query_embedder,
     get_session_factory,
 )
 from app.db.models import Document, DocumentAccess, Space
 from app.db.scoped import apply_reader_scope, has_pending_change, sees_latest, visible
 from app.policy.engine import Sensitivity
+from app.retrieval.search import search
 from app.vault.git import GitError, GitVault, VaultPathError
 from app.vault.indexer import DERIVED_SOURCES, Indexer
 from app.vault.labels import labels_from_rows, pin_placement, resolve_labels, vault_config
@@ -220,6 +222,56 @@ async def create_note(
         )
         await s.commit()
     return SavedOut(id=str(doc.id), vault_path=rel, version=_version(content.encode()), commit=sha)
+
+
+class SimilarIn(BaseModel):
+    title: str = Field(min_length=3, max_length=150)
+
+
+class SimilarOut(BaseModel):
+    id: str
+    title: str
+    folder: str
+
+
+# A new note's title against existing passages (qwen3-embedding:0.6b): a note's
+# own title lands at <= 0.31 for ~85% of demo notes, the closest other note
+# within it for ~10%. Advisory only.
+SIMILAR_DISTANCE = 0.32
+
+
+@router.post("/similar", response_model=list[SimilarOut])
+async def similar_notes(
+    body: SimilarIn,
+    me: CurrentUser = Depends(current_user),
+    session: AsyncSession = Depends(get_db),
+    embed_query=Depends(get_query_embedder),
+) -> list[SimilarOut]:
+    """Before writing a new note: notes the writer can already read that look
+    like the same thing. Titles only, read under RLS and the policy engine like
+    the Library; the title typed is never stored or logged."""
+    title = body.title.replace("\x00", " ").strip()
+    try:
+        vector = await embed_query(title)
+    except Exception:  # noqa: BLE001 - no model, no hint
+        return []
+    await session.commit()
+    await apply_reader_scope(session, me.principal)
+    hits = await search(session, me.principal, title, query_vector=vector, limit=12)
+    out: dict[uuid.UUID, SimilarOut] = {}
+    for h in hits:
+        if h.distance is None or h.distance > SIMILAR_DISTANCE or h.document_id in out:
+            continue
+        if h.vault_path.startswith("Help/"):
+            continue
+        doc = await session.get(Document, h.document_id)
+        if doc is None or not visible(me.principal, doc):
+            continue
+        out[h.document_id] = SimilarOut(
+            id=str(doc.id), title=doc.title, folder=str(PurePosixPath(doc.vault_path).parent)
+        )
+    await session.rollback()
+    return list(out.values())[:3]
 
 
 @router.get("/{note_id}/source", response_model=SourceOut)

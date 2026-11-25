@@ -58,6 +58,8 @@ class VaultConfig:
     allowed_link_domains: tuple[str, ...] = ()  # links allowed in answers (output_guard)
     ocr: OcrSettings = OcrSettings()
     answer_reuse_days: int = 30  # 0 turns answer reuse off
+    classifier_examples: bool = False  # show the AI similar filed documents
+    classifier_sorter: bool = True  # second vote from the trained sorter
 
     def is_handover(self, path: str) -> bool:
         return path.startswith(self.handover_folder + "/")
@@ -87,6 +89,16 @@ def load_vault_config(config_dir: Path | None = None) -> VaultConfig:
         if sens is not None and resolve_sensitivity(sens).label != sens:
             raise ValueError(f"folder rule {r['path']!r}: unknown sensitivity {sens!r}")
         rules.append(FolderRule(path=r["path"], space=r["space"], sensitivity=sens))
+    # Departments created in the app bring their own folder (internal by default);
+    # a folder already covered by vault.yaml keeps its rule.
+    from app.spaces import space_files
+
+    taken = {r.path.lower() for r in rules}
+    for name, raw in space_files(config_dir):
+        folder = str(raw.get("folder") or "").strip("/")
+        if raw.get("created_in_app") and folder and f"{folder}/".lower() not in taken:
+            rules.append(FolderRule(path=f"{folder}/", space=name, sensitivity="internal"))
+            taken.add(f"{folder}/".lower())
     return VaultConfig(
         ignore=tuple(data.get("ignore") or ()),
         stages=tuple(data.get("stages") or ()),
@@ -109,6 +121,8 @@ def load_vault_config(config_dir: Path | None = None) -> VaultConfig:
             str(d) for d in (data.get("answers") or {}).get("allowed_link_domains") or ()
         ),
         answer_reuse_days=int((data.get("answers") or {}).get("reuse_days", 30)),
+        classifier_examples=bool((data.get("classifier") or {}).get("examples", False)),
+        classifier_sorter=(data.get("classifier") or {}).get("sorter", True) is not False,
         ocr=OcrSettings(
             enabled=bool((data.get("ocr") or {}).get("enabled", True)),
             min_confidence=float((data.get("ocr") or {}).get("min_confidence") or 0.6),
@@ -117,9 +131,15 @@ def load_vault_config(config_dir: Path | None = None) -> VaultConfig:
     )
 
 
-@lru_cache(maxsize=1)
-def vault_config() -> VaultConfig:
+@lru_cache(maxsize=4)
+def _vault_config(_stamp: tuple) -> VaultConfig:
     return load_vault_config()
+
+
+def vault_config() -> VaultConfig:
+    from app.spaces import spaces_stamp
+
+    return _vault_config(spaces_stamp())
 
 
 @dataclass

@@ -1,0 +1,68 @@
+# Held-out Classifier cases (FICTIONAL data only). Never used to tune the
+# Classifier, its examples or the trained sorter: only to compare them
+# (`eval-classifier --cases holdout`). Same labelling policy as
+# classifier-cases.yaml. Written 2026-11-26.
+
+cases:
+  # --- core / public --------------------------------------------------------------
+  - {id: hcp1, space: core, sensitivity: public, title: "Wi-Fi at the training rooms", text: "Guests join the TrainingRooms-Guest network. The password is on the card at reception and changes every Monday."}
+  - {id: hcp2, space: core, sensitivity: public, title: "Where to leave coats on training days", text: "Use the coat rail behind the reception desk. Bags can go in the lockers next to the Small Room; take a key from the hook."}
+  - {id: hcp3, space: core, sensitivity: public, title: "Booking the Small Room for a quick meeting", text: "Anyone can book the Small Room for up to an hour on days without training. Add it to the Rooms calendar and tidy the chairs afterwards."}
+  - {id: hcp4, space: core, sensitivity: public, title: "Accessibility at the training venue", text: "The venue has step-free access from the side entrance, a lift to every floor and an accessible toilet next to the Large Room."}
+  - {id: hcp5, space: core, sensitivity: public, title: "What a training day looks like", text: "A training day is a full day with a morning session, lunch together, an afternoon session and a short closing round. Staff from any team are welcome to sit in once."}
+
+  # --- core / internal ------------------------------------------------------------
+  - {id: hci1, space: core, sensitivity: internal, title: "Timing the strengths exercise", text: "Give 8 minutes for silent writing, 12 for pairs and 10 for the group debrief. If the group is larger than eight, split the debrief into two tables."}
+  - {id: hci2, space: core, sensitivity: internal, title: "Coaching call opening routine", text: "Start each coaching call by asking what went well since last time, then check the two agreed actions before moving to the new topic."}
+  - {id: hci3, space: core, sensitivity: internal, title: "Packing the facilitation kit", text: "The kit box holds sticky notes in three colours, two timers, the value cards and spare markers. Restock it after every workshop."}
+  - {id: hci4, space: core, sensitivity: internal, title: "Writing the follow-up email after a workshop", text: "Within a day, send participants the slides, their three chosen actions and the date of the check-in call. Keep it under 150 words."}
+  - {id: hci5, space: core, sensitivity: internal, title: "Draft agenda for a half-day taster", text: "Idea for a shorter format: welcome and story warm-up, headline exercise, short break, peer feedback round, close. To test with the next internal group."}
+
+  # --- core / restricted ----------------------------------------------------------
+  - {id: hcr1, space: core, sensitivity: restricted, title: "Renewal terms for Larkspur Freight", text: "Larkspur Freight renews for another cohort at 7,400 per executive if they sign before March. Invoice 40% on signing, the rest after the first workshop."}
+  - {id: hcr2, space: core, sensitivity: restricted, title: "Notes from a difficult client call", text: "Tomasz Brandt was unhappy with his second coaching session and asked for a different coach. Agreed to switch him to the senior coach at no extra cost."}
+  - {id: hcr3, space: core, sensitivity: restricted, title: "Minimum price for group workshops", text: "Never quote below 1,450 per participant for a group workshop of six or more. Anything lower needs the CEO's written approval."}
+  - {id: hcr4, space: core, sensitivity: restricted, title: "How our presence index is calculated", text: "Our proprietary presence index scores voice 30%, posture 25%, message clarity 30% and audience response 15%. Keep the weighting inside the company."}
+  - {id: hcr5, space: core, sensitivity: restricted, title: "Quote for Ferncliff Health leadership team", text: "Ferncliff Health want twelve leaders through the Signature programme. Quoted 8,200 each with a 6% volume discount, valid for 30 days."}
+
+  # --- it / public ----------------------------------------------------------------
+  - {id: hip1, space: it, sensitivity: public, title: "Connecting to the office printer", text: "Choose Add printer, pick OfficePrinter-2F from the list and print a test page. Ask IT if it does not appear after a restart."}
+  - {id: hip2, space: it, sensitivity: public, title: "Changing your password", text: "Change your password from the account page every 180 days or straight away if you think someone saw it. Use the password manager to create a new one."}
+  - {id: hip3, space: it, sensitivity: public, title: "Joining a video call from the meeting room", text: "Press Join on the room tablet, pick the meeting from today's list and check the camera light turns green."}
+  - {id: hip4, space: it, sensitivity: public, title: "Spotting a phishing email", text: "Be suspicious of urgent requests, unexpected attachments and links that do not match the sender. Forward anything odd to the IT inbox and delete it."}
+  - {id: hip5, space: it, sensitivity: public, title: "Getting a replacement charger", text: "Lost or broken chargers are replaced from the IT cupboard. Send a request through the IT form and collect it the next working day."}
+
+  # --- it / internal --------------------------------------------------------------
+  - {id: hii1, space: it, sensitivity: internal, title: "Monthly patch routine", text: "On the first Tuesday, approve the operating system updates in the device console, restart test laptops first, then roll out to everyone on Thursday."}
+  - {id: hii2, space: it, sensitivity: internal, title: "Setting up a new starter's accounts", text: "Create the email account, add them to the staff groups, enrol the laptop in device management and send the welcome sheet to their manager."}
+  - {id: hii3, space: it, sensitivity: internal, title: "Backup check checklist", text: "Every Friday check the backup report shows all devices green. Restore one random file to confirm backups work and log the result."}
+  - {id: hii4, space: it, sensitivity: internal, title: "Retiring an old laptop", text: "Wipe the disk with the device console, remove it from the asset list, take the asset tag off and put it in the recycling crate."}
+  - {id: hii5, space: it, sensitivity: internal, title: "Handling an IT ticket out of hours", text: "Tickets after 18:00 wait until the next morning unless marked urgent. For urgent ones, the on-call person replies within an hour."}
+
+  # --- it / restricted ------------------------------------------------------------
+  - {id: hir1, space: it, sensitivity: restricted, title: "Firewall admin access", text: "The firewall admin page is at the internal address in the vault entry. Only two people hold the admin login; rotate it after any staff change."}
+  - {id: hir2, space: it, sensitivity: restricted, title: "Incident: suspicious login from abroad", text: "On 3 November an account showed a login attempt from another country. Password reset, sessions revoked, two-factor re-enrolled. Owner informed in person."}
+  - {id: hir3, space: it, sensitivity: restricted, title: "Where the server room key is kept", text: "The server room key is in the key safe in the CEO's office. The safe code is held by IT and the office manager only."}
+  - {id: hir4, space: it, sensitivity: restricted, title: "Vendor contract for device management", text: "The device management licence costs 6.40 per device per month, renews in June and has a 90-day notice period."}
+  - {id: hir5, space: it, sensitivity: restricted, title: "Break-glass procedure for the admin account", text: "If the main admin is locked out, open the sealed envelope in the safe, sign in with the emergency account, then reset and reseal with a new password."}
+
+  # --- hr / public ----------------------------------------------------------------
+  - {id: hhp1, space: hr, sensitivity: public, title: "Public holidays this year", text: "The office closes on public holidays. If you work on one for a training day, you get a day off in lieu within the next month."}
+  - {id: hhp2, space: hr, sensitivity: public, title: "Working from home", text: "Staff may work from home up to two days a week when they have no training or client sessions. Agree the days with your manager."}
+  - {id: hhp3, space: hr, sensitivity: public, title: "Reporting sick", text: "Message your manager before 9:00 on each day you are off sick. After three days, send a medical certificate to HR."}
+  - {id: hhp4, space: hr, sensitivity: public, title: "Claiming a training course", text: "Staff can claim one external course a year. Ask your manager first, then submit the receipt with the expense form."}
+  - {id: hhp5, space: hr, sensitivity: public, title: "Staff birthday leave", text: "Everyone gets a day off in their birthday month. Book it like annual leave and mark it as birthday leave."}
+
+  # --- hr / internal --------------------------------------------------------------
+  - {id: hhi1, space: hr, sensitivity: internal, title: "Preparing a new starter's first day", text: "HR sends the contract pack a week before, books the induction slot, orders the name badge and tells IT the start date."}
+  - {id: hhi2, space: hr, sensitivity: internal, title: "Running the annual review cycle", text: "Send review forms in October, collect them by mid-November, book manager calibration meetings and file outcomes before December."}
+  - {id: hhi3, space: hr, sensitivity: internal, title: "Updating the leave tracker", text: "Approved leave goes into the leave tracker the same day. Check balances at the end of each quarter and remind staff with more than ten days left."}
+  - {id: hhi4, space: hr, sensitivity: internal, title: "Exit interview questions", text: "Ask what they enjoyed most, what made them decide to leave, and one thing we should change. Summarise themes without names for the quarterly report."}
+  - {id: hhi5, space: hr, sensitivity: internal, title: "Checklist for probation reviews", text: "Book the probation meeting two weeks before the end date, collect feedback from the manager and confirm or extend in writing."}
+
+  # --- hr / restricted ------------------------------------------------------------
+  - {id: hhr1, space: hr, sensitivity: restricted, title: "Salary bands for trainers", text: "Junior trainers 42,000 to 50,000; trainers 50,000 to 62,000; senior trainers 62,000 to 75,000. Bands reviewed every April."}
+  - {id: hhr2, space: hr, sensitivity: restricted, title: "Warning issued to a staff member", text: "Danielle Okafor received a first written warning on 18 October for missing three client sessions without notice. Review in three months."}
+  - {id: hhr3, space: hr, sensitivity: restricted, title: "Medical adjustments for an employee", text: "Following a doctor's note, Ravi Menon works shorter days on Tuesdays and Thursdays until January. Keep this between HR and his manager."}
+  - {id: hhr4, space: hr, sensitivity: restricted, title: "Redundancy consultation plan", text: "If the second programme is paused, two coordinator roles may be at risk. Consultation would start in February; do not discuss outside the leadership team."}
+  - {id: hhr5, space: hr, sensitivity: restricted, title: "Bonus decisions this year", text: "Bonuses approved at 4% for trainers who hit their session targets and 6% for the two senior trainers. Pay in the December payroll."}

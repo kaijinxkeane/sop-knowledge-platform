@@ -836,6 +836,107 @@
         "title": "DecisionIn",
         "type": "object"
       },
+      "DepartmentIn": {
+        "properties": {
+          "contact": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Contact",
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 1000,
+            "minLength": 10,
+            "title": "Description",
+            "type": "string"
+          },
+          "folder": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 31,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "title": {
+            "maxLength": 80,
+            "minLength": 2,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "description"
+        ],
+        "title": "DepartmentIn",
+        "type": "object"
+      },
+      "DepartmentOut": {
+        "properties": {
+          "contact": {
+            "title": "Contact",
+            "type": "string"
+          },
+          "created_in_app": {
+            "title": "Created In App",
+            "type": "boolean"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "folders": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Folders",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "title",
+          "description",
+          "contact",
+          "folders",
+          "created_in_app",
+          "roles"
+        ],
+        "title": "DepartmentOut",
+        "type": "object"
+      },
       "DiffOut": {
         "properties": {
           "added": {
@@ -1049,6 +1150,17 @@
             ],
             "title": "Review Due"
           },
+          "space": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Space"
+          },
           "stage": {
             "anyOf": [
               {
@@ -1183,6 +1295,106 @@
           "helpful"
         ],
         "title": "FeedbackIn",
+        "type": "object"
+      },
+      "FolderCoverageOut": {
+        "properties": {
+          "approved": {
+            "title": "Approved",
+            "type": "integer"
+          },
+          "documents": {
+            "title": "Documents",
+            "type": "integer"
+          },
+          "folder": {
+            "title": "Folder",
+            "type": "string"
+          },
+          "gap_questions": {
+            "title": "Gap Questions",
+            "type": "integer"
+          },
+          "open_gaps": {
+            "title": "Open Gaps",
+            "type": "integer"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "folder",
+          "documents",
+          "approved",
+          "stale",
+          "open_gaps",
+          "gap_questions"
+        ],
+        "title": "FolderCoverageOut",
+        "type": "object"
+      },
+      "FolderIn": {
+        "properties": {
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "parent": {
+            "maxLength": 500,
+            "title": "Parent",
+            "type": "string"
+          },
+          "space": {
+            "maxLength": 64,
+            "title": "Space",
+            "type": "string"
+          }
+        },
+        "required": [
+          "space",
+          "parent",
+          "name"
+        ],
+        "title": "FolderIn",
+        "type": "object"
+      },
+      "FolderOut": {
+        "properties": {
+          "can_edit": {
+            "title": "Can Edit",
+            "type": "boolean"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "space": {
+            "title": "Space",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "space",
+          "path",
+          "can_edit"
+        ],
+        "title": "FolderOut",
         "type": "object"
       },
       "FollowUpOut": {
@@ -2246,6 +2458,18 @@
             "title": "Content",
             "type": "string"
           },
+          "folder": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder"
+          },
           "programme": {
             "anyOf": [
               {
@@ -2321,6 +2545,38 @@
           "created_at"
         ],
         "title": "MessageOut",
+        "type": "object"
+      },
+      "MoveIn": {
+        "properties": {
+          "folder": {
+            "maxLength": 500,
+            "title": "Folder",
+            "type": "string"
+          }
+        },
+        "required": [
+          "folder"
+        ],
+        "title": "MoveIn",
+        "type": "object"
+      },
+      "MovedOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "vault_path": {
+            "title": "Vault Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "vault_path"
+        ],
+        "title": "MovedOut",
         "type": "object"
       },
       "NamesIn": {
@@ -3353,6 +3609,17 @@
           "stale": {
             "title": "Stale",
             "type": "boolean"
+          },
+          "suggested_folder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Folder"
           },
           "title": {
             "title": "Title",
@@ -4387,6 +4654,44 @@
           "sensitivity"
         ],
         "title": "SharedIn",
+        "type": "object"
+      },
+      "SimilarIn": {
+        "properties": {
+          "title": {
+            "maxLength": 150,
+            "minLength": 3,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "SimilarIn",
+        "type": "object"
+      },
+      "SimilarOut": {
+        "properties": {
+          "folder": {
+            "title": "Folder",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "folder"
+        ],
+        "title": "SimilarOut",
         "type": "object"
       },
       "SourceOut": {
@@ -5426,6 +5731,81 @@
           }
         ],
         "summary": "Verify Audit",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/departments": {
+      "get": {
+        "operationId": "list_departments_api_v1_admin_departments_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DepartmentOut"
+                  },
+                  "title": "Response List Departments Api V1 Admin Departments Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Departments",
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "description": "A new department with its staff and lead roles (nobody has them yet).",
+        "operationId": "create_department_endpoint_api_v1_admin_departments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DepartmentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepartmentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Department Endpoint",
         "tags": [
           "admin"
         ]
@@ -8208,6 +8588,179 @@
         ]
       }
     },
+    "/api/v1/library/documents/{doc_id}/move": {
+      "post": {
+        "operationId": "move_document_api_v1_library_documents__doc_id__move_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "doc_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Doc Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Move Document",
+        "tags": [
+          "library"
+        ]
+      }
+    },
+    "/api/v1/library/folders": {
+      "get": {
+        "operationId": "list_folders_api_v1_library_folders_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FolderOut"
+                  },
+                  "title": "Response List Folders Api V1 Library Folders Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Folders",
+        "tags": [
+          "library"
+        ]
+      },
+      "post": {
+        "operationId": "create_folder_api_v1_library_folders_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FolderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FolderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Folder",
+        "tags": [
+          "library"
+        ]
+      }
+    },
+    "/api/v1/library/folders/{folder_id}": {
+      "delete": {
+        "operationId": "delete_folder_api_v1_library_folders__folder_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "folder_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Folder Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Folder",
+        "tags": [
+          "library"
+        ]
+      }
+    },
     "/api/v1/me": {
       "get": {
         "operationId": "get_me_api_v1_me_get",
@@ -8709,6 +9262,57 @@
           }
         ],
         "summary": "Create Note",
+        "tags": [
+          "editing"
+        ]
+      }
+    },
+    "/api/v1/notes/similar": {
+      "post": {
+        "description": "Before writing a new note: notes the writer can already read that look\nlike the same thing. Titles only, read under RLS and the policy engine like\nthe Library; the title typed is never stored or logged.",
+        "operationId": "similar_notes_api_v1_notes_similar_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimilarIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SimilarOut"
+                  },
+                  "title": "Response Similar Notes Api V1 Notes Similar Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Similar Notes",
         "tags": [
           "editing"
         ]
@@ -11227,6 +11831,23 @@
           },
           {
             "in": "query",
+            "name": "folder",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 300,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Folder"
+            }
+          },
+          {
+            "in": "query",
             "name": "limit",
             "required": false,
             "schema": {
@@ -11351,6 +11972,58 @@
         "summary": "List Spaces",
         "tags": [
           "me"
+        ]
+      }
+    },
+    "/api/v1/spaces/{space}/folder-coverage": {
+      "get": {
+        "description": "A department's Library folders for its leads: how much is written and\napproved, how much is overdue for review, and how many unanswered question\ntopics sit closest to each folder. Counts only, over documents the lead can\nread (RLS and the policy engine); gap topics only name folders shown here.",
+        "operationId": "folder_coverage_api_v1_spaces__space__folder_coverage_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space",
+            "required": true,
+            "schema": {
+              "title": "Space",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FolderCoverageOut"
+                  },
+                  "title": "Response Folder Coverage Api V1 Spaces  Space  Folder Coverage Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Folder Coverage",
+        "tags": [
+          "retention"
         ]
       }
     },

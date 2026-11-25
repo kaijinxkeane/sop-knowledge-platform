@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from pathlib import PurePosixPath
 
 from sqlalchemy import exists, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -28,6 +29,8 @@ from app.classify.rules import (
     Proposal,
     decide,
 )
+from app.classify.sorter import combine, predict
+from app.classify.training import doc_vector, latest_sorter
 from app.db.models import (
     Chunk,
     ClassificationProposal,
@@ -37,6 +40,7 @@ from app.db.models import (
     Space,
     User,
 )
+from app.vault.folders import department_of
 from app.vault.labels import Labels, VaultConfig, labels_from_rows, vault_config
 
 log = logging.getLogger("sop.classifier")
@@ -149,8 +153,15 @@ async def similar_labelled(s: AsyncSession, doc_id, k: int = MAX_EXAMPLES) -> li
         )
         if doc is None or owner is None:
             continue
+        folder = str(PurePosixPath(doc.vault_path).parent)
         out.append(
-            Example(doc.title, (first or "")[:EXAMPLE_CHARS], owner.space, owner.sensitivity)
+            Example(
+                doc.title,
+                (first or "")[:EXAMPLE_CHARS],
+                owner.space,
+                owner.sensitivity,
+                folder if department_of(folder, vault_config()) == owner.space else None,
+            )
         )
     return out
 
@@ -164,11 +175,15 @@ class ClassifierService:
         # Off by default: on the blind eval, examples from 30/60/120 labelled
         # notes gave 71.7/79.2/77.5% vs 79.2% without (no significant gain).
         # Re-run `eval-classifier --example-pool N` on real labels before enabling.
-        use_examples: bool = False,
+        use_examples: bool | None = None,
+        use_sorter: bool | None = None,
     ):
         self.sessions, self.classifier = sessions, classifier
-        self.use_examples = use_examples
         self.config = config or vault_config()
+        self.use_examples = (
+            self.config.classifier_examples if use_examples is None else use_examples
+        )
+        self.use_sorter = self.config.classifier_sorter if use_sorter is None else use_sorter
 
     async def run_pending(self, limit: int = 20) -> ClassifyReport:
         report = ClassifyReport()
@@ -213,9 +228,15 @@ class ClassifierService:
                 examples=examples,
             )
             version = doc.content_hash
+            vote = None
+            if self.use_sorter and doc.label_source not in RULE_SOURCES:
+                model = await latest_sorter(s)
+                vector = await doc_vector(s, doc_id) if model else None
+                vote = predict(model, vector) if model and vector else None
         proposal = await self.classifier(item)  # outside any transaction (slow)
         if not proposal.valid:
             raise ValueError("unreadable classifier reply")  # stays pending; retried
+        proposal, folder = combine(proposal, vote)
 
         async with self.sessions() as s, s.begin():
             doc = await s.get(Document, doc_id, with_for_update=True)
@@ -233,7 +254,7 @@ class ClassifierService:
             )
             outcome = "names_checked"
             if doc.label_source not in RULE_SOURCES:
-                outcome, rows = await self._label(s, doc, rows, proposal, names)
+                outcome, rows = await self._label(s, doc, rows, proposal, names, vote, folder)
             refresh_name_flags(doc, rows, self.config)
             await audit.record(
                 s,
@@ -258,6 +279,8 @@ class ClassifierService:
         rows: list[DocumentAccess],
         proposal: Proposal,
         names: list[str],
+        vote=None,
+        folder: str | None = None,
     ) -> tuple[str, list]:
         spaces = set((await s.execute(select(Space.name))).scalars())
         current = labels_from_rows(rows) if rows else None
@@ -285,6 +308,14 @@ class ClassifierService:
                 status=result.status,
                 decision=result.decision,
                 group_key=group_key(doc.vault_path, proposal.space, proposal.sensitivity.label),
+                sorter_vote=None
+                if vote is None
+                else {
+                    "space": vote.space,
+                    "confidence": vote.confidence,
+                    "sensitivity": vote.sensitivity.label if vote.sensitivity else None,
+                },
+                suggested_folder=folder,
             )
         )
         if result.apply is not None:

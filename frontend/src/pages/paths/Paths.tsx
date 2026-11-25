@@ -15,6 +15,8 @@ import type { Colleague } from "@/pages/handovers/api";
 import { useDocuments } from "@/pages/library/api";
 import { NotFound } from "@/pages/NotFound";
 import { shortDate, useAssignableRoles } from "@/pages/reading/api";
+import { departmentFolders, docsIn, stepsFromFolder } from "@/lib/pathFolders";
+import { placeFor } from "@/lib/places";
 import {
   canManagePaths,
   leadOf,
@@ -178,7 +180,7 @@ export function PathView() {
   if (p.isError) return <NotFound />;
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-6 py-6">
-      <Link to="/paths" className="text-sm text-muted-foreground hover:text-foreground">← {t("paths.title")}</Link>
+      <Link to={placeFor("paths", "/paths")} className="text-sm text-muted-foreground hover:text-foreground">← {t("paths.title")}</Link>
       <header className="space-y-2">
         <h1 className="text-2xl font-semibold">{p.data.title}</h1>
         {p.data.description && <p className="text-sm text-muted-foreground">{p.data.description}</p>}
@@ -193,19 +195,25 @@ export function PathView() {
 
 type Draft = { title: string; items: { document_id: string; required: boolean }[] };
 
+/** Approved notes can be required (people sign them off against a version). */
+const requirable = (d: { kind: string; approved?: boolean | null } | undefined) => d?.kind === "note" && !!d.approved;
+
 function StepEditor({
   step,
   onChange,
   onRemove,
   n,
+  space,
 }: {
   step: Draft;
   onChange: (s: Draft) => void;
   onRemove: () => void;
   n: number;
+  space: string;
 }) {
   const docs = useDocuments();
   const [q, setQ] = useState("");
+  const folders = departmentFolders(docs.data ?? [], space);
   const byId = new Map((docs.data ?? []).map((d) => [d.id, d]));
   const chosen = new Set(step.items.map((i) => i.document_id));
   const matches = q.trim()
@@ -221,7 +229,7 @@ function StepEditor({
       <ul className="space-y-1">
         {step.items.map((it, k) => {
           const d = byId.get(it.document_id);
-          const canRequire = d?.kind === "note" && d.approved;
+          const canRequire = requirable(d);
           return (
             <li key={it.document_id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
               <span>{d?.title ?? t("paths.hiddenItem")}</span>
@@ -249,6 +257,19 @@ function StepEditor({
       </ul>
       <div className="space-y-1">
         <Input aria-label={t("paths.addItem")} placeholder={t("paths.addItem")} value={q} onChange={(e) => setQ(e.target.value)} />
+        {folders.length > 0 && (
+          <Select
+            aria-label={t("paths.addFolder")}
+            value=""
+            onChange={(e) => {
+              const add = docsIn(docs.data ?? [], space, e.target.value).filter((d) => !chosen.has(d.id));
+              onChange({ ...step, items: [...step.items, ...add.map((d) => ({ document_id: d.id, required: false }))] });
+            }}
+          >
+            <option value="">{t("paths.addFolder")}</option>
+            {folders.map((f) => <option key={f} value={f}>{f}</option>)}
+          </Select>
+        )}
         {matches.length > 0 && (
           <ul className="rounded-md border bg-card text-sm">
             {matches.map((d) => (
@@ -361,6 +382,31 @@ export function PathEditor() {
   return <EditorForm key={existing.data?.id ?? "new"} p={existing.data} />;
 }
 
+function FromFolder({ space, onSteps }: { space: string; onSteps: (s: Draft[]) => void }) {
+  const docs = useDocuments();
+  const folders = departmentFolders(docs.data ?? [], space);
+  if (!folders.length) return null;
+  return (
+    <div className="space-y-1">
+      <Label htmlFor="path-from-folder">{t("paths.fromFolder")}</Label>
+      <Select
+        id="path-from-folder"
+        value=""
+        onChange={(e) => {
+          const steps = stepsFromFolder(docs.data ?? [], space, e.target.value);
+          if (steps.length) {
+            onSteps(steps.map((s) => ({ title: s.title, items: s.docs.map((d) => ({ document_id: d.id, required: false })) })));
+          }
+        }}
+      >
+        <option value="">{t("paths.fromFolderPick")}</option>
+        {folders.map((f) => <option key={f} value={f}>{f}</option>)}
+      </Select>
+      <p className="text-xs text-muted-foreground">{t("paths.fromFolderExplain")}</p>
+    </div>
+  );
+}
+
 function EditorForm({ p }: { p: Path | undefined }) {
   const me = useMe();
   const navigate = useNavigate();
@@ -387,7 +433,7 @@ function EditorForm({ p }: { p: Path | undefined }) {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-6 py-6">
-      <Link to="/paths" className="text-sm text-muted-foreground hover:text-foreground">← {t("paths.title")}</Link>
+      <Link to={placeFor("paths", "/paths")} className="text-sm text-muted-foreground hover:text-foreground">← {t("paths.title")}</Link>
       <h1 className="text-2xl font-semibold">{p ? p.title : t("paths.new")}</h1>
       {editable ? (
         <form
@@ -421,6 +467,7 @@ function EditorForm({ p }: { p: Path | undefined }) {
             />
           </div>
           {hiddenCount > 0 && <Alert>{t("paths.hiddenOnEdit", { n: hiddenCount })}</Alert>}
+          {!p && <FromFolder space={space} onSteps={setSteps} />}
           {steps.map((s, n) => (
             <StepEditor
               key={n}
@@ -428,6 +475,7 @@ function EditorForm({ p }: { p: Path | undefined }) {
               step={s}
               onChange={(next) => setSteps(steps.map((x, j) => (j === n ? next : x)))}
               onRemove={() => setSteps(steps.filter((_, j) => j !== n))}
+              space={space}
             />
           ))}
           <Button type="button" variant="outline" size="sm" onClick={() => setSteps([...steps, { title: t("paths.week", { n: steps.length + 1 }), items: [] }])}>

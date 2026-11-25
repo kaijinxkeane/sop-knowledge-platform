@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { t, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/utils";
-import { AnswerText } from "./AnswerText";
+import { AnswerText, plainWikiLinks } from "./AnswerText";
 import { myGaps, requestSop, sendFeedback, type Citation, type Reason, type Section } from "./api";
 
 const REASONS: Reason[] = ["wrong", "outdated", "missing_steps", "unclear", "other"];
@@ -166,7 +166,7 @@ function copyText(sections: Section[]): string {
   const parts: string[] = [];
   for (const s of sections) {
     if (s.no_answer || s.unavailable || s.hidden) continue;
-    parts.push(s.text.trim());
+    parts.push(plainWikiLinks(s.text).trim());
     if (s.citations.length)
       parts.push(s.citations.map((c) => `[${c.n}] ${c.title}${c.heading ? ` — ${c.heading}` : ""}`).join("\n"));
   }

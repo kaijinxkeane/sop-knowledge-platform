@@ -219,6 +219,34 @@ async def test_routing_falls_back_without_a_model():
     assert r.reason == "fallback" and set(r.spaces) == {"core", "it"}
 
 
+async def test_routing_uses_a_confident_sorter_only_when_search_agrees():
+    from app.classify.sorter import Vote
+
+    hr = Vote("hr", 0.9, None, None)
+    gw, _, local = gateway(['{"spaces": ["it"]}'])
+    # nothing strong in search: the sorter decides, no model call
+    r = await route("q", [hit("core", dist=0.62)], ["core", "hr", "it"], PROFILES, gw, hr)
+    assert (r.spaces, r.reason) == (("hr",), "sorter") and local.calls == []
+    # three spaces, no leader, sorter disagrees with the top one: the model decides
+    mixed = [hit("core", score=0.04), hit("it", score=0.03), hit("hr", score=0.03)]
+    r = await route("q", mixed, ["core", "hr", "it"], PROFILES, gw, hr)
+    assert r.reason == "model" and local.calls == ["router"]
+    # search has a clear leader but the sorter says another space: both answer
+    lead = [hit("core", score=0.05), hit("it", score=0.01)]
+    r = await route("q", lead, ["core", "hr", "it"], PROFILES, gw, hr)
+    assert (r.spaces, r.reason) == (("core", "hr"), "sorter")
+    r = await route("q", lead, ["core", "it"], PROFILES, gw, hr)  # hr not readable
+    assert (r.spaces, r.reason) == (("core",), "search")
+    # a space the asker can't read is never chosen because of the sorter
+    gw, _, local = gateway(['{"spaces": ["it"]}'])
+    r = await route("q", [hit("core", dist=0.62)], ["core", "it"], PROFILES, gw, hr)
+    assert r.reason == "model" and "hr" not in r.spaces
+    # model down: the sorter's space instead of every space
+    gw, *_ = gateway([])
+    r = await route("q", mixed, ["core", "hr", "it"], PROFILES, gw, hr)
+    assert (r.spaces, r.reason) == (("hr",), "fallback")
+
+
 @pytest.mark.parametrize(
     ("parts", "want"),
     [

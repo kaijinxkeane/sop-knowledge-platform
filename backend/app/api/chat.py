@@ -75,6 +75,7 @@ class MessageIn(BaseModel):
     # Optional filters (frontend spec §4); they only narrow what you can read.
     programme: str | None = Field(default=None, max_length=200)
     stage: str | None = Field(default=None, max_length=32)
+    folder: str | None = Field(default=None, max_length=300)
 
 
 class FollowUpOut(BaseModel):
@@ -340,6 +341,7 @@ async def post_message(
     filters = {
         "programme": (body.programme or "").strip() or None,
         "stage": (body.stage or "").strip() or None,
+        "folder": (body.folder or "").strip().strip("/") or None,
     }
     from app.projects.service import project_profiles
 
@@ -357,6 +359,7 @@ async def post_message(
             profiles=profiles,
             programme=filters["programme"],
             stage=filters["stage"],
+            folder=filters["folder"],
         ):
             kind = ev["type"]
             if kind == "routing":

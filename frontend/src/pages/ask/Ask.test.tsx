@@ -134,6 +134,21 @@ describe("Ask", () => {
     expect(screen.getByRole("region", { name: "HR" })).toHaveTextContent("HR says");
   });
 
+  it("asks inside a folder when one is chosen (from the Library's link)", async () => {
+    const { posts } = askApi(
+      () => sse([["routing", { spaces: ["core"], reason: "search" }], ...answer("core", "Core says [1]."), ["done", { message_id: "m3", question_id: "q3", answered: true }]]),
+      [],
+      {
+        "GET /api/v1/documents": () =>
+          json([{ id: "d1", title: CITE.title, vault_path: "Programmes/Signature/Run.md", kind: "note", doc_type: "sop", status: "published", programme: null, stage: null, owner: null, access: [], approved: true, pending_change: false, review_due: null, space: "core" }]),
+      },
+    );
+    renderApp("/ask?folder=Programmes%2FSignature&q=how%20do%20we%20open");
+    await screen.findByRole("region", { name: "Core delivery" });
+    expect(posts).toEqual([{ content: "how do we open", folder: "Programmes/Signature" }]);
+    expect((screen.getByLabelText("Folder") as HTMLSelectElement).value).toBe("Programmes/Signature");
+  });
+
   it("never renders links that come back in an answer", async () => {
     askApi(() => sse([...answer("core", "See [click here](https://evil.example) [1]."), ["done", { message_id: "m2", question_id: "q2", answered: true }]]));
     renderApp("/ask?q=anything%20here");

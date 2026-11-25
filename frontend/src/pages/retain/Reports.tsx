@@ -18,6 +18,7 @@ import {
   useBusFactor,
   useConflicts,
   useCoverage,
+  useFolderCoverage,
   useHrGaps,
   useRetainActions,
   useSpaceGaps,
@@ -205,7 +206,13 @@ export function Coverage() {
   if (cov.isPending) return <Loading />;
   if (cov.isError) return <Failed />;
   const cells = cov.data;
-  if (cells.length === 0) return <p className="text-sm text-muted-foreground">{t("coverage.empty")}</p>;
+  if (cells.length === 0)
+    return (
+      <div className="space-y-6">
+        <p className="text-sm text-muted-foreground">{t("coverage.empty")}</p>
+        <FolderCoverage />
+      </div>
+    );
   const programmes = [...new Set(cells.map((c) => c.programme))].sort();
   const stages = [...new Set(cells.map((c) => c.stage))];
   const at = new Map(cells.map((c) => [`${c.programme}|${c.stage}`, c]));
@@ -269,7 +276,65 @@ export function Coverage() {
           </CardContent>
         </Card>
       )}
+      <FolderCoverage />
     </div>
+  );
+}
+
+/** A lead's department, folder by folder (counts only). */
+function FolderCoverage() {
+  const me = useMe();
+  const spaces = leadSpaces(me.data?.space_actions);
+  const [space, setSpace] = useState(spaces[0] ?? "");
+  const rows = useFolderCoverage(space || null);
+  if (!spaces.length) return null;
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">{t("coverage.byFolder")}</h2>
+          <p className="text-sm text-muted-foreground">{t("coverage.byFolderExplain")}</p>
+        </div>
+        {spaces.length > 1 && <SpacePicker id="folder-cov-space" spaces={spaces} value={space} onChange={setSpace} />}
+      </div>
+      {rows.isPending ? <Loading /> : rows.isError ? <Failed /> : rows.data.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{t("coverage.noFolders")}</p>
+      ) : (
+        <div className="overflow-x-auto rounded-md border">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">{t("coverage.folder")}</th>
+                <th className="px-3 py-2 font-medium">{t("coverage.documents")}</th>
+                <th className="px-3 py-2 font-medium">{t("coverage.approved")}</th>
+                <th className="px-3 py-2 font-medium">{t("coverage.overdue")}</th>
+                <th className="px-3 py-2 font-medium">{t("coverage.openGaps")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.data.map((r) => (
+                <tr key={r.folder} className="border-t">
+                  <th scope="row" className="px-3 py-2 text-left font-medium">
+                    <Link
+                      to={`/library?${new URLSearchParams({ view: "folders", group: space, folder: r.folder })}`}
+                      className="hover:underline"
+                    >
+                      {r.folder}
+                    </Link>
+                  </th>
+                  <td className="px-3 py-2">{r.documents}</td>
+                  <td className={cn("px-3 py-2", r.approved < r.documents && "text-amber-900")}>{r.approved}</td>
+                  <td className={cn("px-3 py-2", r.stale > 0 && "text-amber-900")}>{r.stale}</td>
+                  <td className={cn("px-3 py-2", r.open_gaps > 0 && "font-medium text-red-900")}>
+                    {r.open_gaps > 0 ? t("coverage.gapsCell", { n: r.open_gaps, q: r.gap_questions }) : "0"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 

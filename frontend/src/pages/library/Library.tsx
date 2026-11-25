@@ -2,18 +2,25 @@ import { Search } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router";
 import { api } from "@/api/client";
+import { useMe } from "@/auth/hooks";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { t } from "@/i18n";
+import { HELP_GROUP } from "@/lib/help";
 import { plainName } from "@/lib/obsidian";
 import { cn } from "@/lib/utils";
 import { exportPdf, useDocuments, useSearch, useStages, type Doc } from "./api";
 import { BookmarkList } from "./Bookmarks";
+import { FolderBrowser, folderDepartments } from "./Folders";
 import { StatusDot } from "./StatusDot";
 
-type View = "programme" | "stage" | "department";
+type View = "programme" | "stage" | "department" | "folders";
 const OTHER = "__other__";
+// The built-in user guide (Help/ in the vault) gets its own group in every view.
+const HELP = HELP_GROUP;
+const isGuide = (d: Doc) => d.vault_path.startsWith("Help/");
 
 const isSop = (d: Doc) => d.kind === "note" && ["sop", "checklist"].includes(d.doc_type);
 const isDeck = (d: Doc) => d.kind === "attachment" && d.vault_path.toLowerCase().endsWith(".pptx");
@@ -21,8 +28,10 @@ const spacesOf = (d: Doc) => [...new Set(d.access.map((a) => a.space))];
 
 function groupsFor(view: View, docs: Doc[], stages: string[]): string[] {
   const values = new Set<string>();
+  let guides = false;
   for (const d of docs) {
-    if (view === "programme") values.add(plainName(d.programme) ?? OTHER);
+    if (isGuide(d)) guides = true;
+    else if (view === "programme") values.add(plainName(d.programme) ?? OTHER);
     else if (view === "stage") values.add(d.stage ?? OTHER);
     else spacesOf(d).forEach((s) => values.add(s));
   }
@@ -31,16 +40,18 @@ function groupsFor(view: View, docs: Doc[], stages: string[]): string[] {
     view === "stage"
       ? named.sort((a, b) => (stages.indexOf(a) + 1 || 99) - (stages.indexOf(b) + 1 || 99))
       : named.sort((a, b) => a.localeCompare(b));
-  return values.has(OTHER) ? [...order, OTHER] : order;
+  return [...order, ...(values.has(OTHER) ? [OTHER] : []), ...(guides ? [HELP] : [])];
 }
 
 function inGroup(view: View, group: string, d: Doc): boolean {
+  if (group === HELP || isGuide(d)) return group === HELP && isGuide(d);
   if (view === "programme") return (plainName(d.programme) ?? OTHER) === group;
   if (view === "stage") return (d.stage ?? OTHER) === group;
   return spacesOf(d).includes(group);
 }
 
 function groupLabel(view: View, group: string): string {
+  if (group === HELP) return t("library.help");
   if (group !== OTHER) return group;
   return view === "stage" ? t("library.noStage") : t("library.other");
 }
@@ -106,6 +117,16 @@ function Browse({ view, group, docs, stages }: { view: View; group: string; docs
   // Inside a programme or department, list by stage; inside a stage, by programme.
   const sub = (d: Doc) => (view === "stage" ? (plainName(d.programme) ?? OTHER) : (d.stage ?? OTHER));
   const subGroups = groupsFor(view === "stage" ? "programme" : "stage", here, stages);
+  if (group === HELP) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">{groupLabel(view, group)}</h2>
+        <ul className="divide-y">
+          {[...here].sort((a, b) => a.title.localeCompare(b.title)).map((d) => <DocRow key={d.id} doc={d} />)}
+        </ul>
+      </div>
+    );
+  }
   return (
     <div className="space-y-6">
       <h2 className="text-lg font-semibold">{groupLabel(view, group)}</h2>
@@ -130,8 +151,8 @@ function Browse({ view, group, docs, stages }: { view: View; group: string; docs
   );
 }
 
-function Results({ q }: { q: string }) {
-  const search = useSearch(q);
+function Results({ q, within }: { q: string; within: string | null }) {
+  const search = useSearch(q, within);
   const [answered, setAnswered] = useState(false);
   const opened = useRef(0);
   const searchId = search.data?.search_id ?? null;
@@ -169,7 +190,9 @@ function Results({ q }: { q: string }) {
   if (!data) return <p className="text-sm text-muted-foreground">{t("app.loading")}</p>;
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold">{t("library.searchResults", { q })}</h2>
+      <h2 className="text-lg font-semibold">
+        {within ? t("library.searchResultsIn", { q, folder: within }) : t("library.searchResults", { q })}
+      </h2>
       {!data.semantic && <p className="text-xs text-muted-foreground">{t("library.searchKeywordOnly")}</p>}
       {data.hits.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("library.searchNone")}</p>
@@ -234,14 +257,18 @@ export default function Library() {
   const docs = useDocuments();
   const stagesQ = useStages();
   const [params, setParams] = useSearchParams();
-  const view = (["programme", "stage", "department"].includes(params.get("view") ?? "")
+  const me = useMe();
+  const view = (["programme", "stage", "department", "folders"].includes(params.get("view") ?? "")
     ? params.get("view")
     : "programme") as View;
   const q = params.get("q") ?? "";
+  const within = params.get("within");
+  const openFolder = view === "folders" ? params.get("folder") : null;
   const [draft, setDraft] = useState(q);
+  const [onlyHere, setOnlyHere] = useState(true);
   const stages = stagesQ.data ?? [];
   const all = docs.data ?? [];
-  const groups = groupsFor(view, all, stages);
+  const groups = view === "folders" ? folderDepartments(all, me.data) : groupsFor(view, all, stages);
   const group = params.get("group") ?? groups[0] ?? null;
 
   const set = (changes: Record<string, string | null>) =>
@@ -256,7 +283,7 @@ export default function Library() {
   function submit(e: FormEvent) {
     e.preventDefault();
     const text = draft.trim();
-    if (text.length >= 2) set({ q: text });
+    if (text.length >= 2) set({ q: text, within: openFolder && onlyHere ? openFolder : null });
   }
 
   return (
@@ -274,6 +301,14 @@ export default function Library() {
             <Search />
           </Button>
         </form>
+        {openFolder && (
+          <Checkbox
+            id="library-only-here"
+            checked={onlyHere}
+            onChange={(e) => setOnlyHere(e.target.checked)}
+            label={t("library.searchOnlyIn", { folder: openFolder.slice(openFolder.lastIndexOf("/") + 1) })}
+          />
+        )}
         <div className="space-y-1">
           <label htmlFor="library-view" className="text-xs text-muted-foreground">
             {t("library.view")}
@@ -286,6 +321,7 @@ export default function Library() {
             <option value="programme">{t("library.byProgramme")}</option>
             <option value="stage">{t("library.byStage")}</option>
             <option value="department">{t("library.byDepartment")}</option>
+            <option value="folders">{t("library.byFolder")}</option>
           </Select>
         </div>
         <BookmarkList limit={8} />
@@ -295,14 +331,15 @@ export default function Library() {
               <li key={g}>
                 <button
                   type="button"
-                  onClick={() => set({ group: g, q: null })}
+                  onClick={() => set({ group: g, q: null, folder: null })}
                   aria-current={!q && g === group ? "true" : undefined}
                   className={cn(
                     "w-full rounded px-2 py-1 text-left capitalize hover:bg-accent",
                     !q && g === group && "bg-accent font-medium",
+                    g === HELP && "normal-case",
                   )}
                 >
-                  {groupLabel(view, g)}
+                  {view === "folders" ? g : groupLabel(view, g)}
                 </button>
               </li>
             ))}
@@ -317,17 +354,24 @@ export default function Library() {
               className="mb-2 px-0"
               onClick={() => {
                 setDraft("");
-                set({ q: null });
+                set({ q: null, within: null });
               }}
             >
               {t("library.clearSearch")}
             </Button>
-            <Results key={q} q={q} />
+            <Results key={`${q}|${within ?? ""}`} q={q} within={within} />
           </>
         ) : docs.isPending || stagesQ.isPending ? (
           <p className="text-sm text-muted-foreground">{t("app.loading")}</p>
         ) : docs.isError ? (
           <p className="text-sm" role="alert">{t("error.generic")}</p>
+        ) : group && view === "folders" ? (
+          <FolderBrowser
+            space={group}
+            path={params.get("folder") ?? ""}
+            docs={all}
+            onOpen={(folder) => set({ folder })}
+          />
         ) : group ? (
           <Browse view={view} group={group} docs={all} stages={stages} />
         ) : (

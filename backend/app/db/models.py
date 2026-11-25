@@ -322,6 +322,17 @@ class DocumentTag(Base):
     tag: Mapped[str] = mapped_column(String(128), primary_key=True)
 
 
+class LibraryFolder(Base):
+    """A folder made in the app inside one department (empty ones included)."""
+
+    __tablename__ = "library_folders"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    space: Mapped[str] = mapped_column(ForeignKey("spaces.name"), index=True)
+    path: Mapped[str] = mapped_column(Text, unique=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class VaultState(Base):
     """Indexer bookkeeping, e.g. the last indexed commit."""
 
@@ -355,9 +366,22 @@ class ClassificationProposal(Base):
     # what the one-way rule did: auto_tighten | queued | quarantined | unchanged
     decision: Mapped[str] = mapped_column(String(16))
     group_key: Mapped[str] = mapped_column(Text, default="")
+    # the trained sorter's vote {space, confidence, sensitivity} and its folder
+    sorter_vote: Mapped[dict | None] = mapped_column(JSONB)
+    suggested_folder: Mapped[str | None] = mapped_column(Text)
     reviewed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _created()
+
+
+class TrainedSorter(Base):
+    """The latest trained sorter: average fingerprints, never text."""
+
+    __tablename__ = "sorter_models"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    trained_at: Mapped[datetime] = _created()
+    documents: Mapped[int] = mapped_column(Integer)
+    data: Mapped[dict] = mapped_column(JSONB)
 
 
 class KnownName(Base):
@@ -649,6 +673,7 @@ class GapTopic(Base):
     label: Mapped[str] = mapped_column(Text)  # written from the questions only
     programme: Mapped[str | None] = mapped_column(Text)
     stage: Mapped[str | None] = mapped_column(String(32))
+    folder: Mapped[str | None] = mapped_column(Text)  # nearest approved document's folder
     status: Mapped[str] = mapped_column(String(20), default="open")
     centroid: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM))
     size: Mapped[int] = mapped_column(Integer, default=0)

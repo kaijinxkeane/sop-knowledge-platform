@@ -2,13 +2,21 @@
 
 1. Permissions: only spaces the user may read are candidates.
 2. Search, no model: strong matches from one clear space -> that space; from
-   two -> both (unless one clearly leads).
-3. Unclear (3+ spaces with no leader, or nothing strong): the local `router`
-   tier picks, seeing only the question and one-line space descriptions,
-   never vault content. Routing never uses a cloud tier.
-4. Model unavailable: every permitted space in the results (or all of them).
+   two -> both (unless one clearly leads). If the trained sorter confidently
+   puts the question in another readable space than search's leader, both
+   answer (each in its own section): on the eval questions search was wrong
+   in 3 of those 4 cases.
+3. Unclear, but the trained sorter (app/classify/sorter.py: which department
+   filed documents like this question belong to) is confident and agrees
+   with search's leading space, or search found nothing strong -> that space,
+   no model call.
+4. Still unclear: the local `router` tier picks, seeing only the question and
+   one-line space descriptions, never vault content. Routing never uses a
+   cloud tier.
+5. Model unavailable: the sorter's space if it has one, else every permitted
+   space in the results (or all of them).
 
-Every decision carries a reason (single_space | search | model | fallback)
+Every decision carries a reason (single_space | search | sorter | model | fallback)
 and is logged with the chosen spaces, never the question.
 """
 
@@ -20,6 +28,7 @@ import re
 from dataclasses import dataclass
 
 from app.agents.untrusted import REMINDER, tag, with_rules
+from app.classify.sorter import Vote
 from app.models.gateway import ModelGateway
 from app.models.types import ContentScope, Message
 from app.retrieval.search import Hit
@@ -33,7 +42,7 @@ LEAD_SHARE = 0.7  # one space holding this share of the strong-match score leads
 @dataclass(frozen=True)
 class Route:
     spaces: tuple[str, ...]
-    reason: str  # single_space | search | model | fallback
+    reason: str  # single_space | search | sorter | model | fallback
 
 
 def _strong(hit: Hit) -> bool:
@@ -55,6 +64,7 @@ async def route(
     readable: list[str],
     profiles: dict[str, SpaceProfile],
     gateway: ModelGateway | None,
+    vote: Vote | None = None,
 ) -> Route:
     readable = [s for s in readable if s in profiles]
     if len(readable) <= 1:
@@ -66,10 +76,15 @@ async def route(
             scores[h.space] = scores.get(h.space, 0.0) + h.score
     ranked = sorted(scores, key=scores.get, reverse=True)
     total = sum(scores.values())
+    sorted_space = vote.space if vote is not None and vote.space in readable else None
     if ranked and scores[ranked[0]] / total >= LEAD_SHARE:
+        if sorted_space and sorted_space != ranked[0]:
+            return _done(Route((ranked[0], sorted_space), "sorter"))
         return _done(Route((ranked[0],), "search"))
     if len(ranked) == 2:
         return _done(Route(tuple(ranked), "search"))
+    if sorted_space and (not ranked or ranked[0] == sorted_space):
+        return _done(Route((sorted_space,), "sorter"))
 
     if gateway is not None:
         try:
@@ -88,6 +103,8 @@ async def route(
                 return _done(Route(chosen, "model"))
         except Exception:  # noqa: BLE001 - routing must never fail the question
             pass
+    if sorted_space:
+        return _done(Route((sorted_space,), "fallback"))
     in_results = tuple(dict.fromkeys(h.space for h in hits if h.space in readable))
     return _done(Route(in_results or tuple(readable), "fallback"))
 

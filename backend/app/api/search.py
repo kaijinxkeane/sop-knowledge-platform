@@ -53,6 +53,7 @@ async def search_endpoint(
     stage: str | None = Query(default=None, max_length=32),
     doc_type: str | None = Query(default=None, max_length=32),
     kind: str | None = Query(default=None, max_length=16),
+    folder: str | None = Query(default=None, max_length=300),
     limit: int = Query(default=10, ge=1, le=50),
     me: CurrentUser = Depends(current_user),
     session: AsyncSession = Depends(get_db),
@@ -77,6 +78,7 @@ async def search_endpoint(
         doc_type=doc_type,
         kind=kind,
         limit=limit,
+        folder=folder,
     )
     user_id = me.principal.user_id
     await session.rollback()  # leave reader mode before writing the history row

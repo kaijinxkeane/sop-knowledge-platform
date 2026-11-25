@@ -34,7 +34,7 @@ export type Section = {
 };
 
 export type FollowUp = Schemas["FollowUpOut"];
-export type Filters = { programme: string | null; stage: string | null };
+export type Filters = { programme: string | null; stage: string | null; folder?: string | null };
 
 /** Your conversations; `q` matches titles and your own questions. */
 export const useConversations = (q = "") =>
@@ -132,6 +132,7 @@ export async function streamAnswer(
         content: question,
         ...(filters.programme ? { programme: filters.programme } : {}),
         ...(filters.stage ? { stage: filters.stage } : {}),
+        ...(filters.folder ? { folder: filters.folder } : {}),
       }),
       credentials: "same-origin",
       signal,

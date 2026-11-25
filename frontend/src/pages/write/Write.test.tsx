@@ -265,6 +265,21 @@ describe("new note", () => {
     );
   });
 
+  it("points at notes like this one before a new one is started", async () => {
+    let asked: unknown = null;
+    writeApi({
+      "POST /api/v1/notes/similar": async (req) => (
+        (asked = await req.json()),
+        json([{ id: "n1", title: "Discovery Workshop", folder: "Programmes/Signature" }])
+      ),
+    });
+    renderApp("/write/new");
+    await userEvent.type(await screen.findByLabelText("Title"), "Discovery workshop steps");
+    expect(await screen.findByText("Notes like this already exist", undefined, { timeout: 3000 })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Discovery Workshop" })).toHaveAttribute("href", "/library/n1");
+    expect(asked).toEqual({ title: "Discovery workshop steps" });
+  });
+
   it("is hidden from people who can't write", async () => {
     writeApi({}, makeMe());
     renderApp("/write/new");

@@ -75,6 +75,24 @@ describe("Retain → gaps", () => {
 });
 
 describe("Retain → coverage", () => {
+  it("shows a lead their department folder by folder", async () => {
+    retainApi(lead, {
+      "GET /api/v1/spaces/core/folder-coverage": () =>
+        json([{ folder: "Programmes/Signature", documents: 4, approved: 3, stale: 1, open_gaps: 2, gap_questions: 5 }]),
+    });
+    renderApp("/retain?tab=coverage");
+    const link = await screen.findByRole("link", { name: "Programmes/Signature" });
+    expect(link.getAttribute("href")).toContain("view=folders");
+    expect(screen.getByText("2 (5 questions)")).toBeInTheDocument();
+  });
+
+  it("shows no folder table to HR (counts by programme only)", async () => {
+    retainApi(hr);
+    renderApp("/retain?tab=coverage");
+    await screen.findByText("Signature");
+    expect(screen.queryByText("By folder")).toBeNull();
+  });
+
   it("draws the programme × stage grid and offers to create a missing SOP", async () => {
     retainApi();
     renderApp("/retain?tab=coverage");

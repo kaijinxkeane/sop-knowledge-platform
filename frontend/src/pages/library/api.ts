@@ -43,10 +43,11 @@ export const useVersions = (id: string) =>
  * One search. Cached for the session, so going back to the results doesn't
  * record the same search again in the person's history.
  */
-export const useSearch = (q: string) =>
+export const useSearch = (q: string, folder?: string | null) =>
   useQuery({
-    queryKey: ["search", q],
-    queryFn: () => unwrap(api.GET("/api/v1/search", { params: { query: { q, limit: 20 } } })),
+    queryKey: ["search", q, folder ?? null],
+    queryFn: () =>
+      unwrap(api.GET("/api/v1/search", { params: { query: { q, limit: 20, ...(folder ? { folder } : {}) } } })),
     staleTime: Infinity,
     retry: false,
   });

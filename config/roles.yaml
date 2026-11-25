@@ -4,7 +4,8 @@
 #
 # A grant is {space, max_sensitivity, actions}:
 #   space actions:   ask | contribute | review | approve | admin   (admin = all)
-#   global actions:  manage_users | view_audit | view_gap_reports  (no space)
+#   global actions:  manage_users | manage_spaces | view_audit | view_gap_reports  (no space)
+#   manage_spaces = create departments (Admin → Departments)
 
 roles:
   employee:
@@ -44,8 +45,9 @@ roles:
     description: Approves HR SOPs and sees restricted HR material.
     grants:
       - {space: hr, max_sensitivity: restricted, actions: [ask, contribute, review, approve]}
+      - {space: null, max_sensitivity: public, actions: [manage_spaces]}
 
   platform-admin:
     description: Manages users, roles and grants and reads the audit log. Grants no content by itself.
     grants:
-      - {space: null, max_sensitivity: public, actions: [manage_users, view_audit]}
+      - {space: null, max_sensitivity: public, actions: [manage_spaces, manage_users, view_audit]}

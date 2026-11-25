@@ -91,3 +91,14 @@ ocr:
   enabled: true
   min_confidence: 0.6
   max_images_per_file: 60
+
+# How the AI Classifier (sorter) learns from where people filed documents.
+classifier:
+  # Show the AI the most similar filed documents and their labels and folders.
+  # Held-out notes (eval-classifier --cases holdout, 2026-11-26, 120 filed):
+  # placed correctly 80% -> 96%, too-loose suggestions 13% -> 4%.
+  examples: true
+  # A second vote from a small model trained nightly on filed documents
+  # (app/classify/sorter.py). It only ever makes labels stricter or holds a note
+  # for review, and suggests a folder to reviewers who can file there.
+  sorter: true

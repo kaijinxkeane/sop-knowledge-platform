@@ -6,9 +6,11 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { t, type MessageKey } from "@/i18n";
+import { useFolderActions } from "@/pages/library/Folders";
 import { useLabelActions, useQueue, useSpaces, widens, type Group, type Labels, type Proposal } from "./api";
 
 const SENSITIVITIES = ["public", "internal", "restricted"] as const;
@@ -81,8 +83,13 @@ function WidensLine({ current, next }: { current?: Labels | null; next?: Labels 
   );
 }
 
-function ProposalCard({ p }: { p: Proposal }) {
+type Note = (message: string) => void;
+
+function ProposalCard({ p, onNote }: { p: Proposal; onNote: Note }) {
   const { approve, reject } = useLabelActions();
+  const { move } = useFolderActions();
+  const folder = p.proposed ? p.suggested_folder : null;
+  const [file, setFile] = useState(false); // opt-in: suggestions are often wrong in small libraries
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const busy = approve.isPending || reject.isPending;
@@ -133,12 +140,35 @@ function ProposalCard({ p }: { p: Proposal }) {
           </>
         )}
       </details>
+      {folder && (
+        <div className="text-sm">
+          <Checkbox
+            id={`file-${p.id}`}
+            checked={file}
+            onChange={(e) => setFile(e.target.checked)}
+            label={t("labels.fileIn", { folder })}
+          />
+          <p className="ml-6 text-xs text-muted-foreground">{t("labels.fileExplain")}</p>
+        </div>
+      )}
       {error && <Alert>{error}</Alert>}
       {editing ? (
         <EditLabels p={p} onDone={() => setEditing(false)} />
       ) : (
         <div className="flex gap-2">
-          <Button size="sm" disabled={busy || p.stale || !p.proposed} onClick={() => act(() => approve.mutateAsync({ id: p.id }))}>
+          <Button size="sm" disabled={busy || p.stale || !p.proposed} onClick={() =>
+              act(async () => {
+                await approve.mutateAsync({ id: p.id });
+                if (!folder || !file) return;
+                try {
+                  await move.mutateAsync({ id: p.document_id, folder });
+                  onNote(t("labels.filed", { title: p.title, folder }));
+                } catch (e) {
+                  onNote(t("labels.notFiled", { title: p.title, folder, error: messageOf(e) }));
+                }
+              })
+            }
+          >
             {t("labels.approve")}
           </Button>
           <Button size="sm" variant="outline" disabled={busy || p.stale} onClick={() => setEditing(true)}>
@@ -153,7 +183,7 @@ function ProposalCard({ p }: { p: Proposal }) {
   );
 }
 
-function GroupCard({ g, items }: { g: Group; items: Proposal[] }) {
+function GroupCard({ g, items, onNote }: { g: Group; items: Proposal[]; onNote: Note }) {
   const { bulk } = useLabelActions();
   const [result, setResult] = useState<string[] | null>(null);
   const ready = items.filter((p) => !p.stale && p.proposed);
@@ -199,7 +229,7 @@ function GroupCard({ g, items }: { g: Group; items: Proposal[] }) {
           </ul>
         )}
         <ul className="space-y-3">
-          {items.map((p) => <ProposalCard key={p.id} p={p} />)}
+          {items.map((p) => <ProposalCard key={p.id} p={p} onNote={onNote} />)}
         </ul>
       </CardContent>
     </Card>
@@ -212,6 +242,7 @@ function GroupCard({ g, items }: { g: Group; items: Proposal[] }) {
  */
 export function LabelQueue({ unplaced }: { unplaced: boolean }) {
   const queue = useQueue();
+  const [note, setNote] = useState<string | null>(null);
   if (queue.isPending) return <Loading />;
   if (queue.isError) return <p role="alert" className="text-sm">{t("error.generic")}</p>;
   const groups = queue.data
@@ -220,10 +251,11 @@ export function LabelQueue({ unplaced }: { unplaced: boolean }) {
   return (
     <div className="space-y-4">
       {unplaced && <p className="text-sm text-muted-foreground">{t("labels.unplacedExplain")}</p>}
+      {note && <p role="status" className="rounded-md border bg-muted/40 px-3 py-2 text-sm">{note}</p>}
       {groups.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t(unplaced ? "review.empty.unplaced" : "review.empty.labels")}</p>
       ) : (
-        groups.map(({ g, items }) => <GroupCard key={g.group_key} g={g} items={items} />)
+        groups.map(({ g, items }) => <GroupCard key={g.group_key} g={g} items={items} onNote={setNote} />)
       )}
     </div>
   );

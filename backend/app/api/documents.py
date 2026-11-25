@@ -53,6 +53,7 @@ class DocumentOut(BaseModel):
     stage: str | None
     owner: str | None
     access: list[AccessOut]
+    space: str | None = None  # the department it belongs to (its owner row)
     approved: bool = False  # has an approved version (only that is cited)
     pending_change: bool = False  # editors only: the latest version isn't approved yet
     review_due: date | None = None
@@ -109,6 +110,7 @@ def _out(doc: Document, me: CurrentUser) -> DocumentOut | None:
         access=[
             AccessOut(space=s, sensitivity=v.label) for s, v in rows if me.principal.can_read(s, v)
         ],
+        space=next((a.space for a in doc.access if a.role == "owner"), None),
         approved=doc.approved_hash is not None,
         pending_change=has_pending_change(doc) and sees_latest(me.principal, doc),
         review_due=doc.review_due,

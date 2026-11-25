@@ -15,12 +15,14 @@ function useAdminTabs() {
   return {
     manage: actions.includes("manage_users"),
     audit: actions.includes("view_audit"),
+    spaces: actions.includes("manage_spaces"),
   };
 }
 
-/** Users and roles need manage_users; the audit log needs view_audit (the backend checks both). */
+/** Users and roles need manage_users; the audit log needs view_audit; departments
+ * need manage_spaces (the backend checks all three). */
 export default function AdminLayout() {
-  const { manage, audit } = useAdminTabs();
+  const { manage, audit, spaces } = useAdminTabs();
   return (
     <section className="mx-auto max-w-6xl px-6 py-8">
       <h1 className="text-xl font-semibold">{t("admin.title")}</h1>
@@ -31,6 +33,7 @@ export default function AdminLayout() {
             <NavLink to="/admin/roles" className={tab}>{t("admin.roles")}</NavLink>
           </>
         )}
+        {spaces && <NavLink to="/admin/departments" className={tab}>{t("admin.departments")}</NavLink>}
         {audit && <NavLink to="/admin/audit" className={tab}>{t("admin.audit")}</NavLink>}
         {(manage || audit) && <NavLink to="/admin/usage" className={tab}>{t("admin.usage")}</NavLink>}
       </nav>
@@ -42,6 +45,6 @@ export default function AdminLayout() {
 }
 
 export function AdminIndex() {
-  const { manage } = useAdminTabs();
-  return <Navigate to={manage ? "/admin/users" : "/admin/audit"} replace />;
+  const { manage, audit } = useAdminTabs();
+  return <Navigate to={manage ? "/admin/users" : audit ? "/admin/audit" : "/admin/departments"} replace />;
 }

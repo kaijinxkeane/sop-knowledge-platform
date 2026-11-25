@@ -19,6 +19,7 @@ import type { Colleague } from "@/pages/handovers/api";
 import { useDocuments } from "@/pages/library/api";
 import { NotFound } from "@/pages/NotFound";
 import { useSpaces } from "@/pages/review/api";
+import { placeFor } from "@/lib/places";
 import { useProject, useProjectActions, useProjects, useShareRequests, type Project, type ShareRequest } from "./api";
 
 const day = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString([], { dateStyle: "medium" }) : "");
@@ -329,7 +330,7 @@ export function ProjectView() {
   return (
     <div className="mx-auto grid max-w-6xl grid-cols-[1fr_22rem] gap-6 px-6 py-6">
       <div className="space-y-4">
-        <Link to="/projects" className="text-sm text-muted-foreground hover:text-foreground">← {t("project.title")}</Link>
+        <Link to={placeFor("projects", "/projects")} className="text-sm text-muted-foreground hover:text-foreground">← {t("project.title")}</Link>
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold">{p.name}</h1>
           <Status p={p} />

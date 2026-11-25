@@ -1,6 +1,7 @@
 """Background worker (arq + Redis).
 
-- every minute: re-index files changed in git since the last run (app saves
+- every minute: add the built-in user guide (config/help) if the vault lacks
+  it (app/vault/help.py), then re-index files changed in git since the last run (app saves
   are indexed immediately; this catches Obsidian edits on the device), then
   fill in embeddings that failed earlier (e.g. Ollama was down)
 - every minute (at :30): run the local Classifier / name detector on new
@@ -9,6 +10,8 @@
 - every minute (at :15): summarise open reviews (local `background` tier)
 - every minute (at :45): deliver queued webhooks
 - daily 07:00: review-due reminders
+- nightly 02:20 (and at startup): train the sorter from filed documents
+  (app/classify/training.py): fingerprints only, a second vote for the Classifier
 - nightly 02:30: group gap events into topics, refresh handover readers
 - nightly 03:00: conflict check between approved SOPs (up to 500 pairs, ~25 min)
 - nightly 03:30: delete records past the retention period (24 months)
@@ -49,7 +52,9 @@ async def index_sync(ctx: dict) -> dict:
     if not indexer.git.is_repo():
         log.warning("vault_not_a_git_repo")
         return {}
-    return (await indexer.sync()).summary()
+    from app.vault.help import sync_with_help
+
+    return await sync_with_help(indexer)
 
 
 async def classify_pending(ctx: dict) -> dict:
@@ -62,6 +67,12 @@ async def classify_pending(ctx: dict) -> dict:
         get_sessionmaker(), gateway_classifier(_gateway(), space_profiles())
     )
     return (await service.run_pending()).summary()
+
+
+async def train_sorter(ctx: dict) -> dict:
+    from app.classify.training import train_sorter as run
+
+    return await run(get_sessionmaker())
 
 
 async def nightly_check(ctx: dict) -> int:
@@ -190,6 +201,7 @@ class WorkerSettings:
         apply_retention,
         project_reminders,
         render_slides,
+        train_sorter,
     ]
     cron_jobs = [
         cron(heartbeat, minute={0, 15, 30, 45}),
@@ -203,6 +215,7 @@ class WorkerSettings:
         cron(detect_conflicts, hour=3, minute=0, unique=True, timeout=10800),
         cron(apply_retention, hour=3, minute=30, unique=True, timeout=1800),
         cron(project_reminders, hour=7, minute=10, unique=True, timeout=300),
+        cron(train_sorter, hour=2, minute=20, run_at_startup=True, unique=True, timeout=900),
         cron(render_slides, minute=set(range(5, 60, 10)), unique=True, timeout=1800),
     ]
     on_startup = startup
