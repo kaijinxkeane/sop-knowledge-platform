@@ -557,10 +557,11 @@ async def test_conflicts_need_the_second_opinion_too(indexed, sessions):
     gw = TwoModels(
         ['{"conflict": false}', '{"conflict": true, "explanation": "Different owners."}', None]
     )
-    report = await detect_conflicts(sessions, gw, max_pairs=3, maxd=0.95)
+    # A queue bigger than solo_pairs: the 8B → 14B pipeline.
+    report = await detect_conflicts(sessions, gw, max_pairs=3, maxd=0.95, solo_pairs=2)
     # All 8B checks first, then the 14B on its flags: each model loads once.
     assert gw.calls == ["background"] * 3 + ["conflict-confirm"] * 3
-    assert report == {"checked": 2, "conflicts": 1, "unconfirmed": 1}
+    assert report == {"checked": 2, "conflicts": 1, "unconfirmed": 1, "solo": False}
     # Unstated group overrides count on both stages; only the 8B is told to flag if unsure.
     assert all(STRICT_NOTE in system for system in gw.systems.values())
     assert SCREEN_NOTE in gw.systems["background"]
@@ -573,8 +574,22 @@ async def test_conflicts_need_the_second_opinion_too(indexed, sessions):
         (True, "fake-8b → fake-14b", "Different owners."),
     ]  # the failed second check is not stored, so the pair is tried again next night
     gw.answers = ['{"conflict": false}']
-    again = await detect_conflicts(sessions, gw, max_pairs=1, maxd=0.95, max_confirms=0)
-    assert again == {"checked": 0, "conflicts": 0, "unconfirmed": 1}  # over the cap: wait
+    again = await detect_conflicts(
+        sessions, gw, max_pairs=1, maxd=0.95, max_confirms=0, solo_pairs=0
+    )
+    assert again == {"checked": 0, "conflicts": 0, "unconfirmed": 1, "solo": False}  # over cap
+
+
+async def test_small_queue_is_judged_by_the_14b_alone(indexed, sessions):
+    gw = TwoModels(['{"conflict": false}', '{"conflict": true, "explanation": "Owners."}', None])
+    report = await detect_conflicts(sessions, gw, max_pairs=3, maxd=0.95)
+    assert gw.calls == ["conflict-confirm"] * 3  # the 8B is never asked
+    assert report == {"checked": 2, "conflicts": 1, "unconfirmed": 0, "solo": True}
+    assert STRICT_NOTE in gw.systems["conflict-confirm"]
+    assert SCREEN_NOTE not in gw.systems["conflict-confirm"]
+    async with sessions() as s:
+        rows = (await s.execute(select(Conflict.conflict, Conflict.model))).all()
+    assert sorted(rows) == [(False, "fake-14b"), (True, "fake-14b")]  # the failed one waits
 
 
 async def test_checked_pairs_never_crowd_out_new_ones(indexed, sessions):

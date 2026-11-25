@@ -3,11 +3,13 @@ contradict each other.
 
 Nightly, the closest pairs of live passages from *different* live notes are
 found with the vector index; each new pair (per pair of approved versions) is
-checked once by the local `background` tier (8B). If the `conflict-confirm`
-tier exists (14B, thinking on), every pair the 8B flags is then checked again
-by it, after all 8B checks so each model loads once; only pairs both flag are
-contradictions. Both stages treat a group's unstated override of a general rule
-as a conflict; the 8B is told it is a screen when the second opinion is on.
+checked once. If the `conflict-confirm` tier exists (14B, thinking on) and the
+night's queue is small (`SOLO_PAIRS`, the usual case: pairs from edited SOPs),
+the 14B alone judges every pair. A bigger queue uses the 8B (`background`) on
+every pair, then the 14B on the 8B's flags (each model loads once); only pairs
+both flag are contradictions. Without that tier, the 8B alone decides. Every
+stage treats a group's unstated override of a general rule as a conflict; the
+8B is told it is a screen when the second opinion follows.
 A contradiction is stored with a short explanation, shown only to people who
 can read both notes and review one of their spaces. Bounded to `max_pairs`
 model calls per run.
@@ -37,7 +39,12 @@ PAIR_DISTANCE = 0.55
 NEIGHBOURS = 10  # nearest passages per passage
 MAX_PAIRS = 500  # model checks per night: about 25 minutes at ~3 s a pair
 CONFIRM_TIER = "conflict-confirm"
-MAX_CONFIRMS = 60  # second checks per night: up to ~60 min at 30-80 s a pair (job limit 2 h)
+MAX_CONFIRMS = 60  # second checks per night: up to ~60 min at 30-80 s a pair
+# A normal night's new pairs (from edited SOPs, ~5 per note) are judged by the
+# 14B alone, which catches far more than the 8B → 14B pipeline (eval
+# 2026-11-25). A bigger queue (first run, bulk import) uses the pipeline so it
+# still finishes overnight. 100 pairs at 30-80 s: up to ~2.2 h (job limit 3 h).
+SOLO_PAIRS = 100
 SYSTEM = (
     "You compare two passages from a company's procedures (SOPs). Decide whether "
     "they give contradictory instructions for the same situation (different "
@@ -196,6 +203,7 @@ async def detect_conflicts(
     row_limit: int | None = None,
     confirm_tier: str | None = CONFIRM_TIER,
     max_confirms: int = MAX_CONFIRMS,
+    solo_pairs: int = SOLO_PAIRS,
 ) -> dict:
     checked = found = 0
     async with sessions() as s:
@@ -208,14 +216,16 @@ async def detect_conflicts(
             work.append((a, b, ha, hb, da.title, db.title, ta, tb, spaces))
             if len(work) >= max_pairs:
                 break
-    confirming = confirm_tier is not None and confirm_tier in getattr(
+    has_confirm = confirm_tier is not None and confirm_tier in getattr(
         getattr(gateway, "config", None), "tiers", {}
     )
+    solo = has_confirm and len(work) <= solo_pairs  # the 14B alone judges every pair
+    confirming = has_confirm and not solo  # 8B first, 14B on its flags
     first: list[tuple[tuple, Verdict]] = []
     for job in work:
         a, b, ha, hb, title_a, title_b, ta, tb, spaces = job
         try:
-            # Strict exceptions on both stages; the screening wording only when
+            # Strict exceptions on every stage; the screening wording only when
             # a second opinion follows to clear the extra flags (eval 2026-11-24).
             verdict = await judge_pair(
                 gateway,
@@ -224,6 +234,7 @@ async def detect_conflicts(
                 title_a=title_a,
                 title_b=title_b,
                 scope=_scope(spaces),
+                tier=confirm_tier if solo else "background",
                 strict=True,
                 screen=confirming,
             )
@@ -281,10 +292,11 @@ async def detect_conflicts(
                     "found": found,
                     "confirmed": confirms,
                     "unconfirmed": unconfirmed,
+                    "solo": solo,
                 }
             },
         )
-    return {"checked": checked, "conflicts": found, "unconfirmed": unconfirmed}
+    return {"checked": checked, "conflicts": found, "unconfirmed": unconfirmed, "solo": solo}
 
 
 def _scope(spaces: set[str]) -> ContentScope:

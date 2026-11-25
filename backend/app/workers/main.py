@@ -159,7 +159,7 @@ class WorkerSettings:
         cron(deliver_webhooks, second=45, unique=True, timeout=300),
         cron(review_reminders, hour=7, minute=0, unique=True, timeout=300),
         cron(group_gaps, hour=2, minute=30, unique=True, timeout=1800),
-        cron(detect_conflicts, hour=3, minute=0, unique=True, timeout=7200),
+        cron(detect_conflicts, hour=3, minute=0, unique=True, timeout=10800),
         cron(apply_retention, hour=3, minute=30, unique=True, timeout=1800),
         cron(project_reminders, hour=7, minute=10, unique=True, timeout=300),
     ]

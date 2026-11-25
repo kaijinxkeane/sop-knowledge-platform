@@ -65,8 +65,10 @@ tiers:
   # the 8B flagged, after all 8B checks, so each model loads once. Thinking on:
   # without it the 14B agreed with every 8B flag (eval 2026-11-24); with it,
   # false alarms fell 12.5% -> 4.2% (dev) and 13.0% -> 5.6% (held out), no
-  # conflicts lost. ~9.6 GB and 30-80 s a pair, at most 60 a night (3 am). Remove this tier to
-  # go back to the 8B alone (e.g. if `ollama pull qwen3:14b` isn't possible).
+  # conflicts lost. A night with at most 100 pairs is judged by the 14B alone
+  # (2026-11-25: held out 85.2% vs 81.5% accurate, more conflicts caught).
+  # ~9.6 GB and 30-80 s a pair (3 am). Remove this tier to go back to the 8B
+  # alone (e.g. if `ollama pull qwen3:14b` isn't possible).
   conflict-confirm:
     provider: openai_compat
     location: local

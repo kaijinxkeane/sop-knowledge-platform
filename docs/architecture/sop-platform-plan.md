@@ -1204,7 +1204,7 @@ repo on the company device, mounted at deploy time via `VAULT_PATH`.
 | 6. Company deployment | Not started | Playwright end-to-end suite and accessibility pass not started; nothing tried in a real browser yet |
 | 7. Local models | Model choice settled (`qwen3:8b`, held-out evals); improvement loop not started | — |
 
-Tried 2026-11-24 (§7): a `qwen3:14b` confirm stage with thinking on cuts conflict-check false alarms (dev 12.5% → 4.2%, held out 13.0% → 5.6%) with no lost catches. In the nightly job since 2026-11-24 (`conflict-confirm` tier).
+Tried 2026-11-24 (§7): a `qwen3:14b` confirm stage with thinking on cuts conflict-check false alarms (dev 12.5% → 4.2%, held out 13.0% → 5.6%) with no lost catches. In the nightly job since 2026-11-24 (`conflict-confirm` tier). Since 2026-11-25 the 14B judges a night's pairs on its own when there are at most 100 (fresh held-out set: 85.2% vs 81.5% accurate, 75.9% vs 63.0% of conflicts caught).
 
 **Progress:** Phase 0 *backend* done (2026-11-20): the gateway with its data
 boundary, the Docker stack, migrations, the demo vault, CI and a content-free
@@ -1656,12 +1656,29 @@ Phase 5 *backend* done (2026-11-21):
     Held out it gained 5 checks and lost 2 (p = 0.45; holdout2 +5/−0): small
     but consistent, so it is on in the nightly job. Without the confirm tier
     the 8B gets the strict rule but not the screening wording.
-  - **What's left:** recall is now limited by the 8B first stage (the 14B
-    kept every conflict it was given). Held out, buried (3/12), implicit
-    (3/9) and owner (3/6) conflicts are still mostly missed. Next to try: the
-    14B with thinking as the *only* judge on new pairs. After the first full
-    run, a night's new pairs are only those from edited SOPs, so 40 s a pair
-    may fit; measure its recall on dev first.
+  - **14B alone, tried 2026-11-25** (thinking on, strict rule, 3 runs).
+    Holdout2 and holdout3 were already used, so they count as tuning sets;
+    `conflicts-holdout4.yaml` was written before this run and run once.
+
+    | Accuracy (caught / false alarms) | Dev | Holdout2 | Holdout3 | Holdout4 (once) |
+    |---|---|---|---|---|
+    | 8B → 14B, fix 1 | 93.8% (91.7 / 4.2) | 88.0% (79.6 / 3.7) | 83.3% (66.7 / 0.0) | 81.5% (63.0 / 0.0) |
+    | 14B alone | 96.5% (100 / 6.9) | 93.5% (94.4 / 7.4) | 96.3% (98.1 / 5.6) | 85.2% (75.9 / 5.6) |
+
+    Holdout3: 17 checks gained, 3 lost (p = 0.003); holdout4: +9/−5
+    (p = 0.42). Same direction on all four sets. On holdout4 it caught more
+    buried (13 vs 10 of 15), implicit and deadline conflicts, for 3 false
+    alarms in 54. Both still miss changed tools (0/3) and most changed
+    numbers (1/3). The 14B takes about 40 s a pair against the pipeline's 5 s.
+  - **In the nightly job (2026-11-25):** if a night has at most 100 pairs to
+    check (`SOLO_PAIRS`), the 14B judges each one alone. A normal night only
+    has pairs from edited SOPs: the demo vault has about 5 pairs per note, so
+    about 1-2 hours at most. More pairs (the first full run, a bulk import)
+    use the 8B → 14B pipeline so the job still finishes in one night. The job
+    limit is 3 hours.
+  - **What's left:** changed tools and numbers are still missed (holdout4,
+    0/3 and 1/3). All four held-out sets are now used; write a fresh one
+    before the next comparison.
 - **Retract** (`POST /retractions`, `manage_users`): a document, or a value
   plus its common encodings (llm-wiki's `retract_patterns`).
   - What it purges: the index, answers that cited the document, chat text,
@@ -1786,18 +1803,17 @@ is unchanged), Slack/Teams adapters, the dashboard app, ticketing integrations
 
 ### Deferred work (to do)
 
-- **Conflict check, second stage:** done 2026-11-24 (§7). The nightly job
-  runs every 8B check first, then the `conflict-confirm` tier (`qwen3:14b`,
-  thinking on) on the 8B's flags, so each model loads once; only pairs both
-  flag are stored as conflicts. At most 60 second checks a night
-  (`MAX_CONFIRMS`, 30-80 s each); a flag over the cap or a failed second check
-  is not stored and is checked again the next night. The job limit is 2 hours.
-  Without the tier in `config/models.yaml` the job is the 8B alone. Unit notes
-  and sentence focus are built but off. Strict exceptions + screening (fix 1)
-  are on. All three held-out sets are now used; write a fresh one before the
-  next comparison.
-  Next: misses (held out 67% caught, limited by the 8B first stage): try the
-  14B with thinking as the only judge on new pairs (§7).
+- **Conflict check, second stage:** done 2026-11-24 and 2026-11-25 (§7).
+  With the `conflict-confirm` tier (`qwen3:14b`, thinking on), a night with
+  at most 100 pairs (`SOLO_PAIRS`) is judged by the 14B alone. A bigger night
+  runs every 8B check first, then the 14B on the 8B's flags (at most 60,
+  `MAX_CONFIRMS`), so each model loads once; only pairs both flag are stored.
+  A failed check or one over the cap is not stored and is checked again the
+  next night. The job limit is 3 hours. Without the tier in
+  `config/models.yaml` the job is the 8B alone. Unit notes and sentence focus
+  are built but off; the strict exception rule is on. All four held-out sets
+  are now used; write a fresh one before the next comparison.
+  Next: changed tools and numbers are still mostly missed (§7).
 
 ## 13. Open questions for the owner
 
