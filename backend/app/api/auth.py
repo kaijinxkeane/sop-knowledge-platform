@@ -1,6 +1,8 @@
 """Sign-in (plan §11): password, then a TOTP code. TOTP is required for everyone.
 
     POST /auth/login             email + password -> mfa_token | enrollment_token
+                                 (development demo accounts with SOP_DEMO_SKIP_2FA:
+                                 an access token straight away, see app/demo.py)
     POST /auth/totp/verify       mfa_token + code  -> access token (+ refresh cookie)
     POST /auth/totp/enroll       enrollment_token  -> secret + otpauth URI
     POST /auth/totp/enroll/confirm  enrollment_token + code -> access token
@@ -27,6 +29,7 @@ from app import audit
 from app.api.deps import get_db, limit_auth
 from app.config import get_settings
 from app.db.models import OneTimeToken, RefreshToken, User
+from app.demo import skips_two_factor
 from app.identity import get_user, get_user_by_email
 from app.security import passwords, totp
 from app.security.tokens import (
@@ -56,7 +59,10 @@ class LoginIn(BaseModel):
 
 
 class StepOut(BaseModel):
-    status: Literal["totp_required", "totp_enrollment_required"]
+    """Next sign-in step. `signed_in` (development demo accounts only): `token`
+    is the access token and the refresh cookie is already set."""
+
+    status: Literal["totp_required", "totp_enrollment_required", "signed_in"]
     token: str
     expires_in: int = 600
 
@@ -127,7 +133,11 @@ async def _user_for_step(session: AsyncSession, token: str, typ: str) -> User:
 
 
 async def _start_session(
-    session: AsyncSession, user: User, response: Response, family_id: uuid.UUID | None = None
+    session: AsyncSession,
+    user: User,
+    response: Response,
+    family_id: uuid.UUID | None = None,
+    method: str | None = None,
 ) -> SessionOut:
     settings = get_settings()
     token, digest = new_opaque_token()
@@ -144,7 +154,12 @@ async def _start_session(
         user.failed_logins = 0
         user.locked_until = None
         user.last_login_at = _now()
-        await audit.record(session, "login_succeeded", actor_id=user.id)
+        await audit.record(
+            session,
+            "login_succeeded",
+            actor_id=user.id,
+            details={"method": method} if method else None,
+        )
     await session.commit()
     response.set_cookie(
         REFRESH_COOKIE,
@@ -160,7 +175,9 @@ async def _start_session(
 
 
 @router.post("/login", response_model=StepOut, dependencies=[Depends(limit_auth)])
-async def login(body: LoginIn, session: AsyncSession = Depends(get_db)) -> StepOut:
+async def login(
+    body: LoginIn, response: Response, session: AsyncSession = Depends(get_db)
+) -> StepOut:
     user = await get_user_by_email(session, body.email)
     usable = user is not None and user.is_active and user.password_hash is not None
     ok = passwords.verify_password(user.password_hash if usable else None, body.password)
@@ -174,6 +191,9 @@ async def login(body: LoginIn, session: AsyncSession = Depends(get_db)) -> StepO
     if passwords.needs_rehash(user.password_hash):
         user.password_hash = passwords.hash_password(body.password)
         await session.commit()
+    if skips_two_factor(user.email):
+        out = await _start_session(session, user, response, method="demo_no_code")
+        return StepOut(status="signed_in", token=out.access_token, expires_in=out.expires_in)
     if user.totp_enabled:
         return StepOut(status="totp_required", token=create_purpose_token(user.id, MFA))
     return StepOut(status="totp_enrollment_required", token=create_purpose_token(user.id, ENROLL))

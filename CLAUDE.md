@@ -45,7 +45,7 @@ make frontend-dev                  # Vite on :5173, /api forwarded to the API fr
   (`src/editor/editor.test.ts`): every demo-vault note must round-trip byte
   for byte, and unchanged blocks are restored from the original before saving
   (`src/editor/preserve.ts`). Obsidian syntax stays a verbatim atom
-  (`src/editor/obsidian.ts`). Clashes merge by block, never by a model.
+  (`src/editor/obsidian.ts`), except `==highlights==`, which are an editable mark saved back as `==text==`. Clashes merge by block, never by a model.
 - Sign-in tests must keep the access token out of browser storage
   (`src/pages/SignIn.test.tsx`). UI text goes through `t()` (`src/i18n/en.ts`).
 
@@ -194,6 +194,9 @@ without the owner's decision.
 - Installable web app (`frontend/public/sw.js`, `src/app/pwa.ts`): the service worker never
   caches `/api` responses or pages, only the offline page, its CSS and icon, so nothing readable
   stays on a device. Keep it that way.
+- Two-factor is required for everyone. The only exception is `SOP_DEMO_SKIP_2FA` (`app/demo.py`):
+  the seven seeded demo accounts, only with `SOP_ENV=development` (config refuses it otherwise),
+  audited as `login_succeeded` with method `demo_no_code`. Never widen it to other accounts.
 - The frontend keeps the access token in memory only (never localStorage or
   sessionStorage); the refresh token is the httpOnly `sop_refresh` cookie. Hiding
   a menu is cosmetic: every check stays in the backend. Hidden pages look like 404s.

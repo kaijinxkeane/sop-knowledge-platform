@@ -238,3 +238,32 @@ def labels_from_rows(rows) -> Labels:
             (r.space, resolve_sensitivity(r.sensitivity)) for r in rows if r.role == "shared"
         ],
     )
+
+
+def pin_placement(text: str, frontmatter: dict, in_force: Labels) -> str:
+    """Write a note's placement into its frontmatter.
+
+    A note placed by a decision (an approved label suggestion) has its labels
+    only in document_access; its file names no space. Saving it from the app
+    would then resolve to "no space". Before such a save, the labels in force
+    are written into the file (`space`, plus `sensitivity` and `shared_with`
+    when the file doesn't set them), so the note keeps exactly the access it
+    has and later changes go through the normal one-way checks.
+    Only adds lines; everything already in the file stays byte for byte.
+    """
+    if in_force.space is None:
+        return text
+    lines = [f"space: {in_force.space}"]
+    if "sensitivity" not in frontmatter:
+        lines.append(f"sensitivity: {in_force.sensitivity.label}")
+    if "shared_with" not in frontmatter and in_force.shared_with:
+        items = ", ".join(f'"{s}:{lvl.label}"' for s, lvl in in_force.shared_with)
+        lines.append(f"shared_with: [{items}]")
+    nl = "\r\n" if "\r\n" in text[:200] else "\n"
+    added = nl.join(lines) + nl
+    if text.startswith("---" + nl):
+        end = text.find(nl + "---", len("---"))
+        if end != -1:
+            cut = end + len(nl)
+            return text[:cut] + added + text[cut:]
+    return "---" + nl + added + "---" + nl + text

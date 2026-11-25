@@ -12,8 +12,11 @@ export type Row =
 export type Stats = { added: number; removed: number; changed: number };
 
 export function lineDiff(before: string, after: string): Row[] {
-  const a = before.split("\n");
-  const b = after.split("\n");
+  return seqDiff(before.split("\n"), after.split("\n"));
+}
+
+/** The same diff over any list of strings (lines, or blocks of a note). */
+export function seqDiff(a: string[], b: string[]): Row[] {
   // Trim the common start and end: most edits are small and local.
   let start = 0;
   while (start < a.length && start < b.length && a[start] === b[start]) start++;

@@ -9,7 +9,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -38,6 +38,10 @@ class Settings(BaseSettings):
 
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
+    # Development only: the seeded demo accounts (app/demo.py) sign in without a
+    # two-factor code. Refused in any other environment; never affects real users.
+    demo_skip_2fa: bool = Field(default=False, alias="SOP_DEMO_SKIP_2FA")
+
     # Slide pictures (app/vault/slides.py): rendered once per deck version.
     cache_dir: Path = Field(default=REPO_ROOT / "deploy" / "data" / "cache", alias="SOP_CACHE_DIR")
     soffice_path: str | None = Field(default=None, alias="SOFFICE_PATH")
@@ -47,6 +51,12 @@ class Settings(BaseSettings):
     access_token_minutes: int = Field(default=15, alias="ACCESS_TOKEN_MINUTES")
     refresh_token_days: int = Field(default=14, alias="REFRESH_TOKEN_DAYS")
     invite_hours: int = Field(default=72, alias="INVITE_HOURS")
+
+    @model_validator(mode="after")
+    def _demo_skip_2fa_only_in_development(self) -> Settings:
+        if self.demo_skip_2fa and self.environment != "development":
+            raise ValueError("SOP_DEMO_SKIP_2FA is only allowed with SOP_ENV=development")
+        return self
 
     @property
     def is_production(self) -> bool:

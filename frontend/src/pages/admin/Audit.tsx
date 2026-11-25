@@ -53,22 +53,41 @@ function useAudit(f: Filter) {
   });
 }
 
-/** CSV with every cell quoted, and formula-looking cells neutralised for spreadsheets. */
-export function toCsv(rows: Event[], name: (id: string | null | undefined) => string): string {
+/**
+ * CSV for people first (plain-words columns), then the raw record unchanged
+ * for auditors and tools. Every cell is quoted; formula-looking cells are
+ * neutralised for spreadsheets.
+ */
+export function toCsv(
+  rows: Event[],
+  name: (id: string | null | undefined) => string,
+  nameOf: (id: string) => string | undefined = () => undefined,
+): string {
   const cell = (v: unknown) => {
     let s = typeof v === "string" ? v : v == null ? "" : JSON.stringify(v);
     if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
     return `"${s.replace(/"/g, '""')}"`;
   };
-  const head = ["id", "ts", "actor_id", "actor", "action", "target_type", "target_id", "details"];
+  const when = (ts: string) => new Date(ts).toLocaleString([], { dateStyle: "medium", timeStyle: "medium" });
+  const readable = (e: Event) =>
+    detailRows(e.details, nameOf)
+      .map((r) => `${r.label}: ${r.value}`)
+      .join("; ");
+  const head = [
+    t("audit.csvNumber"), t("audit.when"), t("audit.who"), t("audit.what"), t("audit.csvTarget"), t("audit.details"),
+    "ts", "actor_id", "action", "target_type", "target_id", "details_raw",
+  ];
   const lines = rows.map((e) =>
-    [e.id, e.ts, e.actor_id, name(e.actor_id), e.action, e.target_type, e.target_id, e.details].map(cell).join(","),
+    [
+      e.id, when(e.ts), name(e.actor_id), actionText(e.action), targetText(e.target_type, e.target_id, nameOf) ?? "", readable(e),
+      e.ts, e.actor_id, e.action, e.target_type, e.target_id, e.details,
+    ].map(cell).join(","),
   );
   return [head.map(cell).join(","), ...lines].join("\r\n");
 }
 
 function download(text: string, filename: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: "text/csv" }));
+  const url = URL.createObjectURL(new Blob(["\uFEFF", text], { type: "text/csv;charset=utf-8" }));
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
@@ -150,7 +169,7 @@ export default function Audit() {
           variant="outline"
           size="sm"
           disabled={!events.data?.length}
-          onClick={() => download(toCsv(events.data ?? [], name), `audit-${new Date().toISOString().slice(0, 10)}.csv`)}
+          onClick={() => download(toCsv(events.data ?? [], name, nameOf), `audit-${new Date().toISOString().slice(0, 10)}.csv`)}
         >
           {t("audit.export")}
         </Button>

@@ -10,6 +10,20 @@
 export const LINK = "sop-link:";
 export const EMBED = "sop-embed:";
 export const TAG = "sop-tag:";
+export const MARK = "sop-mark:";
+export const CALLOUT = "sop-callout:";
+
+export type CalloutTone = "blue" | "green" | "amber" | "red" | "grey";
+const TONES: Record<string, CalloutTone> = {
+  note: "blue", info: "blue", todo: "blue", abstract: "blue", summary: "blue", tldr: "blue",
+  question: "blue", help: "blue", faq: "blue",
+  tip: "green", hint: "green", important: "green", success: "green", check: "green", done: "green",
+  warning: "amber", caution: "amber", attention: "amber",
+  danger: "red", error: "red", failure: "red", fail: "red", missing: "red", bug: "red",
+  example: "grey", quote: "grey", cite: "grey",
+};
+/** Colour family of an Obsidian callout type (unknown types read as a note). */
+export const calloutTone = (kind: string): CalloutTone => TONES[kind.toLowerCase()] ?? "blue";
 
 export function splitFrontmatter(text: string): { frontmatter: string; body: string } {
   const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text);
@@ -22,10 +36,11 @@ const escapeText = (s: string) => s.replace(/([[\]\\])/g, "\\$1");
 function transformProse(text: string): string {
   return (
     text
-      // > [!note] Title  ->  > **Note:** Title
+      // > [!warning] Title  ->  a callout header the renderer colours by type
       .replace(/^(\s*>\s*)\[!(\w+)\][+-]?\s*(.*)$/gm, (_m, lead: string, kind: string, title: string) => {
         const label = kind.charAt(0).toUpperCase() + kind.slice(1).toLowerCase();
-        return `${lead}**${label}:** ${title}`.trimEnd();
+        const text = title.trim() ? `${label}: ${title.trim()}` : label;
+        return `${lead}[${escapeText(text)}](${CALLOUT}${kind.toLowerCase()})`;
       })
       // ![[target]] (embed: a deck, PDF or note shown as a card)
       .replace(/!\[\[([^\]\n]+?)\]\]/g, (_m, inner: string) => {
@@ -38,6 +53,8 @@ function transformProse(text: string): string {
         const shown = (alias ?? target.split("#")[0] ?? "").trim();
         return `[${escapeText(shown)}](${LINK}${encodeURIComponent(target.trim())})`;
       })
+      // ==highlight== (Obsidian), shown as a highlight
+      .replace(/==([^=\n]+)==/g, (_m, inner: string) => `[${escapeText(inner)}](${MARK})`)
       // #tag (a letter right after #, so "# Heading" is left alone)
       .replace(/(^|[\s(])#([A-Za-z][\w/-]*)/g, (_m, pre: string, tag: string) => {
         return `${pre}[#${tag}](${TAG}${encodeURIComponent(tag)})`;

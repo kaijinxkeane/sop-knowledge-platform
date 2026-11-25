@@ -60,3 +60,17 @@ describe("images in notes", () => {
     await waitFor(() => expect(fn).not.toHaveBeenCalled());
   });
 });
+
+describe("formatting in notes", () => {
+  it("shows callouts as coloured boxes and highlights as highlights", () => {
+    mockFetch({});
+    show("> [!warning] Check the date\n> Rooms fill fast.\n\nPlain quote:\n\n> just a quote\n\nBring ==spare markers==.", []);
+    const warning = screen.getByText("Warning: Check the date").closest("blockquote")!;
+    expect(warning).toHaveClass("sop-callout", "sop-callout-amber");
+    expect(warning).toHaveTextContent("Rooms fill fast.");
+    expect(screen.getByText("just a quote").closest("blockquote")).not.toHaveClass("sop-callout");
+    const mark = screen.getByText("spare markers");
+    expect(mark.tagName).toBe("MARK");
+    expect(document.body.textContent).not.toContain("==");
+  });
+});

@@ -33,26 +33,10 @@ from sqlalchemy import select
 
 from app.config import get_settings
 from app.db.session import get_engine, get_sessionmaker
+from app.demo import DEMO_PASSWORD, DEMO_USERS
 from app.identity import create_user, get_user_by_email, sync_roles, sync_spaces
 from app.security import passwords, totp
 from app.security.tokens import hash_opaque
-
-DEMO_PASSWORD = "demo-password-2026"
-# Fictional staff of the demo training company (names match demo-vault owners).
-DEMO_USERS = [
-    (
-        "jordan.ng@staff.example.com",
-        "Jordan Ng (CEO)",
-        ["employee", "core-lead", "platform-admin"],
-        "core",
-    ),
-    ("avery.tan@staff.example.com", "Avery Tan", ["employee", "core-staff"], "core"),
-    ("sam.lee@staff.example.com", "Sam Lee", ["employee", "core-staff"], "core"),
-    ("morgan.lim@staff.example.com", "Morgan Lim", ["employee", "core-staff"], "core"),
-    ("riley.ong@staff.example.com", "Riley Ong", ["employee", "it-lead"], "it"),
-    ("casey.wong@staff.example.com", "Casey Wong", ["employee", "hr-staff", "hr-lead"], "hr"),
-    ("taylor.goh@staff.example.com", "Taylor Goh (new hire)", ["employee"], None),
-]
 
 
 def _demo_totp_secret(email: str) -> str:

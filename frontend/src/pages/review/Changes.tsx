@@ -1,16 +1,15 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { messageOf } from "@/api/errors";
 import { Loading } from "@/app/routes";
 import { useMe } from "@/auth/hooks";
-import { DiffTable } from "@/components/DiffTable";
+import { VersionDiff } from "@/components/VersionDiff";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { t } from "@/i18n";
-import { lineDiff, stats } from "@/lib/diff";
 import { cn } from "@/lib/utils";
 import { useVersion } from "@/pages/library/api";
 import { useReviewActions, useReviews, type ReviewItem } from "./api";
@@ -22,23 +21,14 @@ function ReviewDiff({ r }: { r: ReviewItem }) {
   const left = useVersion(r.document_id, r.base_commit ?? null);
   const right = useVersion(r.document_id, r.git_commit ?? null);
   const before = r.base_commit ? left.data?.content : "";
-  const rows = useMemo(
-    () => (before !== undefined && right.data ? lineDiff(before, right.data.content) : null),
-    [before, right.data],
-  );
   if (left.isError || right.isError || !r.git_commit) {
     return <p role="alert" className="text-sm">{t("review.diffUnavailable")}</p>;
   }
-  if (!rows) return <Loading />;
-  const s = stats(rows);
+  if (before === undefined || !right.data) return <Loading />;
   return (
     <div className="space-y-2">
-      <p className="text-sm text-muted-foreground" role="status">
-        {!r.base_commit
-          ? t("review.firstVersion")
-          : t("compare.stats", { added: s.added, removed: s.removed, changed: s.changed })}
-      </p>
-      <div className="overflow-x-auto rounded-md border"><DiffTable rows={rows} /></div>
+      {!r.base_commit && <p className="text-sm text-muted-foreground">{t("review.firstVersion")}</p>}
+      <VersionDiff before={before} after={right.data.content} />
     </div>
   );
 }

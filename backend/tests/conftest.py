@@ -15,7 +15,9 @@ CONFIG_DIR = REPO_ROOT / "config"
 
 
 @pytest.fixture(autouse=True)
-def _fresh_settings():
+def _fresh_settings(monkeypatch):
+    # A developer's .env may switch on demo sign-in without codes: tests start with it off.
+    monkeypatch.setenv("SOP_DEMO_SKIP_2FA", "false")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

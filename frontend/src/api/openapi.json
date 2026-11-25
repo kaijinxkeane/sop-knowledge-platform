@@ -4094,6 +4094,17 @@
             "title": "Commit",
             "type": "string"
           },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -4606,6 +4617,7 @@
         "type": "object"
       },
       "StepOut": {
+        "description": "Next sign-in step. `signed_in` (development demo accounts only): `token`\nis the access token and the refresh cookie is already set.",
         "properties": {
           "expires_in": {
             "default": 600,
@@ -4615,7 +4627,8 @@
           "status": {
             "enum": [
               "totp_required",
-              "totp_enrollment_required"
+              "totp_enrollment_required",
+              "signed_in"
             ],
             "title": "Status",
             "type": "string"

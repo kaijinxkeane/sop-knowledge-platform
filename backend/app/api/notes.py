@@ -33,8 +33,8 @@ from app.db.models import Document, DocumentAccess, Space
 from app.db.scoped import apply_reader_scope, has_pending_change, sees_latest, visible
 from app.policy.engine import Sensitivity
 from app.vault.git import GitError, GitVault, VaultPathError
-from app.vault.indexer import Indexer
-from app.vault.labels import labels_from_rows, resolve_labels, vault_config
+from app.vault.indexer import DERIVED_SOURCES, Indexer
+from app.vault.labels import labels_from_rows, pin_placement, resolve_labels, vault_config
 from app.vault.parse import ATTACHMENT_EXT, parse_note
 from app.vault.writes import WriteDenied, check_write
 
@@ -72,6 +72,9 @@ class SavedOut(BaseModel):
     vault_path: str
     version: str
     commit: str
+    # Set only when the server added to what was sent (a decision's placement
+    # written into the frontmatter): the editor continues from this text.
+    content: str | None = None
 
 
 def _version(data: bytes) -> str:
@@ -252,15 +255,30 @@ async def update_note(
     old_labels = _labels_in_force(rows)
     if old_labels.space is None or not me.principal.can("contribute", old_labels.space):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "you can't edit this note")
-    parsed = parse_note(rel, body.content)
+    content = body.content
+    known = await _spaces(session)
+    parsed = parse_note(rel, content)
     new = resolve_labels(
         rel,
         parsed.frontmatter,
-        body.content,
-        known_spaces=await _spaces(session),
+        content,
+        known_spaces=known,
         config=vault_config(),
         frontmatter_error=parsed.frontmatter_error,
     )
+    placed_by_decision = any(r.source not in DERIVED_SOURCES for r in rows)
+    if new.space is None and new.source == "default" and placed_by_decision:
+        # Placed by an approved decision, not by the file: keep that placement.
+        content = pin_placement(content, parsed.frontmatter, old_labels)
+        parsed = parse_note(rel, content)
+        new = resolve_labels(
+            rel,
+            parsed.frontmatter,
+            content,
+            known_spaces=known,
+            config=vault_config(),
+            frontmatter_error=parsed.frontmatter_error,
+        )
     new_status = str(parsed.frontmatter.get("status") or "") or None
     try:
         check_write(
@@ -283,7 +301,7 @@ async def update_note(
                     "current_version": current,
                 },
             )
-        full.write_text(body.content, encoding="utf-8")
+        full.write_text(content, encoding="utf-8")
         if rel in git.uncommitted():
             sha = git.commit(
                 [rel],
@@ -306,7 +324,11 @@ async def update_note(
         )
         await s.commit()
     return SavedOut(
-        id=str(doc.id), vault_path=rel, version=_version(body.content.encode()), commit=sha
+        id=str(doc.id),
+        vault_path=rel,
+        version=_version(content.encode()),
+        commit=sha,
+        content=content if content != body.content else None,
     )
 
 

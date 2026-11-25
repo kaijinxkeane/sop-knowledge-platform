@@ -3502,6 +3502,8 @@ export interface components {
         SavedOut: {
             /** Commit */
             commit: string;
+            /** Content */
+            content?: string | null;
             /** Id */
             id: string;
             /** Vault Path */
@@ -3677,7 +3679,11 @@ export interface components {
             /** Title */
             title: string;
         };
-        /** StepOut */
+        /**
+         * StepOut
+         * @description Next sign-in step. `signed_in` (development demo accounts only): `token`
+         *     is the access token and the refresh cookie is already set.
+         */
         StepOut: {
             /**
              * Expires In
@@ -3688,7 +3694,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "totp_required" | "totp_enrollment_required";
+            status: "totp_required" | "totp_enrollment_required" | "signed_in";
             /** Token */
             token: string;
         };

@@ -35,6 +35,21 @@ describe("sign-in", () => {
     expect(await screen.findByRole("link", { name: "Write" })).toBeInTheDocument();
   });
 
+  it("signs a development demo account straight in when the server says so", async () => {
+    session.signOut();
+    const { calls } = mockFetch({
+      "POST /api/v1/auth/login": () => json({ status: "signed_in", token: "tok-demo", expires_in: 900 }),
+      "GET /api/v1/me": () => json(makeMe()),
+    });
+    const { router } = renderApp("/library");
+    await waitFor(() => expect(router.state.location.pathname).toBe("/sign-in"));
+    await enterPassword();
+    await waitFor(() => expect(router.state.location.pathname).toBe("/library"));
+    expect(screen.queryByLabelText("Code")).toBeNull();
+    expect(calls.some((c) => c.url.includes("/totp/"))).toBe(false);
+    expect(localStorage.length + sessionStorage.length).toBe(0);
+  });
+
   it("keeps the access token out of browser storage", async () => {
     session.signOut();
     mockFetch({

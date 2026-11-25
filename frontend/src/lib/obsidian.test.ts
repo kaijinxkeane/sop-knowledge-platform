@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMBED, LINK, TAG, makeResolver, plainName, splitFrontmatter, toMarkdown } from "./obsidian";
+import { CALLOUT, EMBED, LINK, MARK, TAG, calloutTone, makeResolver, plainName, splitFrontmatter, toMarkdown } from "./obsidian";
 
 describe("obsidian markdown", () => {
   it("splits frontmatter from the body", () => {
@@ -11,6 +11,8 @@ describe("obsidian markdown", () => {
 
   it("turns links, aliases, headings and embeds into private links", () => {
     expect(toMarkdown("See [[Leave Policy]].")).toBe(`See [Leave Policy](${LINK}Leave%20Policy).`);
+    expect(toMarkdown("Bring ==spare markers== today")).toBe(`Bring [spare markers](${MARK}) today`);
+    expect(toMarkdown("```\na ==b== c\n```")).toBe("```\na ==b== c\n```");
     expect(toMarkdown("[[Leave Policy|leave]]")).toBe(`[leave](${LINK}Leave%20Policy)`);
     expect(toMarkdown("[[Leave Policy#Carry over]]")).toBe(`[Leave Policy](${LINK}Leave%20Policy%23Carry%20over)`);
     expect(toMarkdown("![[Brand Foundations.pptx]]")).toBe(
@@ -23,7 +25,9 @@ describe("obsidian markdown", () => {
   });
 
   it("turns callouts into a bold label", () => {
-    expect(toMarkdown("> [!warning] Check the date\n> body")).toBe("> **Warning:** Check the date\n> body");
+    expect(toMarkdown("> [!warning] Check the date\n> body")).toBe(`> [Warning: Check the date](${CALLOUT}warning)\n> body`);
+    expect(toMarkdown("> [!TIP]-")).toBe(`> [Tip](${CALLOUT}tip)`);
+    expect([calloutTone("warning"), calloutTone("Caution"), calloutTone("bug"), calloutTone("odd")]).toEqual(["amber", "amber", "red", "blue"]);
   });
 
   it("never touches fenced code", () => {

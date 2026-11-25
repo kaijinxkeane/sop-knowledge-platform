@@ -3,21 +3,13 @@ import Markdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Link } from "react-router";
 import { t } from "@/i18n";
-import {
-  EMBED,
-  LINK,
-  TAG,
-  makeResolver,
-  plainName,
-  splitFrontmatter,
-  toMarkdown,
-} from "@/lib/obsidian";
+import { CALLOUT, EMBED, LINK, MARK, TAG, calloutTone, makeResolver, plainName, splitFrontmatter, toMarkdown } from "@/lib/obsidian";
 import { useFileUrl, type Doc } from "./api";
 
 // Keep our private schemes; everything else goes through react-markdown's
 // default filter (which drops javascript: and other unsafe URLs).
 const urlTransform = (url: string) =>
-  [LINK, EMBED, TAG].some((p) => url.startsWith(p)) ? url : defaultUrlTransform(url);
+  [LINK, EMBED, TAG, MARK, CALLOUT].some((p) => url.startsWith(p)) ? url : defaultUrlTransform(url);
 
 const IMAGE = /\.(png|jpe?g)$/i;
 
@@ -96,6 +88,12 @@ export function NoteView({ text, docs }: { text: string; docs: Doc[] }) {
               }
               return <Link to={`/library/${doc.id}`}>{children}</Link>;
             }
+            if (href.startsWith(CALLOUT)) {
+              return <strong className="sop-callout-title">{children}</strong>;
+            }
+            if (href === MARK) {
+              return <mark className="rounded-sm bg-amber-100 px-0.5 text-inherit">{children}</mark>;
+            }
             if (href.startsWith(TAG)) {
               return <span className="rounded bg-muted px-1 text-sm text-muted-foreground">{children}</span>;
             }
@@ -103,6 +101,13 @@ export function NoteView({ text, docs }: { text: string; docs: Doc[] }) {
               <a href={href} target="_blank" rel="noopener noreferrer">
                 {children}
               </a>
+            );
+          },
+          // A blockquote that starts with a callout header gets that callout's colour.
+          blockquote: ({ node, children }) => {
+            const kind = calloutKind(node);
+            return (
+              <blockquote className={kind ? `sop-callout sop-callout-${calloutTone(kind)}` : undefined}>{children}</blockquote>
             );
           },
           // ![alt](Attachments/pic.png): only vault images this reader can open.
@@ -129,3 +134,14 @@ export function NoteView({ text, docs }: { text: string; docs: Doc[] }) {
     </div>
   );
 }
+
+type HastNode = { type: string; tagName?: string; properties?: { href?: unknown }; children?: HastNode[] };
+
+/** The callout type of a blockquote whose first paragraph opens with a callout header. */
+function calloutKind(node: unknown): string | null {
+  const first = (node as HastNode | undefined)?.children?.find((c) => c.type === "element");
+  const link = first?.tagName === "p" ? first.children?.find((c) => c.type === "element") : undefined;
+  const href = link?.tagName === "a" ? String(link.properties?.href ?? "") : "";
+  return href.startsWith(CALLOUT) ? href.slice(CALLOUT.length) : null;
+}
+

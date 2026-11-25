@@ -65,6 +65,11 @@ export function SignIn() {
       });
       if (!data) throw response;
       setPassword("");
+      if (data.status === "signed_in") {
+        // Development demo accounts only (SOP_DEMO_SKIP_2FA); the server decides.
+        session.signIn(data.token);
+        return;
+      }
       setStep(
         data.status === "totp_required"
           ? { kind: "totp", token: data.token }

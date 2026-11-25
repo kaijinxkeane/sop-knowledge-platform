@@ -99,7 +99,14 @@ describe("version history", () => {
   it("compares two versions side by side, folding unchanged lines", async () => {
     api();
     renderApp(`/library/n1/compare?from=${C1}&to=${C2}`);
-    expect(await screen.findByRole("status")).toHaveTextContent("1 changed, 0 added, 0 removed lines");
+    expect(await screen.findByText("1 changed, 0 added, 0 removed lines")).toBeInTheDocument();
+    // Formatted (the default): the note as it reads, the old text struck out, the new one added.
+    expect(screen.getByRole("button", { name: "Formatted" })).toHaveAttribute("aria-pressed", "true");
+    expect(document.querySelector('[data-change="removed"]')).toHaveTextContent("Carry over 5 days.");
+    expect(document.querySelector('[data-change="added"]')).toHaveTextContent("Carry over 10 days.");
+    expect(document.querySelector("article")).toHaveTextContent("Line 1.");
+    // Source: the exact text, line by line.
+    await userEvent.click(screen.getByRole("button", { name: "Source" }));
     const changed = document.querySelector('tr[data-kind="changed"]')!;
     expect(changed).toHaveTextContent("Carry over 5 days.");
     expect(changed).toHaveTextContent("Carry over 10 days.");

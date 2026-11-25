@@ -76,4 +76,19 @@ describe("audit log viewer", () => {
     expect(csv.split("\r\n")[1]).toContain(`"'=HYPERLINK(1)"`);
     expect(csv).toContain(`"{""method"":""review""}"`);
   });
+
+  it("puts plain words first in the CSV and keeps the raw record after", () => {
+    const pat = "bbbbbbbb-0000-0000-0000-000000000000";
+    const csv = toCsv(
+      [{ ...EVENTS[0]!, actor_id: pat, target_id: pat, target_type: "user", details: { restricted: true, bytes: 2048 } }],
+      () => "Pat Lim",
+      (id) => (id === pat ? "Pat Lim" : undefined),
+    );
+    const [head, row] = csv.split("\r\n");
+    expect(head).toBe(
+      `"Event #","When","Who","What","About","Details","ts","actor_id","action","target_type","target_id","details_raw"`,
+    );
+    expect(row).toContain(`"Approved an SOP version","Person · Pat Lim","Restricted content: Yes; File size: 2 KB"`);
+    expect(row).toContain(`"sop_approved","user","${pat}","{""restricted"":true,""bytes"":2048}"`);
+  });
 });

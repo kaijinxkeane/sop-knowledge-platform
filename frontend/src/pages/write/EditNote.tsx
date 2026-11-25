@@ -97,7 +97,10 @@ function Editor({ id, opened }: { id: string; opened: Saved }) {
       setError(null);
       try {
         const out = await saveNote(id, saved.version, content);
-        setSaved({ text: content, version: out.version });
+        // The server may add the note's placement to its details (out.content);
+        // only the frontmatter changes, so the body in the editor stays as it is.
+        setSaved({ text: out.content ?? content, version: out.version });
+        if (out.content) setMeta(readMeta(out.content));
         setBaseline(body);
         setLastSaved(new Date());
         setState("idle");
@@ -142,7 +145,7 @@ function Editor({ id, opened }: { id: string; opened: Saved }) {
     try {
       const out = await saveNote(id, merge.theirs.version, text);
       setMerge(null);
-      reset({ text, version: out.version });
+      reset({ text: out.content ?? text, version: out.version });
       setLastSaved(new Date());
       setState("idle");
       afterSave(id);

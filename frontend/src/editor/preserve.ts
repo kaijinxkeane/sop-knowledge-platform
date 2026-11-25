@@ -14,7 +14,7 @@ import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import remarkStringify, { type Options } from "remark-stringify";
 import { unified } from "unified";
-import { ATOM, splitText } from "./obsidian";
+import { obsidianHandlers, splitText } from "./obsidian";
 
 type Block = { key: string; start: number; end: number };
 
@@ -35,7 +35,7 @@ const printer = unified()
   .use(remarkGfm)
   .use(remarkStringify, {
     ...STRINGIFY,
-    handlers: { [ATOM]: (node: { value: string }) => node.value } as never,
+    handlers: obsidianHandlers as never,
   });
 
 /** Strip positions so two blocks compare by content only. */

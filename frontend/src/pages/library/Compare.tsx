@@ -1,12 +1,10 @@
 import { ArrowLeft } from "lucide-react";
-import { useMemo } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { Loading } from "@/app/routes";
-import { DiffTable } from "@/components/DiffTable";
+import { VersionDiff } from "@/components/VersionDiff";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { t } from "@/i18n";
-import { lineDiff, stats } from "@/lib/diff";
 import { NotFound } from "@/pages/NotFound";
 import { useDocument, useVersion, useVersions, type Version } from "./api";
 
@@ -31,10 +29,6 @@ export default function Compare() {
   const from = params.get("from") ?? defaultFrom;
   const left = useVersion(id, from);
   const right = useVersion(id, to);
-  const rows = useMemo(
-    () => (left.data && right.data ? lineDiff(left.data.content, right.data.content) : null),
-    [left.data, right.data],
-  );
 
   if (doc.isError || versions.isError) return <NotFound />;
   if (doc.isPending || versions.isPending) return <Loading />;
@@ -44,7 +38,6 @@ export default function Compare() {
       if (k === "to" && !p.get("from") && from) p.set("from", from);
       return p;
     }, { replace: true });
-  const s = rows ? stats(rows) : null;
 
   return (
     <div className="mx-auto max-w-6xl space-y-4 px-6 py-6">
@@ -72,17 +65,10 @@ export default function Compare() {
           </div>
           {left.isError || right.isError ? (
             <p role="alert" className="text-sm">{t("compare.unavailable")}</p>
-          ) : !rows ? (
+          ) : !left.data || !right.data ? (
             <Loading />
           ) : (
-            <>
-              <p className="text-sm text-muted-foreground" role="status">
-                {s!.added + s!.removed + s!.changed === 0
-                  ? t("compare.same")
-                  : t("compare.stats", { added: s!.added, removed: s!.removed, changed: s!.changed })}
-              </p>
-              <div className="overflow-x-auto rounded-md border"><DiffTable rows={rows} /></div>
-            </>
+            <VersionDiff before={left.data.content} after={right.data.content} formatted={doc.data.kind === "note"} />
           )}
         </>
       )}

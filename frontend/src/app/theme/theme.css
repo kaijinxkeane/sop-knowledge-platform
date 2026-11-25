@@ -119,9 +119,58 @@
   }
   .prose-sop th,
   .prose-sop td {
-    @apply border px-2 py-1 text-left;
+    @apply px-2 py-1 text-left;
   }
 }
+
+/* Tables (reader and editor): one clear look everywhere, as notes stay plain
+   markdown. Visible borders, a shaded header row, light banding. */
+.prose-sop table,
+.sop-editor table {
+  border-collapse: collapse;
+  border: 1px solid var(--sop-table-line);
+}
+.prose-sop th,
+.prose-sop td,
+.sop-editor th,
+.sop-editor td {
+  border: 1px solid var(--sop-table-line);
+}
+.prose-sop th,
+.sop-editor th {
+  background: oklch(0.955 0 0);
+  font-weight: 600;
+}
+.prose-sop tbody tr:nth-child(even) td,
+.sop-editor tbody tr:nth-child(even) td {
+  background: oklch(0.985 0 0);
+}
+:root {
+  --sop-table-line: oklch(0.78 0 0);
+}
+
+/* Callouts (Obsidian > [!type]): coloured boxes. The reader adds the class;
+   the editor matches the callout marker at the start of the box. */
+.sop-callout,
+.sop-editor blockquote:has(> p:first-child > .obsidian-callout) {
+  border-left-width: 4px;
+  border-radius: 0.375rem;
+  padding: 0.5rem 1rem;
+  border-left-color: var(--callout);
+  background: color-mix(in oklch, var(--callout) 9%, white);
+  --callout: oklch(0.6 0.15 250);
+}
+.sop-callout-title { color: var(--callout); display: block; }
+.sop-callout-blue { --callout: oklch(0.6 0.15 250); }
+.sop-callout-green { --callout: oklch(0.6 0.14 150); }
+.sop-callout-amber { --callout: oklch(0.72 0.15 75); }
+.sop-callout-red { --callout: oklch(0.58 0.2 25); }
+.sop-callout-grey { --callout: oklch(0.6 0 0); }
+.sop-editor blockquote:has(> p:first-child > .obsidian-callout:is([data-obsidian^="[!tip" i], [data-obsidian^="[!hint" i], [data-obsidian^="[!important" i], [data-obsidian^="[!success" i], [data-obsidian^="[!check" i], [data-obsidian^="[!done" i])) { --callout: oklch(0.6 0.14 150); }
+.sop-editor blockquote:has(> p:first-child > .obsidian-callout:is([data-obsidian^="[!warning" i], [data-obsidian^="[!caution" i], [data-obsidian^="[!attention" i])) { --callout: oklch(0.72 0.15 75); }
+.sop-editor blockquote:has(> p:first-child > .obsidian-callout:is([data-obsidian^="[!danger" i], [data-obsidian^="[!error" i], [data-obsidian^="[!fail" i], [data-obsidian^="[!missing" i], [data-obsidian^="[!bug" i])) { --callout: oklch(0.58 0.2 25); }
+.sop-editor blockquote:has(> p:first-child > .obsidian-callout:is([data-obsidian^="[!example" i], [data-obsidian^="[!quote" i], [data-obsidian^="[!cite" i])) { --callout: oklch(0.6 0 0); }
+.sop-editor .obsidian-callout { color: var(--callout, inherit); font-weight: 600; background: transparent; }
 
 /* Editor (Milkdown): Obsidian syntax shown as chips that are kept verbatim. */
 .sop-editor .ProseMirror {
@@ -139,10 +188,20 @@
 }
 .sop-editor .obsidian-embed { font-weight: 500; }
 .sop-editor .obsidian-comment { color: var(--color-muted-foreground); font-style: italic; }
-.sop-editor .obsidian-highlight { background: #fef3c7; color: inherit; }
+.sop-editor mark.sop-highlight { background: #fde68a; color: inherit; border-radius: 0.125rem; padding: 0 0.0625rem; }
 .sop-editor .ProseMirror-selectednode { outline: 2px solid var(--color-ring); }
-.sop-editor table { border-collapse: collapse; }
-.sop-editor td, .sop-editor th { border: 1px solid var(--color-border); padding: 0.25rem 0.5rem; min-width: 4rem; }
+.sop-editor td, .sop-editor th { padding: 0.25rem 0.5rem; min-width: 4rem; }
+
+/* Compare versions, formatted: tracked-changes look. */
+.sop-change { border-left: 3px solid; padding: 0.125rem 0 0.125rem 0.75rem; margin: 0.25rem 0; border-radius: 0.25rem; }
+.sop-change > .prose-sop > :first-child { margin-top: 0.25rem; }
+.sop-change > .prose-sop > :last-child { margin-bottom: 0.25rem; }
+.sop-change-removed { border-color: oklch(0.65 0.2 25); background: oklch(0.97 0.02 25); color: oklch(0.45 0.12 25); }
+.sop-change-removed .prose-sop { text-decoration: line-through; text-decoration-color: oklch(0.65 0.2 25 / 0.7); }
+.sop-change-added { border-color: oklch(0.6 0.15 150); background: oklch(0.97 0.03 150); }
+.sop-change-key { display: inline-block; width: 0.75rem; height: 0.75rem; border-left: 3px solid; border-radius: 0.125rem; }
+.sop-change-removed-text { color: oklch(0.5 0.15 25); text-decoration: line-through; }
+.sop-change-added-text { color: oklch(0.45 0.13 150); text-decoration: none; background: oklch(0.95 0.04 150); border-radius: 0.125rem; padding: 0 0.125rem; }
 
 /* The heading a citation points to, in the Ask side panel. */
 .sop-cited { background: #fef3c7; border-radius: 0.25rem; padding: 0 0.25rem; }

@@ -89,3 +89,26 @@ def test_short_secret_key_rejected(monkeypatch):
     get_settings.cache_clear()
     with pytest.raises(SecretKeyError, match="at least"):
         master_key()
+
+
+@pytest.mark.parametrize("env", ["production", "staging", "test"])
+def test_demo_sign_in_without_codes_is_refused_outside_development(monkeypatch, env):
+    from app.config import get_settings
+
+    monkeypatch.setenv("SOP_ENV", env)
+    monkeypatch.setenv("SOP_DEMO_SKIP_2FA", "true")
+    get_settings.cache_clear()
+    with pytest.raises(ValueError, match="only allowed with SOP_ENV=development"):
+        get_settings()
+
+
+def test_demo_switch_never_covers_other_accounts(monkeypatch):
+    from app.config import get_settings
+    from app.demo import skips_two_factor
+
+    monkeypatch.setenv("SOP_ENV", "development")
+    monkeypatch.setenv("SOP_DEMO_SKIP_2FA", "true")
+    get_settings.cache_clear()
+    assert skips_two_factor("Sam.Lee@staff.example.com")
+    assert not skips_two_factor("chiangkaijin@gmail.com")
+    assert not skips_two_factor("someone@staff.example.com")

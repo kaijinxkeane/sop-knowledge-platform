@@ -169,3 +169,43 @@ async def test_sign_in_logs_contain_no_credentials(client, make_user, caplog):
     logged = " ".join(r.getMessage() + repr(getattr(r, "fields", "")) for r in caplog.records)
     assert person.email not in logged and PASSWORD not in logged
     assert "wrong-password-123" not in logged
+
+
+async def test_demo_accounts_skip_the_code_only_in_development(client, make_user, monkeypatch):
+    from app.config import get_settings
+
+    demo = await make_user(email="sam.lee@staff.example.com")
+    other = await make_user()
+    login = {"email": demo.email, "password": PASSWORD}
+
+    # Switch off (the default): a demo account still needs its code.
+    r = await client.post(f"{API}/auth/login", json=login)
+    assert r.json()["status"] == "totp_required"
+
+    monkeypatch.setenv("SOP_DEMO_SKIP_2FA", "true")
+    get_settings.cache_clear()
+    r = await client.post(f"{API}/auth/login", json=login)
+    assert r.status_code == 200 and r.json()["status"] == "signed_in"
+    assert "sop_refresh" in r.cookies
+    me = await client.get(f"{API}/me", headers={"Authorization": f"Bearer {r.json()['token']}"})
+    assert me.status_code == 200 and me.json()["email"] == demo.email
+
+    # Everyone else still needs a code, and a wrong password still fails.
+    r = await client.post(f"{API}/auth/login", json={"email": other.email, "password": PASSWORD})
+    assert r.json()["status"] == "totp_required"
+    r = await client.post(f"{API}/auth/login", json={**login, "password": "wrong"})
+    assert r.status_code == 401
+
+
+async def test_demo_sign_in_without_a_code_is_audited(client, make_user, sessions, monkeypatch):
+    from app.config import get_settings
+
+    demo = await make_user(email="casey.wong@staff.example.com")
+    monkeypatch.setenv("SOP_DEMO_SKIP_2FA", "true")
+    get_settings.cache_clear()
+    await client.post(f"{API}/auth/login", json={"email": demo.email, "password": PASSWORD})
+    async with sessions() as s:
+        event = (
+            await s.execute(select(AuditEvent).where(AuditEvent.action == "login_succeeded"))
+        ).scalar_one()
+    assert event.details == {"method": "demo_no_code"}
