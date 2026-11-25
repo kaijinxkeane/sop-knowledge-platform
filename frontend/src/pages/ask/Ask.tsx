@@ -185,7 +185,11 @@ export default function Ask() {
     }
   }, [conversationId]);
 
-  useEffect(() => bottom.current?.scrollIntoView?.({ block: "end" }), [messages.data, live]);
+  // Braces matter: newer browsers return a Promise from scrollIntoView, and an
+  // effect must return nothing or a cleanup function (else leaving Ask crashes).
+  useEffect(() => {
+    bottom.current?.scrollIntoView?.({ block: "end" });
+  }, [messages.data, live]);
 
   const stored = messages.data ?? [];
   const lastStored = stored.at(-1);

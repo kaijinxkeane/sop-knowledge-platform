@@ -242,3 +242,21 @@ describe("Ask", () => {
     expect(screen.getByRole("button", { name: "Ask" })).toBeInTheDocument();
   });
 });
+
+describe("leaving Ask", () => {
+  it("doesn't crash when the browser's scrollIntoView returns a Promise (newer Chrome)", async () => {
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = vi.fn(() => Promise.resolve()) as never;
+    try {
+      askApi(() => json([]), [], { "GET /api/v1/notifications": () => json([]) });
+      const { router } = renderApp("/ask");
+      await screen.findByRole("textbox");
+      await router.navigate("/library");
+      await waitFor(() => expect(router.state.location.pathname).toBe("/library"));
+      expect(screen.queryByText(/Unexpected Application Error/)).toBeNull();
+      expect(screen.queryByText(/is not a function/)).toBeNull();
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+});
