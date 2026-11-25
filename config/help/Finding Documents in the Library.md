@@ -18,6 +18,7 @@ The **Library** lists every document you are allowed to open: SOPs, guides, slid
 - Switch the view to browse by space, by programme and stage, or by type.
 - Press Ctrl+K (Cmd+K on a Mac) anywhere to jump straight to a document by its title.
 - Select the star on a document to bookmark it. Bookmarks appear on Home.
+- Inside a programme, people who can write in its department can choose **Arrange** on a stage to put its documents in teaching order. Everyone sees the same order.
 
 ## Folders
 
@@ -27,6 +28,7 @@ Choose **Folders** as the view to browse a department's documents like a file ex
 - If you can write in a department, choose **New folder** inside one of its folders to make a subfolder.
 - Choose **Move** next to a document to put it in another folder of the same department. A move never changes who can read the document. If it would, for example moving into a restricted folder, change the document's access in the editor first.
 - An empty folder you made can be removed with **Remove empty folder**.
+- While a folder is open, the search box searches only that folder (untick **Only search in** to search everywhere). **Ask about this folder** asks questions answered from that folder only.
 
 ## Reading a document
 

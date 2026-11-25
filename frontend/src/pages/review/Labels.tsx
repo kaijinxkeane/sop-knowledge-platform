@@ -12,14 +12,15 @@ import { Select } from "@/components/ui/select";
 import { t, type MessageKey } from "@/i18n";
 import { useFolderActions } from "@/pages/library/Folders";
 import { useLabelActions, useQueue, useSpaces, widens, type Group, type Labels, type Proposal } from "./api";
+import { spaceLabel } from "@/lib/spaceLabel";
 
 const SENSITIVITIES = ["public", "internal", "restricted"] as const;
 const level = (s: string) =>
   (SENSITIVITIES as readonly string[]).includes(s) ? t(`sensitivity.${s}` as MessageKey) : t("sensitivity.restricted");
 
 export function labelText(l: Labels): string {
-  const main = `${l.space} · ${level(l.sensitivity)}`;
-  const shared = (l.shared_with ?? []).map((s) => `${s.space} · ${level(s.sensitivity)}`);
+  const main = `${spaceLabel(l.space)} · ${level(l.sensitivity)}`;
+  const shared = (l.shared_with ?? []).map((s) => `${spaceLabel(s.space)} · ${level(s.sensitivity)}`);
   return shared.length ? `${main} (${t("labels.sharedWith", { list: shared.join(", ") })})` : main;
 }
 

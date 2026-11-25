@@ -21,6 +21,7 @@ import { NotFound } from "@/pages/NotFound";
 import { useSpaces } from "@/pages/review/api";
 import { placeFor } from "@/lib/places";
 import { useProject, useProjectActions, useProjects, useShareRequests, type Project, type ShareRequest } from "./api";
+import { spaceLabel } from "@/lib/spaceLabel";
 
 const day = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString([], { dateStyle: "medium" }) : "");
 const tomorrow = () => new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
@@ -66,7 +67,7 @@ function ApproveShare({ r }: { r: ShareRequest }) {
   return (
     <li className="space-y-3 border-t pt-3 first:border-t-0 first:pt-0">
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="font-medium">{r.space}</span>
+        <span className="font-medium">{spaceLabel(r.space)}</span>
         <span>{t("project.requestLine", { project: r.project, lead: r.project_lead, members: r.members, date: day(r.ends_on) })}</span>
         <Badge variant="outline">{label(`project.share.status.${r.status}`, r.status)}</Badge>
         {r.renewal_requested && <Badge variant="warning">{t("project.renewalAsked")}</Badge>}
@@ -353,7 +354,7 @@ export function ProjectView() {
               <ul className="space-y-1 text-sm">
                 {p.shares.map((s) => (
                   <li key={s.id} className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{s.space}</span>
+                    <span className="font-medium">{spaceLabel(s.space)}</span>
                     <Badge variant={s.in_force ? "default" : "outline"}>{label(`project.share.status.${s.status}`, s.status)}</Badge>
                     {s.status === "approved" && (
                       <span className="text-xs text-muted-foreground">

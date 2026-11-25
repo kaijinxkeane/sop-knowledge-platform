@@ -96,10 +96,42 @@ describe("library: browse", () => {
     renderApp("/library");
     const u = userEvent.setup();
     await u.selectOptions(await screen.findByLabelText("View"), "department");
-    await u.click(screen.getByRole("button", { name: "hr" }));
+    await u.click(screen.getByRole("button", { name: "HR" }));
     expect(await screen.findByRole("link", { name: "Leave Policy" })).toBeInTheDocument();
     // An editor sees that changes are waiting.
     expect(screen.getByText("Changes waiting for review")).toBeInTheDocument();
+  });
+});
+
+describe("library: arranging a programme", () => {
+  it("lets contributors put a stage in their own order, saved for everyone", async () => {
+    let saved: unknown = null;
+    let order: { document_id: string; position: number }[] = [];
+    libraryApi({
+      "GET /api/v1/me": () => json(makeMe({ space_actions: { core: ["ask", "contribute"], hr: ["ask"] } })),
+      "GET /api/v1/documents": () => json(DOCS.map((d) => ({ ...d, space: d.access[0]!.space }))),
+      "GET /api/v1/library/order": () => json(order),
+      "PUT /api/v1/library/order": async (req) => {
+        saved = await req.json();
+        order = [{ document_id: "d2", position: 10 }, { document_id: "d1", position: 20 }];
+        return new Response(null, { status: 204 });
+      },
+    });
+    renderApp(`/library?group=${encodeURIComponent("Signature Personal Brand Programme")}`);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Arrange" }));
+    await u.click(screen.getByRole("button", { name: "Move Brand Foundations up" }));
+    await u.click(screen.getByRole("button", { name: "Save order" }));
+    await waitFor(() => expect(saved).toEqual({ programme: SIG, stage: "discovery", document_ids: ["d2", "d1"] }));
+    const links = await screen.findAllByRole("link", { name: /Brand Foundations|Discovery Workshop SOP/ });
+    expect(links.map((l) => l.textContent)).toEqual(["Brand Foundations", "Discovery Workshop SOP"]);
+  });
+
+  it("offers no Arrange to readers", async () => {
+    libraryApi({ "GET /api/v1/library/order": () => json([]) });
+    renderApp(`/library?group=${encodeURIComponent("Signature Personal Brand Programme")}`);
+    await screen.findByRole("link", { name: "Discovery Workshop SOP" });
+    expect(screen.queryByRole("button", { name: "Arrange" })).toBeNull();
   });
 });
 

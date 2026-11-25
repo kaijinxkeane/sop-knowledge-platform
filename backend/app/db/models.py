@@ -374,6 +374,18 @@ class ClassificationProposal(Base):
     created_at: Mapped[datetime] = _created()
 
 
+class ProgrammeOrder(Base):
+    """Where a document sits in its programme stage when arranged by hand."""
+
+    __tablename__ = "programme_order"
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), primary_key=True
+    )
+    position: Mapped[int] = mapped_column(Integer)
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    updated_at: Mapped[datetime] = _created()
+
+
 class TrainedSorter(Base):
     """The latest trained sorter: average fingerprints, never text."""
 

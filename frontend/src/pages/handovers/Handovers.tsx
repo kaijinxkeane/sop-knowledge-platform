@@ -13,6 +13,7 @@ import { NoteView } from "@/pages/library/NoteView";
 import { NotFound } from "@/pages/NotFound";
 import { placeFor } from "@/lib/places";
 import { useComments, useHandover, useHandoverActions, useHandovers, type Handover, type Issue } from "./api";
+import { spaceLabel } from "@/lib/spaceLabel";
 
 const day = (iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "";
@@ -161,7 +162,7 @@ export function HandoverView() {
           <h1 className="text-2xl font-semibold">{d.title}</h1>
           <Badge variant={d.status === "draft" ? "outline" : "default"}>{statusLabel(d.status)}</Badge>
         </div>
-        <p className="text-sm text-muted-foreground">{t("handover.by", { name: d.author })} · {d.space}</p>
+        <p className="text-sm text-muted-foreground">{t("handover.by", { name: d.author })} · {spaceLabel(d.space)}</p>
         {d.mine && (
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline" size="sm"><Link to={`/handovers/${d.id}/edit`}>{t("handover.edit")}</Link></Button>

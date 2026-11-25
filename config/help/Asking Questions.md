@@ -24,6 +24,7 @@ Use **Ask** to get answers from the company's SOPs in plain language.
 1. Ask one thing at a time, in your own words.
 2. Mention the programme or process if it matters, for example "the discovery workshop".
 3. Use the suggested follow-up questions under an answer to dig deeper.
+4. To keep answers to one area, choose a programme, stage or folder above the question box.
 
 ## When an answer isn't right
 

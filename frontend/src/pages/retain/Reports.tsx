@@ -25,6 +25,7 @@ import {
   useStale,
   type Topic,
 } from "./api";
+import { spaceLabel } from "@/lib/spaceLabel";
 
 const day = (iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleDateString([], { dateStyle: "medium" }) : "";
@@ -41,7 +42,7 @@ export function SpacePicker({ spaces, value, onChange, id }: { spaces: string[];
     <div className="w-56 space-y-1">
       <Label htmlFor={id}>{t("retain.space")}</Label>
       <Select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
-        {spaces.map((s) => <option key={s} value={s}>{s}</option>)}
+        {spaces.map((s) => <option key={s} value={s}>{spaceLabel(s)}</option>)}
       </Select>
     </div>
   );
@@ -172,7 +173,7 @@ function HrGaps() {
                         : t("gaps.trendNone")}
                     </p>
                   </td>
-                  <td className="px-3 py-2">{g.space}</td>
+                  <td className="px-3 py-2">{spaceLabel(g.space)}</td>
                   <td className="px-3 py-2 text-xs">
                     {Object.entries(g.by_role ?? {}).map(([role, n]) => <div key={role}>{role}: {String(n)}</div>)}
                   </td>

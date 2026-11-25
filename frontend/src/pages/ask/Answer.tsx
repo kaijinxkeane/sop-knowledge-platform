@@ -10,6 +10,7 @@ import { t, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { AnswerText, plainWikiLinks } from "./AnswerText";
 import { myGaps, requestSop, sendFeedback, type Citation, type Reason, type Section } from "./api";
+import { spaceLabel } from "@/lib/spaceLabel";
 
 const REASONS: Reason[] = ["wrong", "outdated", "missing_steps", "unclear", "other"];
 
@@ -203,7 +204,7 @@ export function Answer({ sections, fallback, titles, question, questionId, messa
       ) : (
         sections.map((s, i) => (
           <section key={`${s.space}-${i}`} aria-label={s.space ? titles[s.space] ?? s.space : undefined}>
-            {several && s.space && <h3 className="mb-1 text-xs font-semibold uppercase text-muted-foreground">{titles[s.space] ?? s.space}</h3>}
+            {several && s.space && <h3 className="mb-1 text-xs font-semibold uppercase text-muted-foreground">{titles[s.space] ?? spaceLabel(s.space)}</h3>}
             {s.unavailable ? (
               <p className="text-sm">
                 {t("ask.unavailable")}{" "}

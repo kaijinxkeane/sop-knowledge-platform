@@ -30,6 +30,7 @@ import {
   type PathBody,
   type PathItem,
 } from "./api";
+import { spaceLabel } from "@/lib/spaceLabel";
 
 function Progress({ done, total }: { done: number; total: number }) {
   const pct = total ? Math.round((done / total) * 100) : 0;
@@ -103,7 +104,7 @@ export function PathList() {
                     <div>
                       <Link to={`/paths/${p.id}/edit`} className="font-medium hover:underline">{p.title}</Link>
                       <p className="text-xs text-muted-foreground">
-                        {p.space} · {t("paths.items", { n: p.total })}
+                        {spaceLabel(p.space)} · {t("paths.items", { n: p.total })}
                         {c && ` · ${t("paths.finished", { done: finished, total: c.people.length })}`}
                       </p>
                     </div>
@@ -451,7 +452,7 @@ function EditorForm({ p }: { p: Path | undefined }) {
             <div className="space-y-1">
               <Label htmlFor="path-space">{t("labels.space")}</Label>
               <Select id="path-space" value={space} disabled={!!p} onChange={(e) => setSpace(e.target.value)}>
-                {(p ? [p.space] : leads).map((s) => <option key={s} value={s}>{s}</option>)}
+                {(p ? [p.space] : leads).map((s) => <option key={s} value={s}>{spaceLabel(s)}</option>)}
               </Select>
             </div>
           </div>

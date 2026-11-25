@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import audit
 from app.config import get_settings
 from app.db.models import Grant, Role, Space
+from app.identity import load_roles_config
 from app.models.types import UNCLASSIFIED
 from app.spaces import space_files
 from app.vault.labels import vault_config
@@ -126,6 +127,18 @@ async def create_department(
     employee = (await session.execute(select(Role).where(Role.name == "employee"))).scalar()
     if employee is not None:
         employee.grants.append(Grant(space=name, max_sensitivity="public", actions=["ask"]))
+    # Roles that work in every department (e.g. the CEO: `new_departments` in roles.yaml).
+    for role_name, spec in load_roles_config().items():
+        extra = spec.get("new_departments")
+        role = (await session.execute(select(Role).where(Role.name == role_name))).scalar()
+        if extra and role is not None:
+            role.grants.append(
+                Grant(
+                    space=name,
+                    max_sensitivity=extra.get("max_sensitivity", "public"),
+                    actions=list(extra.get("actions") or []),
+                )
+            )
     await session.flush()
     await audit.record(
         session,

@@ -12,6 +12,8 @@ tags: [help, write]
 
 Use **Write** to create a new note, or open a document in the Library and choose **Edit**.
 
+When you type the title of a new note, notes you can already read that look similar are shown. Check them first: updating one may be better than starting another.
+
 ## The editor
 
 The toolbar works like a word processor:

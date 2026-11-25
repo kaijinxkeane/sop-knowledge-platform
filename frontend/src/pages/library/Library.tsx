@@ -12,9 +12,11 @@ import { HELP_GROUP } from "@/lib/help";
 import { plainName } from "@/lib/obsidian";
 import { cn } from "@/lib/utils";
 import { exportPdf, useDocuments, useSearch, useStages, type Doc } from "./api";
+import { StageSection } from "./Arrange";
 import { BookmarkList } from "./Bookmarks";
 import { FolderBrowser, folderDepartments } from "./Folders";
 import { StatusDot } from "./StatusDot";
+import { spaceLabel } from "@/lib/spaceLabel";
 
 type View = "programme" | "stage" | "department" | "folders";
 const OTHER = "__other__";
@@ -52,7 +54,7 @@ function inGroup(view: View, group: string, d: Doc): boolean {
 
 function groupLabel(view: View, group: string): string {
   if (group === HELP) return t("library.help");
-  if (group !== OTHER) return group;
+  if (group !== OTHER) return view === "department" || view === "folders" ? spaceLabel(group) : group;
   return view === "stage" ? t("library.noStage") : t("library.other");
 }
 
@@ -137,11 +139,24 @@ function Browse({ view, group, docs, stages }: { view: View; group: string; docs
         subGroups.map((g) => {
           const items = here.filter((d) => sub(d) === g);
           if (!items.length) return null;
+          const heading = groupLabel(view === "stage" ? "programme" : "stage", g);
+          // Inside a programme, each stage can be arranged by hand.
+          const programme = view === "programme" ? (items.find((d) => d.programme)?.programme ?? null) : null;
+          if (programme && items.every((d) => d.programme === programme)) {
+            return (
+              <StageSection
+                key={g}
+                title={heading}
+                docs={items}
+                programme={programme}
+                stage={g === OTHER ? null : g}
+                row={(d) => <DocRow key={d.id} doc={d} />}
+              />
+            );
+          }
           return (
             <section key={g}>
-              <h3 className="text-sm font-medium capitalize text-muted-foreground">
-                {groupLabel(view === "stage" ? "programme" : "stage", g)}
-              </h3>
+              <h3 className="text-sm font-medium capitalize text-muted-foreground">{heading}</h3>
               <ul className="divide-y">{items.map((d) => <DocRow key={d.id} doc={d} />)}</ul>
             </section>
           );
@@ -334,12 +349,13 @@ export default function Library() {
                   onClick={() => set({ group: g, q: null, folder: null })}
                   aria-current={!q && g === group ? "true" : undefined}
                   className={cn(
-                    "w-full rounded px-2 py-1 text-left capitalize hover:bg-accent",
+                    "w-full rounded px-2 py-1 text-left hover:bg-accent",
+                    (view === "programme" || view === "stage") && "capitalize",
                     !q && g === group && "bg-accent font-medium",
                     g === HELP && "normal-case",
                   )}
                 >
-                  {view === "folders" ? g : groupLabel(view, g)}
+                  {view === "folders" ? spaceLabel(g) : groupLabel(view, g)}
                 </button>
               </li>
             ))}

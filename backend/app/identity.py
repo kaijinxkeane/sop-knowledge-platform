@@ -45,6 +45,16 @@ def load_roles_config(config_dir: Path | None = None) -> dict[str, dict]:
             validate_grant(
                 g.get("space"), g.get("max_sensitivity", "public"), g.get("actions") or [], spaces
             )
+        extra = role.get("new_departments")
+        if extra is not None:
+            if not spaces:
+                raise ValueError("new_departments needs at least one configured space")
+            validate_grant(
+                next(iter(spaces)),
+                extra.get("max_sensitivity", "public"),
+                extra.get("actions") or [],
+                spaces,
+            )
         role.setdefault("description", "")
         role.setdefault("grants", [])
         roles[name] = role

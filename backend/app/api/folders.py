@@ -37,7 +37,7 @@ from app.api.deps import (
     get_git,
     get_session_factory,
 )
-from app.db.models import Document, DocumentAccess, LibraryFolder, Space
+from app.db.models import Document, DocumentAccess, LibraryFolder, ProgrammeOrder, Space
 from app.db.scoped import apply_reader_scope, visible
 from app.vault.folders import department_of, may_leave
 from app.vault.git import GitVault, VaultPathError
@@ -301,3 +301,86 @@ async def move_document(
     )
     await session.commit()
     return MovedOut(id=str(doc.id), vault_path=new)
+
+
+# --- manual order inside a programme stage -----------------------------------------
+
+
+class OrderOut(BaseModel):
+    document_id: str
+    position: int
+
+
+class OrderIn(BaseModel):
+    programme: str = Field(min_length=1, max_length=200)
+    stage: str | None = Field(default=None, max_length=32)
+    document_ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+
+
+async def _readable_docs(session: AsyncSession, me: CurrentUser) -> dict[uuid.UUID, Document]:
+    await session.commit()
+    await apply_reader_scope(session, me.principal)
+    docs = {
+        d.id: d
+        for d in (await session.execute(select(Document))).scalars().all()
+        if visible(me.principal, d)
+    }
+    await session.commit()
+    return docs
+
+
+@router.get("/order", response_model=list[OrderOut])
+async def programme_order(
+    me: CurrentUser = Depends(current_user), session: AsyncSession = Depends(get_db)
+) -> list[OrderOut]:
+    """Hand-arranged positions, for documents this person can read (ids only)."""
+    readable = await _readable_docs(session, me)
+    rows = (await session.execute(select(ProgrammeOrder))).scalars().all()
+    return [
+        OrderOut(document_id=str(r.document_id), position=r.position)
+        for r in rows
+        if r.document_id in readable
+    ]
+
+
+@router.put("/order", status_code=204)
+async def set_programme_order(
+    body: OrderIn,
+    me: CurrentUser = Depends(current_user),
+    session: AsyncSession = Depends(get_db),
+) -> None:
+    """Arrange one stage of a programme. Every document listed must be readable,
+    in that programme and stage, and in a department where this person may
+    contribute. Documents they can't see keep their place."""
+    ids = list(dict.fromkeys(body.document_ids))
+    readable = await _readable_docs(session, me)
+    for doc_id in ids:
+        doc = readable.get(doc_id)
+        if doc is None:
+            raise NOT_FOUND
+        if doc.programme != body.programme or (doc.stage or None) != (body.stage or None):
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, "documents must be in this programme stage"
+            )
+        owner = next((a.space for a in doc.access if a.role == "owner"), None)
+        if owner is None or not me.principal.can("contribute", owner):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "you can't arrange this programme")
+    existing = {
+        r.document_id: r
+        for r in (
+            await session.execute(select(ProgrammeOrder).where(ProgrammeOrder.document_id.in_(ids)))
+        ).scalars()
+    }
+    for n, doc_id in enumerate(ids):
+        row = existing.get(doc_id) or ProgrammeOrder(document_id=doc_id)
+        row.position, row.updated_by = (n + 1) * 10, me.user.id
+        session.add(row)
+    await audit.record(
+        session,
+        "programme_arranged",
+        actor_id=me.user.id,
+        target_type="programme",
+        target_id=None,
+        details={"documents": len(ids)},
+    )
+    await session.commit()

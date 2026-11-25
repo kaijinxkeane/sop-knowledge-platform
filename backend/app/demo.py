@@ -13,7 +13,7 @@ DEMO_USERS = [
     (
         "jordan.ng@staff.example.com",
         "Jordan Ng (CEO)",
-        ["employee", "core-lead", "platform-admin"],
+        ["employee", "core-lead", "ceo", "platform-admin"],
         "core",
     ),
     ("avery.tan@staff.example.com", "Avery Tan", ["employee", "core-staff"], "core"),

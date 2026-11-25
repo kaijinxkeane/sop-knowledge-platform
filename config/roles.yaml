@@ -2,6 +2,9 @@
 # role that doesn't exist yet; after that, roles are managed in the Admin
 # screens and this file is not re-applied (use --reset-roles to force it).
 #
+# `new_departments` on a role: the grant it also gets in every department
+# created in the app (Admin → Departments).
+#
 # A grant is {space, max_sensitivity, actions}:
 #   space actions:   ask | contribute | review | approve | admin   (admin = all)
 #   global actions:  manage_users | manage_spaces | view_audit | view_gap_reports  (no space)
@@ -24,6 +27,15 @@ roles:
     description: Leads the core team (the CEO). Approves core SOPs and sees restricted IP.
     grants:
       - {space: core, max_sensitivity: restricted, actions: [ask, contribute, review, approve]}
+
+  ceo:
+    description: >-
+      The CEO: writes and edits notes in every department, up to internal. Approving
+      them stays with each department's lead; restricted material stays with them.
+    grants:
+      - {space: it, max_sensitivity: internal, actions: [ask, contribute]}
+      - {space: hr, max_sensitivity: internal, actions: [ask, contribute]}
+    new_departments: {max_sensitivity: internal, actions: [ask, contribute]}
 
   it-staff:
     description: IT team members.

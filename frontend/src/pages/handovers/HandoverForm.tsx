@@ -15,6 +15,7 @@ import { t } from "@/i18n";
 import { useStages } from "@/pages/library/api";
 import { NotFound } from "@/pages/NotFound";
 import { emptyFields, useHandover, useHandoverActions, type Colleague, type Fields } from "./api";
+import { spaceLabel } from "@/lib/spaceLabel";
 
 const area = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
 
@@ -86,7 +87,7 @@ function Editor({ initial, existing }: { initial: { title: string; space: string
         </Field>
         <Field id="ho-space" label={t("handover.space")}>
           <Select id="ho-space" value={space} disabled={!!existing} onChange={(e) => setSpace(e.target.value)}>
-            {spaces.map((s) => <option key={s} value={s}>{s}</option>)}
+            {spaces.map((s) => <option key={s} value={s}>{spaceLabel(s)}</option>)}
           </Select>
         </Field>
       </div>

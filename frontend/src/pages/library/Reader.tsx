@@ -35,6 +35,7 @@ function backLabel(back: Place): string {
   return known.includes(back.section) ? t(`nav.${back.section}` as MessageKey) : t("doc.backToLibrary");
 }
 import { StatusDot } from "./StatusDot";
+import { spaceLabel } from "@/lib/spaceLabel";
 
 const ext = (doc: Doc) => doc.vault_path.split(".").pop()?.toLowerCase() ?? "";
 
@@ -51,7 +52,7 @@ function Meta({ doc }: { doc: Doc }) {
         <span className="flex flex-wrap gap-1">
           {doc.access.map((a) => (
             <Badge key={`${a.space}-${a.sensitivity}`} variant="outline">
-              {a.space} · {t(`sensitivity.${a.sensitivity}` as MessageKey)}
+              {spaceLabel(a.space)} · {t(`sensitivity.${a.sensitivity}` as MessageKey)}
             </Badge>
           ))}
         </span>

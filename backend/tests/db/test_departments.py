@@ -36,7 +36,7 @@ async def test_ceo_creates_a_department_with_roles_and_folder(client, sessions, 
     body = r.json()
     assert body["name"] == "marketing" and body["folders"] == ["Marketing"]
     assert body["created_in_app"] is True
-    assert body["roles"] == ["marketing-lead", "marketing-staff"]
+    assert body["roles"] == ["ceo", "marketing-lead", "marketing-staff"]
 
     async with sessions() as s:
         roles = {r.name: r for r in (await s.execute(select(Role))).scalars()}
@@ -47,6 +47,11 @@ async def test_ceo_creates_a_department_with_roles_and_folder(client, sessions, 
         assert (staff.max_sensitivity, sorted(staff.actions)) == ("internal", ["ask", "contribute"])
         employee = [g for g in roles["employee"].grants if g.space == "marketing"]
         assert [(g.max_sensitivity, g.actions) for g in employee] == [("public", ["ask"])]
+        # the CEO role writes in every department, up to internal (roles.yaml new_departments)
+        ceo = [g for g in roles["ceo"].grants if g.space == "marketing"]
+        assert [(g.max_sensitivity, sorted(g.actions)) for g in ceo] == [
+            ("internal", ["ask", "contribute"])
+        ]
         ev = (
             await s.execute(select(AuditEvent).where(AuditEvent.action == "space_created"))
         ).scalar()
@@ -110,3 +115,26 @@ async def test_notes_in_the_folder_belong_to_the_department(
         assert await roles_by_name(s, ["marketing-staff"])
     member = await sign_in(await make_user(roles=("employee", "marketing-staff")))
     assert "Launch Checklist" in titles(await client.get("/api/v1/documents", headers=member))
+
+
+async def test_the_ceo_writes_in_every_department_but_reads_no_restricted_material(
+    indexed, client, make_user, sign_in
+):
+    """`ceo` (config/roles.yaml): new notes and edits in IT and HR, up to internal;
+    approving stays with each department's lead."""
+    h = await sign_in(await make_user(roles=("employee", "core-lead", "ceo")))
+    me = (await client.get("/api/v1/me", headers=h)).json()
+    for space in ("core", "hr", "it"):
+        assert "contribute" in me["space_actions"][space], space
+    assert "approve" not in me["space_actions"]["hr"]
+    titles = {d["title"] for d in (await client.get("/api/v1/documents", headers=h)).json()}
+    assert "Leave Policy" in titles  # HR internal: readable and editable
+    assert "Disciplinary Process" not in titles  # HR restricted: still hidden
+    note = {
+        "title": "Office keys",
+        "space": "hr",
+        "sensitivity": "internal",
+        "body": "# Office keys\n",
+    }
+    r = await client.post("/api/v1/notes", json=note, headers=h)
+    assert r.status_code == 201, r.text

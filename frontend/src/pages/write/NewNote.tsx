@@ -12,6 +12,7 @@ import { t } from "@/i18n";
 import { plainName } from "@/lib/obsidian";
 import { useDocuments, useStages } from "@/pages/library/api";
 import { createNote, useAfterSave, useSimilarNotes } from "./api";
+import { spaceLabel } from "@/lib/spaceLabel";
 
 /**
  * A new note starts from its template. Started from a gap, the URL carries the
@@ -104,7 +105,7 @@ export default function NewNote() {
           <Label htmlFor="new-space">{t("write.space")}</Label>
           <Select id="new-space" value={space} onChange={(e) => setSpace(e.target.value)}>
             {spaces.map((s) => (
-              <option key={s} value={s}>{s}</option>
+              <option key={s} value={s}>{spaceLabel(s)}</option>
             ))}
           </Select>
         </div>

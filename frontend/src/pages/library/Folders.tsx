@@ -3,7 +3,7 @@ import { ChevronRight, Folder, FolderPlus } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router";
 import { api, unwrap, type Schemas } from "@/api/client";
-import { messageOf } from "@/api/errors";
+import { call, messageOf } from "@/api/errors";
 import { useMe } from "@/auth/hooks";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Select } from "@/components/ui/select";
 import { t } from "@/i18n";
 import type { Doc } from "./api";
 import { StatusDot } from "./StatusDot";
+import { spaceLabel } from "@/lib/spaceLabel";
 
 type FolderInfo = Schemas["FolderOut"];
 
@@ -39,7 +40,7 @@ export function useFolderActions() {
     }),
     remove: useMutation({
       mutationFn: (id: string) =>
-        unwrap(api.DELETE("/api/v1/library/folders/{folder_id}", { params: { path: { folder_id: id } } })),
+        call(api.DELETE("/api/v1/library/folders/{folder_id}", { params: { path: { folder_id: id } } })),
       onSettled: refresh,
     }),
     move: useMutation({
@@ -148,8 +149,8 @@ export function FolderBrowser({
   return (
     <div className="space-y-4">
       <nav aria-label={t("folders.breadcrumb")} className="flex flex-wrap items-center gap-1 text-sm">
-        <button type="button" className="font-semibold capitalize hover:underline" onClick={() => onOpen(null)}>
-          {space}
+        <button type="button" className="font-semibold hover:underline" onClick={() => onOpen(null)}>
+          {spaceLabel(space)}
         </button>
         {crumbs.map((c) => (
           <span key={c} className="inline-flex items-center gap-1">

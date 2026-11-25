@@ -120,3 +120,40 @@ async def test_only_empty_app_folders_can_be_removed(indexed, client, sessions, 
         headers=lead,
     )
     assert (await client.delete(f"{API}/folders/{folder['id']}", headers=core)).status_code == 204
+
+
+async def test_arranging_a_programme_stage(indexed, sessions, client, make_user, sign_in):
+    stage_dir = "Programmes/Signature Personal Brand Programme/01 Discovery/"
+    async with sessions() as s:
+        docs = (
+            (await s.execute(select(Document).where(Document.vault_path.like(stage_dir + "%"))))
+            .scalars()
+            .all()
+        )
+    notes = [d for d in docs if d.kind == "note"]
+    assert len(notes) >= 2
+    programme, stage = notes[0].programme, notes[0].stage
+    ids = [str(d.id) for d in reversed(notes)]
+    body = {"programme": programme, "stage": stage, "document_ids": ids}
+    url = f"{API}/order"
+
+    staff = await sign_in(await make_user(roles=CORE_STAFF))
+    r = await client.put(url, json=body, headers=staff)
+    assert r.status_code == 204, r.text
+    got = {o["document_id"]: o["position"] for o in (await client.get(url, headers=staff)).json()}
+    assert sorted(ids, key=got.get) == ids
+
+    # Can't see them: nothing to arrange, and their positions aren't listed.
+    for roles in (("employee",), HR_STAFF):
+        h = await sign_in(await make_user(roles=roles))
+        assert (await client.put(url, json=body, headers=h)).status_code == 404
+        listed = {o["document_id"] for o in (await client.get(url, headers=h)).json()}
+        assert not listed & set(ids)
+    # Wrong stage for the documents: refused.
+    wrong = {**body, "stage": "delivery"}
+    assert (await client.put(url, json=wrong, headers=staff)).status_code == 422
+    async with sessions() as s:
+        ev = (
+            await s.execute(select(AuditEvent).where(AuditEvent.action == "programme_arranged"))
+        ).scalar()
+        assert ev.details == {"documents": len(ids)}

@@ -2847,6 +2847,62 @@
         "title": "OptionsOut",
         "type": "object"
       },
+      "OrderIn": {
+        "properties": {
+          "document_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Document Ids",
+            "type": "array"
+          },
+          "programme": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Programme",
+            "type": "string"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          }
+        },
+        "required": [
+          "programme",
+          "document_ids"
+        ],
+        "title": "OrderIn",
+        "type": "object"
+      },
+      "OrderOut": {
+        "properties": {
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "document_id",
+          "position"
+        ],
+        "title": "OrderOut",
+        "type": "object"
+      },
       "OutcomeIn": {
         "properties": {
           "opened": {
@@ -8756,6 +8812,75 @@
           }
         ],
         "summary": "Delete Folder",
+        "tags": [
+          "library"
+        ]
+      }
+    },
+    "/api/v1/library/order": {
+      "get": {
+        "description": "Hand-arranged positions, for documents this person can read (ids only).",
+        "operationId": "programme_order_api_v1_library_order_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OrderOut"
+                  },
+                  "title": "Response Programme Order Api V1 Library Order Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Programme Order",
+        "tags": [
+          "library"
+        ]
+      },
+      "put": {
+        "description": "Arrange one stage of a programme. Every document listed must be readable,\nin that programme and stage, and in a department where this person may\ncontribute. Documents they can't see keep their place.",
+        "operationId": "set_programme_order_api_v1_library_order_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Programme Order",
         "tags": [
           "library"
         ]

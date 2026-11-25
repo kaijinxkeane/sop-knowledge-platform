@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { session } from "@/auth/session";
@@ -37,9 +37,9 @@ describe("library folders", () => {
     setup();
     const { router } = renderApp("/library?view=folders&group=core");
     const u = userEvent.setup();
-    await screen.findByRole("button", { name: "hr" });
+    await screen.findByRole("button", { name: "HR" });
     const groups = screen.getByRole("navigation", { name: "Programmes, stages or departments" });
-    expect(within(groups).getAllByRole("button").map((b) => b.textContent)).toEqual(["core", "hr"]);
+    expect(within(groups).getAllByRole("button").map((b) => b.textContent)).toEqual(["Core", "HR"]);
     await u.click(await screen.findByRole("button", { name: /Programmes/ }));
     expect(router.state.location.search).toContain("folder=Programmes");
     expect(screen.getByRole("button", { name: /Onboarding/ })).toHaveTextContent("0 documents");
@@ -64,6 +64,16 @@ describe("library folders", () => {
     await u.type(screen.getByLabelText("Search the library"), "intake{Enter}");
     expect(await screen.findByText("Results for “intake” in Programmes/Discovery")).toBeInTheDocument();
     expect(searched!.get("folder")).toBe("Programmes/Discovery");
+  });
+
+  it("removes an empty folder and goes back up", async () => {
+    let removed = false;
+    setup({ "DELETE /api/v1/library/folders/f1": () => ((removed = true), new Response(null, { status: 204 })) });
+    const { router } = renderApp("/library?view=folders&group=core&folder=Programmes%2FOnboarding");
+    await userEvent.click(await screen.findByRole("button", { name: "Remove empty folder" }));
+    await waitFor(() => expect(router.state.location.search).toMatch(/folder=Programmes$/));
+    expect(removed).toBe(true);
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("makes a folder and moves a document within the department", async () => {

@@ -1013,6 +1013,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/library/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Programme Order
+         * @description Hand-arranged positions, for documents this person can read (ids only).
+         */
+        get: operations["programme_order_api_v1_library_order_get"];
+        /**
+         * Set Programme Order
+         * @description Arrange one stage of a programme. Every document listed must be readable,
+         *     in that programme and stage, and in a department where this person may
+         *     contribute. Documents they can't see keep their place.
+         */
+        put: operations["set_programme_order_api_v1_library_order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -3216,6 +3242,22 @@ export interface components {
             space_actions: string[];
             /** Spaces */
             spaces: components["schemas"]["SpaceOption"][];
+        };
+        /** OrderIn */
+        OrderIn: {
+            /** Document Ids */
+            document_ids: string[];
+            /** Programme */
+            programme: string;
+            /** Stage */
+            stage?: string | null;
+        };
+        /** OrderOut */
+        OrderOut: {
+            /** Document Id */
+            document_id: string;
+            /** Position */
+            position: number;
         };
         /** OutcomeIn */
         OutcomeIn: {
@@ -6111,6 +6153,57 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    programme_order_api_v1_library_order_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderOut"][];
+                };
+            };
+        };
+    };
+    set_programme_order_api_v1_library_order_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrderIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             204: {
