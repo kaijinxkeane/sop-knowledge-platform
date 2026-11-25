@@ -566,6 +566,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/acknowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Acknowledge */
+        post: operations["acknowledge_api_v1_documents__document_id__acknowledge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/backlinks": {
         parameters: {
             query?: never;
@@ -648,6 +665,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/reading": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Reading Status */
+        get: operations["reading_status_api_v1_documents__document_id__reading_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/versions": {
         parameters: {
             query?: never;
@@ -705,6 +739,23 @@ export interface paths {
         get: operations["get_version_file_api_v1_documents__document_id__versions__commit__file_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Export Pdf */
+        post: operations["export_pdf_api_v1_exports_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -957,6 +1008,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/paths": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Paths */
+        get: operations["my_paths_api_v1_me_paths_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/paths/{path_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Path */
+        get: operations["my_path_api_v1_me_paths__path_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/recent": {
         parameters: {
             query?: never;
@@ -969,6 +1054,23 @@ export interface paths {
          * @description SOPs approved in the last 30 days that you can read, newest first.
          */
         get: operations["recent_api_v1_me_recent_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/required-reading": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Required */
+        get: operations["my_required_api_v1_me_required_reading_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1229,6 +1331,99 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/path-items/{item_id}/done": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark Done */
+        post: operations["mark_done_api_v1_path_items__item_id__done_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/paths": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Paths */
+        get: operations["list_paths_api_v1_paths_get"];
+        put?: never;
+        /** Create Path */
+        post: operations["create_path_api_v1_paths_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/paths/{path_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Path */
+        get: operations["get_path_api_v1_paths__path_id__get"];
+        /** Update Path */
+        put: operations["update_path_api_v1_paths__path_id__put"];
+        post?: never;
+        /** Delete Path */
+        delete: operations["delete_path_api_v1_paths__path_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/paths/{path_id}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign Path */
+        post: operations["assign_path_api_v1_paths__path_id__assign_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * People
+         * @description Colleagues to pick as handover receivers or project members: active
+         *     accounts, display names only (no emails, roles or departments). The query
+         *     is never logged or stored.
+         */
+        get: operations["people_api_v1_people_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/project-shares": {
         parameters: {
             query?: never;
@@ -1450,6 +1645,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reading-assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign */
+        post: operations["assign_api_v1_reading_assignments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reading-assignments/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Assignable Roles
+         * @description Role names a lead can assign reading to (names only, no grants or members).
+         */
+        get: operations["assignable_roles_api_v1_reading_assignments_roles_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reading-assignments/{assignment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Unassign */
+        delete: operations["unassign_api_v1_reading_assignments__assignment_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/bus-factor": {
         parameters: {
             query?: never;
@@ -1550,6 +1799,63 @@ export interface paths {
          * @description For a space's leads (approve) and auditors (view_audit: every space).
          */
         get: operations["governance_report_api_v1_reports_governance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/path-completion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Completion
+         * @description Done of total per person; no item titles (HR may not read restricted items).
+         */
+        get: operations["completion_api_v1_reports_path_completion_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/read-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Status
+         * @description For a space's leads: every assigned SOP, who must read it and who has.
+         */
+        get: operations["read_status_api_v1_reports_read_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Usage */
+        get: operations["usage_api_v1_reports_usage_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1804,6 +2110,19 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** ApproveIn */
+        ApproveIn: {
+            /**
+             * Comment
+             * @default
+             */
+            comment: string;
+            /**
+             * Material Change
+             * @default false
+             */
+            material_change: boolean;
+        };
         /** ApproveShareIn */
         ApproveShareIn: {
             /** Document Ids */
@@ -1960,6 +2279,13 @@ export interface components {
             /** Token */
             token: string;
         };
+        /** ColleagueOut */
+        ColleagueOut: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+        };
         /** CommentIn */
         CommentIn: {
             /** Body */
@@ -1978,6 +2304,19 @@ export interface components {
             created_at: string;
             /** Id */
             id: string;
+        };
+        /** CompletionOut */
+        CompletionOut: {
+            /** Path Id */
+            path_id: string;
+            /** People */
+            people: components["schemas"]["PersonProgress"][];
+            /** Space */
+            space: string;
+            /** Title */
+            title: string;
+            /** Total */
+            total: number;
         };
         /** ConflictOut */
         ConflictOut: {
@@ -2019,6 +2358,20 @@ export interface components {
              */
             updated_at: string;
         };
+        /** DayOut */
+        DayOut: {
+            /** Calls */
+            calls: number;
+            /** Cloud Calls */
+            cloud_calls: number;
+            /** Cost Usd */
+            cost_usd: number;
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+        };
         /** DecisionIn */
         DecisionIn: {
             /**
@@ -2051,8 +2404,28 @@ export interface components {
              * @default
              */
             comment: string;
+            /**
+             * Material Change
+             * @default false
+             */
+            material_change: boolean;
             /** Version */
             version: string;
+        };
+        /** DocStatus */
+        DocStatus: {
+            /** Assignments */
+            assignments: components["schemas"]["ReadingAssignmentOut"][];
+            /** Current Version */
+            current_version: number | null;
+            /** Document Id */
+            document_id: string;
+            /** People */
+            people: components["schemas"]["PersonStatus"][];
+            /** Space */
+            space: string | null;
+            /** Title */
+            title: string;
         };
         /** DocumentOut */
         DocumentOut: {
@@ -2095,6 +2468,15 @@ export interface components {
             otpauth_uri: string;
             /** Secret */
             secret: string;
+        };
+        /** ExportIn */
+        ExportIn: {
+            /** Document Id */
+            document_id?: string | null;
+            /** Programme */
+            programme?: string | null;
+            /** Stage */
+            stage?: string | null;
         };
         /** FeedbackIn */
         FeedbackIn: {
@@ -2415,6 +2797,19 @@ export interface components {
             /** Source */
             source: string;
         };
+        /** ItemIn */
+        ItemIn: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /**
+             * Required
+             * @default false
+             */
+            required: boolean;
+        };
         /** LabelsIn */
         LabelsIn: {
             /** Sensitivity */
@@ -2616,12 +3011,134 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** PathAssignIn */
+        PathAssignIn: {
+            /** Due On */
+            due_on?: string | null;
+            /** Roles */
+            roles?: string[];
+            /** User Ids */
+            user_ids?: string[];
+        };
+        /** PathAssignmentOut */
+        PathAssignmentOut: {
+            /** Due On */
+            due_on: string | null;
+            /** Id */
+            id: string;
+            /** Target */
+            target: string;
+            /** Target Type */
+            target_type: string;
+        };
+        /** PathIn */
+        PathIn: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Space */
+            space: string;
+            /** Steps */
+            steps?: components["schemas"]["StepIn"][];
+            /** Title */
+            title: string;
+        };
+        /** PathItemOut */
+        PathItemOut: {
+            /** Doc Type */
+            doc_type?: string | null;
+            /** Document Id */
+            document_id?: string | null;
+            /**
+             * Done
+             * @default false
+             */
+            done: boolean;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind?: string | null;
+            /** Readable */
+            readable: boolean;
+            /** Required */
+            required: boolean;
+            /** Title */
+            title?: string | null;
+        };
+        /** PathOut */
+        PathOut: {
+            /**
+             * Assignments
+             * @default []
+             */
+            assignments: components["schemas"]["PathAssignmentOut"][];
+            /**
+             * Can Edit
+             * @default false
+             */
+            can_edit: boolean;
+            /** Description */
+            description: string;
+            /** Done */
+            done: number;
+            /** Due On */
+            due_on?: string | null;
+            /** Id */
+            id: string;
+            /** Next Item */
+            next_item?: string | null;
+            /** Space */
+            space: string;
+            /** Steps */
+            steps: components["schemas"]["PathStepOut"][];
+            /** Title */
+            title: string;
+            /** Total */
+            total: number;
+        };
+        /** PathStepOut */
+        PathStepOut: {
+            /** Items */
+            items: components["schemas"]["PathItemOut"][];
+            /** Title */
+            title: string;
+        };
         /** PersonOut */
         PersonOut: {
             /** Id */
             id: string;
             /** Name */
             name: string;
+        };
+        /** PersonProgress */
+        PersonProgress: {
+            /** Done */
+            done: number;
+            /** Due On */
+            due_on: string | null;
+            /** Name */
+            name: string;
+            /** Overdue */
+            overdue: boolean;
+            /** Total */
+            total: number;
+        };
+        /** PersonStatus */
+        PersonStatus: {
+            /** Acknowledged At */
+            acknowledged_at: string | null;
+            /** Can Read */
+            can_read: boolean;
+            /** Due On */
+            due_on: string | null;
+            /** Name */
+            name: string;
+            /** Overdue */
+            overdue: boolean;
+            /** Version */
+            version: number | null;
         };
         /** PersonalGapOut */
         PersonalGapOut: {
@@ -2768,6 +3285,33 @@ export interface components {
             /** Stages */
             stages: string[];
         };
+        /** ReadingAssignIn */
+        ReadingAssignIn: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Due On */
+            due_on?: string | null;
+            /** Roles */
+            roles?: string[];
+            /** User Ids */
+            user_ids?: string[];
+        };
+        /** ReadingAssignmentOut */
+        ReadingAssignmentOut: {
+            /** Document Id */
+            document_id: string;
+            /** Due On */
+            due_on: string | null;
+            /** Id */
+            id: string;
+            /** Target */
+            target: string;
+            /** Target Type */
+            target_type: string;
+        };
         /** ReceiverOut */
         ReceiverOut: {
             /** Acknowledged At */
@@ -2826,6 +3370,23 @@ export interface components {
             /** Space */
             space: string;
         };
+        /** RequiredOut */
+        RequiredOut: {
+            /** Acknowledged At */
+            acknowledged_at: string | null;
+            /** Current Version */
+            current_version: number | null;
+            /** Document Id */
+            document_id: string;
+            /** Due On */
+            due_on: string | null;
+            /** Overdue */
+            overdue: boolean;
+            /** Reread */
+            reread: boolean;
+            /** Title */
+            title: string;
+        };
         /** RetractIn */
         RetractIn: {
             /** Document Id */
@@ -2835,6 +3396,8 @@ export interface components {
         };
         /** ReviewOut */
         ReviewOut: {
+            /** Base Commit */
+            base_commit: string | null;
             /** Comment */
             comment: string;
             /** Decided At */
@@ -2848,6 +3411,8 @@ export interface components {
              * @default []
              */
             flags: string[];
+            /** Git Commit */
+            git_commit: string | null;
             /** Id */
             id: string;
             /**
@@ -2883,6 +3448,13 @@ export interface components {
             description: string;
             /** Grants */
             grants?: components["schemas"]["GrantIn"][];
+            /** Name */
+            name: string;
+        };
+        /** RoleName */
+        RoleName: {
+            /** Description */
+            description: string;
             /** Name */
             name: string;
         };
@@ -3057,6 +3629,32 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** StatusOut */
+        StatusOut: {
+            /** Acknowledged At */
+            acknowledged_at: string | null;
+            /** Acknowledged Version */
+            acknowledged_version: number | null;
+            /** Current Version */
+            current_version: number | null;
+            /** Document Id */
+            document_id: string;
+            /** Due On */
+            due_on: string | null;
+            /** Overdue */
+            overdue: boolean;
+            /** Required */
+            required: boolean;
+            /** Reread */
+            reread: boolean;
+        };
+        /** StepIn */
+        StepIn: {
+            /** Items */
+            items?: components["schemas"]["ItemIn"][];
+            /** Title */
+            title: string;
+        };
         /** StepOut */
         StepOut: {
             /**
@@ -3111,6 +3709,48 @@ export interface components {
         TopicStatusIn: {
             /** Status */
             status: string;
+        };
+        /** UsageOut */
+        UsageOut: {
+            /** Cloud Calls */
+            cloud_calls: number;
+            /** Days */
+            days: components["schemas"]["DayOut"][];
+            /** Fallbacks */
+            fallbacks: number;
+            /** Local Calls */
+            local_calls: number;
+            /** Month */
+            month: string;
+            /** Priced */
+            priced: boolean;
+            /** Tiers */
+            tiers: components["schemas"]["UsageRow"][];
+            /** Total Cost Usd */
+            total_cost_usd: number;
+        };
+        /** UsageRow */
+        UsageRow: {
+            /** Cache Read Tokens */
+            cache_read_tokens: number;
+            /** Calls */
+            calls: number;
+            /** Cost Usd */
+            cost_usd: number;
+            /** Fallbacks */
+            fallbacks: number;
+            /** Input Tokens */
+            input_tokens: number;
+            /** Location */
+            location: string;
+            /** Model */
+            model: string;
+            /** Output Tokens */
+            output_tokens: number;
+            /** Provider */
+            provider: string;
+            /** Tier */
+            tier: string;
         };
         /** UserCreateIn */
         UserCreateIn: {
@@ -4369,6 +5009,37 @@ export interface operations {
             };
         };
     };
+    acknowledge_api_v1_documents__document_id__acknowledge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_backlinks_api_v1_documents__document_id__backlinks_get: {
         parameters: {
             query?: never;
@@ -4495,6 +5166,37 @@ export interface operations {
             };
         };
     };
+    reading_status_api_v1_documents__document_id__reading_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_versions_api_v1_documents__document_id__versions_get: {
         parameters: {
             query?: never;
@@ -4577,6 +5279,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_pdf_api_v1_exports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": unknown;
                 };
             };
             /** @description Validation Error */
@@ -5102,6 +5837,57 @@ export interface operations {
             };
         };
     };
+    my_paths_api_v1_me_paths_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PathOut"][];
+                };
+            };
+        };
+    };
+    my_path_api_v1_me_paths__path_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                path_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PathOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     recent_api_v1_me_recent_get: {
         parameters: {
             query?: {
@@ -5129,6 +5915,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_required_api_v1_me_required_reading_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequiredOut"][];
                 };
             };
         };
@@ -5551,6 +6357,249 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_done_api_v1_path_items__item_id__done_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_paths_api_v1_paths_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PathOut"][];
+                };
+            };
+        };
+    };
+    create_path_api_v1_paths_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PathIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PathOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_path_api_v1_paths__path_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                path_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PathOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_path_api_v1_paths__path_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                path_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PathIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PathOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_path_api_v1_paths__path_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                path_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_path_api_v1_paths__path_id__assign_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                path_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PathAssignIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PathOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    people_api_v1_people_get: {
+        parameters: {
+            query?: {
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColleagueOut"][];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -6002,6 +7051,88 @@ export interface operations {
             };
         };
     };
+    assign_api_v1_reading_assignments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReadingAssignIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadingAssignmentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assignable_roles_api_v1_reading_assignments_roles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleName"][];
+                };
+            };
+        };
+    };
+    unassign_api_v1_reading_assignments__assignment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     bus_factor_api_v1_reports_bus_factor_get: {
         parameters: {
             query?: never;
@@ -6133,6 +7264,88 @@ export interface operations {
             };
         };
     };
+    completion_api_v1_reports_path_completion_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompletionOut"][];
+                };
+            };
+        };
+    };
+    read_status_api_v1_reports_read_status_get: {
+        parameters: {
+            query?: {
+                space?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocStatus"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    usage_api_v1_reports_usage_get: {
+        parameters: {
+            query?: {
+                month?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     retract_api_v1_retractions_post: {
         parameters: {
             query?: never;
@@ -6241,7 +7454,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["DecisionIn"];
+                "application/json": components["schemas"]["ApproveIn"];
             };
         };
         responses: {

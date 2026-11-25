@@ -28,6 +28,9 @@ tiers:
     model: claude-haiku-5-5
     effort: medium
     max_tokens: 8000
+    # USD per million tokens, Anthropic list price (checked 2026-11-25) for
+    # prompts up to 100K tokens. Cache read is an estimate (0.1x input).
+    price: {input: 0.10, output: 0.50, cache_read: 0.01}
     # No API key yet, or Claude unreachable: answer locally instead of failing.
     fallback_tier: answer-local
 
@@ -37,6 +40,7 @@ tiers:
     model: claude-sonnet-5-5
     effort: medium
     max_tokens: 16000
+    price: {input: 2.00, output: 10.00, cache_read: 0.10}  # USD per million tokens (2026-11-25)
     fallbacks: default
     fallback_tier: answer-local
 

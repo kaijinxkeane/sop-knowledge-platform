@@ -146,3 +146,33 @@
 
 /* The heading a citation points to, in the Ask side panel. */
 .sop-cited { background: #fef3c7; border-radius: 0.25rem; padding: 0 0.25rem; }
+
+/* Browser printing of the reader (frontend spec §9.3): app chrome is hidden
+   with print:hidden; text prints black on white with readable links. */
+@media print {
+  @page {
+    margin: 16mm 18mm;
+  }
+  body {
+    background: white;
+    color: black;
+  }
+  .prose-sop {
+    font-size: 11pt;
+    line-height: 1.45;
+  }
+  .prose-sop h1,
+  .prose-sop h2,
+  .prose-sop h3 {
+    break-after: avoid;
+  }
+  .prose-sop table,
+  .prose-sop pre,
+  .prose-sop img {
+    break-inside: avoid;
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+}

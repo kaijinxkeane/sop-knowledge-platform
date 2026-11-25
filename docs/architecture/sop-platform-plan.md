@@ -1189,18 +1189,18 @@ repo on the company device, mounted at deploy time via `VAULT_PATH`.
 
 ## 12. Phased plan
 
-**Status at a glance (2026-11-24).** Details per phase follow below.
+**Status at a glance (2026-11-25).** Details per phase follow below.
 
 | Phase | Backend | Frontend |
 |---|---|---|
 | 0. Foundations | Done | Done |
 | 1. Identity and RBAC | Done | Done (sign-in, two-factor, notice, Admin users/roles/grants) |
-| 2. Indexing and retrieval | Done, incl. local OCR | Done: Library, editor, upload, merge, versions (notes, decks, PDFs), bookmarks, Ctrl+K. To do: slide pictures, images in notes |
-| 2b. AI Classifier | Done | **To do:** Review → AI label suggestions, unplaced notes |
+| 2. Indexing and retrieval | Done, incl. local OCR | Done: Library, editor, upload, merge, versions (notes, decks, PDFs), bookmarks, Ctrl+K, images in notes. To do: slide pictures (needs headless LibreOffice in the worker) |
+| 2b. AI Classifier | Done | Done: Review → AI label suggestions (grouped, bulk approve, edit, plain-words widening warning), unplaced notes |
 | 3. Agents | Done | Done: Ask (streaming, citations panel, filters, follow-ups, no-answer actions, feedback, history) and Home |
-| 4. SOP governance | Done (approvals, reviews, notifications, governance report, webhooks). **To do:** required reading and sign-off, material-change flag, PDF/print export | **To do:** Review → SOP changes, notifications bell |
-| 5. Retention | Done (handovers, gaps, coverage, stale, bus factor, conflicts, retract, retention job). **To do:** onboarding paths, cost and usage endpoint | **To do:** Retain screens, onboarding paths, cost dashboard, audit log viewer, CEO/HR Home cards |
-| Project spaces | Done | **To do:** project screens |
+| 4. SOP governance | Done (approvals, reviews, notifications, governance report, webhooks, required reading and sign-off with append-only acknowledgements, material-change flag, PDF export with watermark and audit, per-space `pdf_export` switch) | Done: Review → SOP changes (side-by-side, material-change option), governance report, notifications bell, reader sign-off banner and "Assign reading", Export PDF (note or programme stage), print CSS |
+| 5. Retention | Done (handovers, gaps, coverage, stale, bus factor, conflicts, retract, retention job, onboarding paths, cost and usage: daily `model_usage` totals priced from `config/models.yaml`) | Done: Retain (gaps incl. HR view, coverage, review due, required-reading status with CSV export, bus factor, conflicts), handover notes, onboarding paths (learner, lead editor, HR completion), Admin → audit log and cost and usage, Home cards (CEO cost, leads, HR, required reading, onboarding) |
+| Project spaces | Done | Done: project list and detail, members, share requests and lead approval |
 | 6. Company deployment | Not started | Playwright end-to-end suite and accessibility pass not started; nothing tried in a real browser yet |
 | 7. Local models | Model choice settled (`qwen3:8b`, held-out evals); improvement loop not started | — |
 

@@ -9,34 +9,39 @@ const tab = ({ isActive }: { isActive: boolean }) =>
     isActive ? "border-primary font-medium" : "border-transparent text-muted-foreground",
   );
 
-/** Users and roles need manage_users; an auditor-only account sees the audit note. */
-export default function AdminLayout() {
+function useAdminTabs() {
   const me = useMe();
-  const canManage = me.data?.global_actions.includes("manage_users") ?? false;
+  const actions = me.data?.global_actions ?? [];
+  return {
+    manage: actions.includes("manage_users"),
+    audit: actions.includes("view_audit"),
+  };
+}
+
+/** Users and roles need manage_users; the audit log needs view_audit (the backend checks both). */
+export default function AdminLayout() {
+  const { manage, audit } = useAdminTabs();
   return (
     <section className="mx-auto max-w-6xl px-6 py-8">
       <h1 className="text-xl font-semibold">{t("admin.title")}</h1>
-      {canManage ? (
-        <>
-          <nav className="mt-4 flex gap-6 border-b" aria-label={t("admin.title")}>
-            <NavLink to="/admin/users" className={tab}>
-              {t("admin.users")}
-            </NavLink>
-            <NavLink to="/admin/roles" className={tab}>
-              {t("admin.roles")}
-            </NavLink>
-          </nav>
-          <div className="mt-6">
-            <Outlet />
-          </div>
-        </>
-      ) : (
-        <p className="mt-4 text-sm text-muted-foreground">{t("admin.auditSoon")}</p>
-      )}
+      <nav className="mt-4 flex gap-6 border-b" aria-label={t("admin.title")}>
+        {manage && (
+          <>
+            <NavLink to="/admin/users" className={tab}>{t("admin.users")}</NavLink>
+            <NavLink to="/admin/roles" className={tab}>{t("admin.roles")}</NavLink>
+          </>
+        )}
+        {audit && <NavLink to="/admin/audit" className={tab}>{t("admin.audit")}</NavLink>}
+        {(manage || audit) && <NavLink to="/admin/usage" className={tab}>{t("admin.usage")}</NavLink>}
+      </nav>
+      <div className="mt-6">
+        <Outlet />
+      </div>
     </section>
   );
 }
 
 export function AdminIndex() {
-  return <Navigate to="/admin/users" replace />;
+  const { manage } = useAdminTabs();
+  return <Navigate to={manage ? "/admin/users" : "/admin/audit"} replace />;
 }

@@ -13,8 +13,8 @@ export type UserUpdate = Schemas["UserUpdateIn"];
 const USERS = ["admin", "users"] as const;
 const ROLES = ["admin", "roles"] as const;
 
-export const useUsers = () =>
-  useQuery({ queryKey: USERS, queryFn: () => call(api.GET("/api/v1/admin/users")) });
+export const useUsers = (enabled = true) =>
+  useQuery({ queryKey: USERS, queryFn: () => call(api.GET("/api/v1/admin/users")), enabled });
 
 export const useRoles = () =>
   useQuery({ queryKey: ROLES, queryFn: () => call(api.GET("/api/v1/admin/roles")) });

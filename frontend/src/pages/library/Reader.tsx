@@ -1,4 +1,4 @@
-import { ArrowLeft, Download, Pencil } from "lucide-react";
+import { ArrowLeft, Download, FileDown, Pencil } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { ApiError } from "@/api/client";
@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { NotFound } from "@/pages/NotFound";
 import {
   downloadFile,
+  exportPdf,
   useBacklinks,
   useDocument,
   useDocuments,
@@ -20,6 +21,7 @@ import {
   type Doc,
 } from "./api";
 import { BookmarkButton } from "./BookmarkButton";
+import { AssignReading, ReadingBanner } from "@/pages/reading/ReadingPanel";
 import { DeckViewer } from "./DeckViewer";
 import { NoteView } from "./NoteView";
 import { PdfViewer } from "./PdfViewer";
@@ -67,6 +69,31 @@ function Meta({ doc }: { doc: Doc }) {
   );
 }
 
+function ExportButton({ doc }: { doc: Doc }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <span className="inline-flex items-center gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={busy}
+        onClick={() => {
+          setBusy(true);
+          setError(null);
+          exportPdf({ document_id: doc.id }, doc.title)
+            .catch((e) => setError(e instanceof ApiError && e.status === 403 ? t("doc.exportOff") : t("doc.loadFailed")))
+            .finally(() => setBusy(false));
+        }}
+      >
+        <FileDown />
+        {t("doc.exportPdf")}
+      </Button>
+      {error && <span className="text-xs text-destructive">{error}</span>}
+    </span>
+  );
+}
+
 function DownloadButton({ doc, commit }: { doc: Doc; commit?: string | null }) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -96,7 +123,7 @@ function Sidebar({ doc, viewing }: { doc: Doc; viewing: string | null }) {
   const backlinks = useBacklinks(doc.id);
   const versions = useVersions(doc.id);
   return (
-    <aside className="space-y-8 text-sm">
+    <aside className="space-y-8 text-sm print:hidden">
       <section>
         <h2 className="font-medium">{t("doc.usedIn")}</h2>
         {backlinks.data?.length ? (
@@ -214,6 +241,7 @@ export default function Reader() {
   const me = useMe();
   const [params] = useSearchParams();
   const version = params.get("version");
+  const [assigning, setAssigning] = useState(false);
   if (doc.isPending) return <p className="p-6 text-sm text-muted-foreground">{t("app.loading")}</p>;
   // A hidden document answers 404 like a missing one, and looks the same here.
   if (doc.isError) {
@@ -228,18 +256,28 @@ export default function Reader() {
   const d = doc.data;
   // Cosmetic only: the save endpoint checks `contribute` again.
   const canEdit = d.access.some((a) => me.data?.space_actions[a.space]?.includes("contribute"));
+  // Cosmetic too: assigning reading checks `approve` on the note's space.
+  const canAssign =
+    d.kind === "note" && d.approved && d.status !== "retired" &&
+    d.access.some((a) => me.data?.space_actions[a.space]?.includes("approve"));
   return (
     <div className="mx-auto max-w-6xl px-6 py-6">
-      <Link to="/library" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <Link to="/library" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground print:hidden">
         <ArrowLeft className="size-4" />
         {t("doc.backToLibrary")}
       </Link>
       <header className="mt-3 border-b pb-4">
         <div className="flex items-start justify-between gap-4">
           <h1 className="text-2xl font-semibold">{d.title}</h1>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2 print:hidden">
           {d.kind !== "note" && <DownloadButton doc={d} />}
+          {d.kind === "note" && !version && <ExportButton doc={d} />}
           <BookmarkButton docId={d.id} />
+          {canAssign && !assigning && (
+            <Button variant="outline" size="sm" onClick={() => setAssigning(true)}>
+              {t("reading.assign")}
+            </Button>
+          )}
           {d.kind === "note" && canEdit && (
             <Button asChild variant="outline" size="sm">
               <Link to={`/write/${d.id}`}>
@@ -251,8 +289,10 @@ export default function Reader() {
           </div>
         </div>
         <Meta doc={d} />
+        {assigning && <AssignReading docId={d.id} onDone={() => setAssigning(false)} />}
+        {d.kind === "note" && d.approved && !version && <ReadingBanner docId={d.id} />}
       </header>
-      <div className="mt-6 grid grid-cols-[1fr_16rem] gap-10">
+      <div className="mt-6 grid grid-cols-[1fr_16rem] gap-10 print:block">
         <article className="min-w-0">
           <Body doc={d} version={version} />
         </article>

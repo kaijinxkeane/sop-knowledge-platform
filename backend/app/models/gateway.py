@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import replace
 
 from app.models.adapters.anthropic_adapter import AnthropicAdapter
@@ -29,6 +29,7 @@ from app.models.types import (
     ProviderUnavailableError,
     StreamEnd,
 )
+from app.models.usage import UsageEvent
 
 log = logging.getLogger("sop.gateway")
 
@@ -40,8 +41,10 @@ class ModelGateway:
         *,
         adapters: dict[str, ChatAdapter] | None = None,
         anthropic_api_key: str | None = None,
+        on_usage: Callable[[UsageEvent], Awaitable[None]] | None = None,
     ):
         self.config = config
+        self.on_usage = on_usage
         self._adapters: dict[str, object] = adapters or {
             "anthropic": AnthropicAdapter(anthropic_api_key),
             "openai_compat": OpenAICompatAdapter(),
@@ -120,6 +123,24 @@ class ModelGateway:
             },
         )
 
+    async def _usage(self, tier: TierConfig, result=None, *, fallback: bool = False) -> None:
+        """Daily totals for the cost dashboard: tier, model and token counts only."""
+        if self.on_usage is None:
+            return
+        u = result.usage if result is not None else None
+        await self.on_usage(
+            UsageEvent(
+                tier=tier.name,
+                model=getattr(result, "model", None) or tier.model,
+                provider=tier.provider,
+                location=tier.location,
+                input_tokens=u.input_tokens if u else 0,
+                output_tokens=u.output_tokens if u else 0,
+                cache_read_tokens=u.cache_read_tokens if u else 0,
+                fallback=fallback,
+            )
+        )
+
     async def chat(
         self,
         tier_name: str,
@@ -132,6 +153,7 @@ class ModelGateway:
     ) -> ChatResult:
         tier = self.config.tier(tier_name)
         self.check_boundary(tier, scope)
+        fell_back = False
         try:
             result = await self._adapter(tier).chat(  # type: ignore[attr-defined]
                 tier,
@@ -145,7 +167,7 @@ class ModelGateway:
             if fallback is None:
                 raise
             self.check_boundary(fallback, scope)
-            tier = fallback
+            tier, fell_back = fallback, True
             result = await self._adapter(tier).chat(  # type: ignore[attr-defined]
                 tier,
                 system=system,
@@ -154,6 +176,7 @@ class ModelGateway:
                 json_mode=json_mode,
             )
         self._log("model_call", tier, scope, result)
+        await self._usage(tier, result, fallback=fell_back)
         return result
 
     async def stream(
@@ -177,6 +200,7 @@ class ModelGateway:
             ):
                 if isinstance(item, StreamEnd):
                     self._log("model_call", tier, scope, item, stream=True)
+                    await self._usage(tier, item)
                     yield item
                     return
                 started = True
@@ -196,6 +220,7 @@ class ModelGateway:
             if isinstance(item, StreamEnd):
                 item = replace(item, fallback_from=fallback_from)
                 self._log("model_call", tier, scope, item, stream=True)
+                await self._usage(tier, item, fallback=fallback_from is not None)
             yield item
 
     async def embed(
@@ -207,6 +232,7 @@ class ModelGateway:
         if not hasattr(adapter, "embed"):
             raise ProviderConfigError(f"provider {tier.provider!r} does not support embeddings")
         vectors = await adapter.embed(tier, texts)  # type: ignore[attr-defined]
+        await self._usage(tier)
         log.info(
             "embed_call",
             extra={"fields": {"tier": tier.name, "model": tier.model, "count": len(texts)}},
@@ -222,7 +248,14 @@ def build_gateway() -> ModelGateway:
     env = dict(os.environ)
     env["OLLAMA_BASE_URL"] = settings.ollama_base_url.rstrip("/")
     key = settings.anthropic_api_key.get_secret_value() if settings.anthropic_api_key else None
-    return ModelGateway(load_gateway_config(settings.config_dir, env), anthropic_api_key=key)
+    from app.db.session import get_sessionmaker
+    from app.models.usage import recorder
+
+    return ModelGateway(
+        load_gateway_config(settings.config_dir, env),
+        anthropic_api_key=key,
+        on_usage=recorder(get_sessionmaker()),
+    )
 
 
 __all__ = ["ModelGateway", "build_gateway", "EmbedAdapter"]

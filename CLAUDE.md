@@ -94,7 +94,7 @@ backend/                 — FastAPI app (uv project, Python 3.12)
   app/retrieval/         — local embeddings, hybrid search (RLS + policy engine, distance cutoff), small-to-big expansion of hits
   app/classify/          — local Classifier, one-way rule, name detector, review service, eval (few-shot examples: built, off by default)
   app/agents/            — Concierge routing, department agents (answer contract), answer reuse, follow-up chips, orchestration
-  app/governance/        — version-bound approvals (live vs current chunks), readable past versions, reviews jobs, notifications, webhooks
+  app/governance/        — version-bound approvals (live vs current chunks), readable past versions, reviews jobs, notifications, webhooks, required reading (reading.py), PDF export (export.py)
   app/retention/         — handovers, gap topics + personal gaps, conflicts, retract, 24-month retention
   app/projects/          — project spaces: per-request project access, lead-approved shares, expiry
   app/eval/              — answering, retrieval + conflict-check eval runners, stats (tune on dev sets, compare on *-holdout.yaml)
@@ -107,7 +107,7 @@ frontend/                — React + TS (Vite), shadcn-style ui, TanStack Query,
   src/app/theme/         — all brand values (theme.css variables, brand.tsx name/logo)
   src/editor/            — Milkdown editor, Obsidian atoms, block preservation, 3-way merge, metadata form logic
   src/lib/obsidian.ts    — Obsidian markdown for the reader (links resolved only to readable docs)
-  src/i18n/, src/layout/, src/pages/ (ask/, home/, library/, write/, admin/), src/components/ui/
+  src/i18n/, src/layout/, src/pages/ (ask/, home/, library/, write/, review/, retain/, handovers/, projects/, reading/, paths/, admin/), src/components/ui/
   deploy/Caddyfile       — serves dist/, proxies /api, security headers, no access log
 config/                  — models.yaml (tiers), spaces/*.yaml, roles.yaml, vault.yaml (folder rules), notice.md, eval/
 demo-vault/              — synthetic Obsidian vault (fictional data only) + demo-vault-labels.yaml
@@ -121,9 +121,8 @@ claude-plugin/           — inherited llm-wiki workflow specs, reused as agent 
 tests/                   — structural tests, fixtures (golden-wiki, defects), promptfoo evals
 ```
 
-Planned (see the status table in plan §12): the Review (2b, 4), Retain (5) and project
-screens; required reading, onboarding paths, PDF export and the cost dashboard;
-TLS, Headscale and Playwright in Phase 6.
+Planned (see the status table in plan §12): slide pictures; TLS, Headscale,
+Playwright and the accessibility pass in Phase 6.
 
 ## Security rules for platform code
 
@@ -161,6 +160,14 @@ TLS, Headscale and Playwright in Phase 6.
 - Past versions (`app/governance/history.py`): people who can't see unapproved
   changes get approved versions only, and any old version is judged by the
   labels it had. Versions list, version text and review diffs all use it.
+- Required reading (`app/api/reading.py`) and onboarding paths (`app/api/paths.py`) never show
+  a title to someone who can't read the document: unreadable path items are counted but have no
+  title, link or type. Acknowledgements are append-only (DB trigger); a material change on
+  approve makes older ones stop counting. A required path item is done only by sign-off.
+- PDF export (`app/api/exports.py`) reads under RLS like the reader, watermarks restricted
+  content with the reader's name and date, and audits every export (ids only).
+- Cost and usage (`model_usage`, `app/models/usage.py`) stores daily totals per tier and model:
+  never content, users or questions; a recording failure never fails a model call.
 - Bookmarks and Ctrl+K return titles only, re-checked against today's access;
   never store or log quick-search queries.
 - Hidden conversations (`hidden_at`) are 404 to their owner everywhere but are

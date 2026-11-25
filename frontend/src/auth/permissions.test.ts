@@ -7,14 +7,14 @@ describe("visibleSections", () => {
     expect(visibleSections(makeMe())).toEqual(["ask", "library"]);
   });
 
-  it("adds Write for contributors", () => {
+  it("adds Write and Review for contributors", () => {
     const me = makeMe({ space_actions: { core: ["ask", "contribute"] } });
-    expect(visibleSections(me)).toEqual(["ask", "library", "write"]);
+    expect(visibleSections(me)).toEqual(["ask", "library", "write", "review", "handovers", "projects"]);
   });
 
   it("adds Review and Retain for leads who approve", () => {
     const me = makeMe({ space_actions: { core: ["approve", "ask", "contribute", "review"] } });
-    expect(visibleSections(me)).toEqual(["ask", "library", "write", "review", "retain"]);
+    expect(visibleSections(me)).toEqual(["ask", "library", "write", "review", "retain", "handovers", "projects"]);
   });
 
   it("gives HR Retain through gap reports", () => {

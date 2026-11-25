@@ -12,17 +12,38 @@ import {
   splitFrontmatter,
   toMarkdown,
 } from "@/lib/obsidian";
-import type { Doc } from "./api";
+import { useFileUrl, type Doc } from "./api";
 
 // Keep our private schemes; everything else goes through react-markdown's
 // default filter (which drops javascript: and other unsafe URLs).
 const urlTransform = (url: string) =>
   [LINK, EMBED, TAG].some((p) => url.startsWith(p)) ? url : defaultUrlTransform(url);
 
+const IMAGE = /\.(png|jpe?g)$/i;
+
+/**
+ * An image from the vault, fetched with the reader's token like any file (so
+ * the backend checks access) and shown from a short-lived blob: URL.
+ */
+function NoteImage({ doc, alt }: { doc: Doc; alt?: string }) {
+  const { url, failed } = useFileUrl(doc);
+  const name = alt || doc.title;
+  if (failed) return <span className="text-muted-foreground italic">{t("doc.notAvailable")}</span>;
+  if (!url) return <span className="text-sm text-muted-foreground">{t("doc.imageLoading")}</span>;
+  return (
+    <Link to={`/library/${doc.id}`} className="my-2 inline-block" title={t("doc.image", { name })}>
+      <img src={url} alt={name} className="max-h-[32rem] max-w-full rounded-md border" />
+    </Link>
+  );
+}
+
+const isImage = (doc: Doc | null): boolean => !!doc && (doc.doc_type === "image" || IMAGE.test(doc.vault_path));
+
 function EmbedCard({ target, doc }: { target: string; doc: Doc | null }) {
   if (!doc) {
     return <span className="text-muted-foreground italic">{t("doc.notAvailable")}</span>;
   }
+  if (isImage(doc)) return <NoteImage doc={doc} />;
   return (
     <Link
       to={`/library/${doc.id}`}
@@ -84,8 +105,23 @@ export function NoteView({ text, docs }: { text: string; docs: Doc[] }) {
               </a>
             );
           },
-          // Images in notes would need an authenticated fetch: not shown yet.
-          img: ({ alt }) => <span className="text-muted-foreground italic">[{alt}]</span>,
+          // ![alt](Attachments/pic.png): only vault images this reader can open.
+          // Outside addresses are never fetched (the page's CSP refuses them too).
+          img: ({ src, alt }) => {
+            const raw = typeof src === "string" ? src : "";
+            let target = "";
+            if (raw && !/^[a-z][a-z0-9+.-]*:|^\/\//i.test(raw)) {
+              try {
+                target = decodeURIComponent(raw);
+              } catch {
+                target = raw;
+              }
+            }
+            // A path from the vault root, else by file name as Obsidian does.
+            const doc = target ? resolve(target.replace(/^(\.\.?\/)+/, "")) ?? resolve(target.split("/").pop()!) : null;
+            if (isImage(doc as Doc | null)) return <NoteImage doc={doc as Doc} alt={alt} />;
+            return <span className="text-muted-foreground italic">[{alt || t("doc.notAvailable")}]</span>;
+          },
         }}
       >
         {toMarkdown(body)}

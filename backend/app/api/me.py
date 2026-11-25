@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import audit
 from app.api.deps import CurrentUser, current_user, get_db
-from app.db.models import NoticeAcknowledgement, Space
+from app.db.models import NoticeAcknowledgement, Space, User
 from app.identity import load_notice
 
 router = APIRouter(tags=["me"])
@@ -116,3 +116,25 @@ async def list_spaces(
         for s in spaces
         if s.name in scopes
     ]
+
+
+class ColleagueOut(BaseModel):
+    id: str
+    name: str
+
+
+@router.get("/people", response_model=list[ColleagueOut])
+async def people(
+    me: CurrentUser = Depends(current_user),
+    session: AsyncSession = Depends(get_db),
+    q: str = Query(default="", max_length=100),
+) -> list[ColleagueOut]:
+    """Colleagues to pick as handover receivers or project members: active
+    accounts, display names only (no emails, roles or departments). The query
+    is never logged or stored."""
+    stmt = select(User.id, User.display_name).where(User.is_active.is_(True))
+    if q.strip():
+        pattern = "%" + q.strip().replace("\\", "").replace("%", "").replace("_", "") + "%"
+        stmt = stmt.where(User.display_name.ilike(pattern))
+    rows = (await session.execute(stmt.order_by(User.display_name).limit(50))).all()
+    return [ColleagueOut(id=str(i), name=n) for i, n in rows if i != me.user.id]

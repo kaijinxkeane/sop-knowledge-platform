@@ -488,6 +488,9 @@ class SopApproval(Base):
     approved_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    # The approver said this version changes what people must do: earlier
+    # read acknowledgements stop counting (frontend spec §9.2).
+    material_change: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class ReviewRequest(Base):
@@ -757,3 +760,119 @@ class ProjectShare(Base):
     approved_until: Mapped[date | None] = mapped_column(Date)
     renewal_requested: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = _created()
+
+
+class ModelUsage(Base):
+    """Daily model-call totals per tier and model, for the cost dashboard.
+
+    Counts and token numbers only: no content, no users, no questions.
+    """
+
+    __tablename__ = "model_usage"
+
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    tier: Mapped[str] = mapped_column(String(64), primary_key=True)
+    model: Mapped[str] = mapped_column(String(128), primary_key=True)
+    provider: Mapped[str] = mapped_column(String(32))
+    location: Mapped[str] = mapped_column(String(8))
+    calls: Mapped[int] = mapped_column(Integer, default=0)
+    fallbacks: Mapped[int] = mapped_column(Integer, default=0)  # served by a local fallback tier
+    input_tokens: Mapped[int] = mapped_column(BigInteger, default=0)
+    output_tokens: Mapped[int] = mapped_column(BigInteger, default=0)
+    cache_read_tokens: Mapped[int] = mapped_column(BigInteger, default=0)
+
+
+class ReadingAssignment(Base):
+    """An SOP that people (a user, or everyone with a role) must read."""
+
+    __tablename__ = "reading_assignments"
+    __table_args__ = (
+        UniqueConstraint("document_id", "target_type", "target", name="reading_once"),
+    )
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), index=True
+    )
+    target_type: Mapped[str] = mapped_column(String(8))  # user | role
+    target: Mapped[str] = mapped_column(String(64))  # user id or role name
+    due_on: Mapped[date | None] = mapped_column(Date)
+    assigned_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ReadAcknowledgement(Base):
+    """ "I have read version N": who, which approved version, when. Append-only."""
+
+    __tablename__ = "read_acknowledgements"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), index=True
+    )
+    approval_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("sop_approvals.id", ondelete="CASCADE")
+    )
+    version: Mapped[int] = mapped_column(Integer)
+    git_commit: Mapped[str | None] = mapped_column(String(64))
+    acknowledged_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class ReadingPath(Base):
+    """An onboarding path a space's lead builds: steps of SOPs, decks, worksheets."""
+
+    __tablename__ = "reading_paths"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    space: Mapped[str] = mapped_column(String(64), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text, default="")
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    items: Mapped[list[PathItem]] = relationship(
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="(PathItem.step, PathItem.position)",
+    )
+
+
+class PathItem(Base):
+    __tablename__ = "path_items"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    path_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("reading_paths.id", ondelete="CASCADE"), index=True
+    )
+    step: Mapped[int] = mapped_column(Integer)
+    step_title: Mapped[str] = mapped_column(String(200))
+    position: Mapped[int] = mapped_column(Integer)
+    document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"))
+    required: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class PathAssignment(Base):
+    __tablename__ = "path_assignments"
+    __table_args__ = (
+        UniqueConstraint("path_id", "target_type", "target", name="path_assigned_once"),
+    )
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    path_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("reading_paths.id", ondelete="CASCADE"), index=True
+    )
+    target_type: Mapped[str] = mapped_column(String(8))  # user | role
+    target: Mapped[str] = mapped_column(String(64))
+    due_on: Mapped[date | None] = mapped_column(Date)
+    assigned_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PathProgress(Base):
+    __tablename__ = "path_progress"
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("path_items.id", ondelete="CASCADE"), primary_key=True
+    )
+    done_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

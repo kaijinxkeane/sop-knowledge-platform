@@ -177,3 +177,18 @@ export function bookmarkHref(b: Bookmark): string {
   // Deck and PDF viewers each read their own parameter and ignore the other.
   return `/library/${b.target_id}${b.part ? `?slide=${b.part}&page=${b.part}` : ""}`;
 }
+
+/** A PDF of one note or a whole programme stage, as this reader may read it (audited). */
+export async function exportPdf(
+  body: { document_id: string } | { programme: string; stage: string },
+  name: string,
+): Promise<void> {
+  const { data, response } = await api.POST("/api/v1/exports", { body, parseAs: "blob" });
+  if (!response.ok || !data) throw new ApiError(response.status);
+  const url = URL.createObjectURL(new Blob([data as Blob], { type: "application/pdf" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${name.replace(/[\\/:*?"<>|]+/g, " ").trim() || "sop"}.pdf`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}

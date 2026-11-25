@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Link } from "react-router";
 import { messageOf } from "@/api/errors";
 import { useMe } from "@/auth/hooks";
@@ -10,15 +10,7 @@ import { useBookmarks } from "@/pages/library/api";
 import { BookmarkList } from "@/pages/library/Bookmarks";
 import { requestSop } from "@/pages/ask/api";
 import { useMyGaps, useRecent, useWaiting } from "./api";
-
-function Card({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="rounded-lg border p-4 text-left">
-      <h2 className="text-xs font-medium uppercase text-muted-foreground">{title}</h2>
-      <div className="mt-2">{children}</div>
-    </section>
-  );
-}
+import { Card, HandoverCard, PathCard, ReadingCard, RoleCards } from "./RoleCards";
 
 type Gap = NonNullable<ReturnType<typeof useMyGaps>["data"]>[number];
 
@@ -82,14 +74,17 @@ export function HomeCards() {
   const waitingItems = w
     ? (
         [
-          ["home.waiting.reviews", w.reviews, "/review"],
+          ["home.waiting.reviews", w.reviews, "/review?tab=changes"],
           ["home.waiting.drafts", w.drafts, "/write"],
-          ["home.waiting.labels", w.labels, "/review"],
+          ["home.waiting.labels", w.labels, "/review?tab=labels"],
         ] as const
       ).filter(([, n]) => n > 0)
     : [];
   return (
     <div className="mx-auto mt-12 grid max-w-4xl gap-4 sm:grid-cols-2">
+      <ReadingCard />
+      <PathCard />
+      <HandoverCard />
       {!!gaps.data?.length && (
         <Card title={t("home.gaps")}>
           <ul className="space-y-3">
@@ -112,6 +107,7 @@ export function HomeCards() {
           </ul>
         </Card>
       )}
+      <RoleCards />
       {!!recent.data?.length && (
         <Card title={t("home.recent")}>
           <ul className="space-y-1 text-sm">

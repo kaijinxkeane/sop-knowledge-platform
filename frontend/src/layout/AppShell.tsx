@@ -5,6 +5,7 @@ import { brand, Logo } from "@/app/theme/brand";
 import { useMe, useSignOut } from "@/auth/hooks";
 import { visibleSections, type Section } from "@/auth/permissions";
 import { CommandPalette } from "@/components/CommandPalette";
+import { NotificationBell } from "@/components/NotificationBell";
 import { Button } from "@/components/ui/button";
 import { t, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,8 @@ export const SECTION_PATHS: Record<Section, string> = {
   write: "/write",
   review: "/review",
   retain: "/retain",
+  handovers: "/handovers",
+  projects: "/projects",
   admin: "/admin",
 };
 
@@ -41,7 +44,7 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="border-b bg-background">
+      <header className="border-b bg-background print:hidden">
         <div className="flex h-14 items-center gap-6 px-6">
           <NavLink to="/" className="flex items-center gap-2 font-semibold">
             <Logo className="size-5" />
@@ -67,6 +70,7 @@ export function AppShell() {
           )}
           <div className="ml-auto flex items-center gap-3">
             {!gated && <CommandPalette sections={sections} />}
+            {!gated && <NotificationBell />}
             {gated ? (
               <span className="text-sm text-muted-foreground">{me.data.display_name}</span>
             ) : (

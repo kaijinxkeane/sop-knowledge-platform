@@ -32,6 +32,9 @@ class TierConfig:
     cache: bool = True
     think: bool | None = None  # False: switch off a local model's thinking (Qwen3 /no_think)
     fallback_tier: str | None = None  # used when this tier's provider is unavailable
+    # USD per million tokens (input, output, cache read), for the cost dashboard.
+    # Local tiers cost nothing per call and leave it unset.
+    price: tuple[float, float, float] | None = None
 
 
 @dataclass(frozen=True)
@@ -85,6 +88,15 @@ def _tier_from_dict(name: str, raw: dict, env: dict[str, str]) -> TierConfig:
         if not raw.get("base_url"):
             raise ValueError(f"tier {name!r}: openai_compat requires base_url")
 
+    price = None
+    if raw.get("price") is not None:
+        p = raw["price"]
+        if not isinstance(p, dict) or not {"input", "output"} <= set(p):
+            raise ValueError(f"tier {name!r}: price needs input and output (USD per 1M tokens)")
+        price = (float(p["input"]), float(p["output"]), float(p.get("cache_read", 0)))
+        if min(price) < 0:
+            raise ValueError(f"tier {name!r}: prices can't be negative")
+
     return TierConfig(
         name=name,
         provider=provider,
@@ -97,6 +109,7 @@ def _tier_from_dict(name: str, raw: dict, env: dict[str, str]) -> TierConfig:
         cache=bool(raw.get("cache", True)),
         think=None if raw.get("think") is None else bool(raw.get("think")),
         fallback_tier=raw.get("fallback_tier"),
+        price=price,
     )
 
 

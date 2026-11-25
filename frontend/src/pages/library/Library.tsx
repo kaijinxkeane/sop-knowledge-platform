@@ -8,7 +8,7 @@ import { Select } from "@/components/ui/select";
 import { t } from "@/i18n";
 import { plainName } from "@/lib/obsidian";
 import { cn } from "@/lib/utils";
-import { useDocuments, useSearch, useStages, type Doc } from "./api";
+import { exportPdf, useDocuments, useSearch, useStages, type Doc } from "./api";
 import { BookmarkList } from "./Bookmarks";
 import { StatusDot } from "./StatusDot";
 
@@ -70,6 +70,7 @@ function StageColumns({ docs, stages }: { docs: Doc[]; stages: string[] }) {
         const here = docs.filter((d) => d.stage === stage);
         const sops = here.filter(isSop).length;
         const decks = here.filter(isDeck).length;
+        const programme = here.find((d) => d.kind === "note" && d.programme)?.programme;
         return (
           <div key={stage} className={cn("rounded-md border p-3", !sops && "border-amber-300 bg-amber-50")}>
             <div className="text-sm font-medium capitalize">{stage}</div>
@@ -78,6 +79,20 @@ function StageColumns({ docs, stages }: { docs: Doc[]; stages: string[] }) {
             </div>
             {decks > 0 && (
               <div className="text-xs text-muted-foreground">{t("library.decks", { count: decks })}</div>
+            )}
+            {programme && (
+              <button
+                type="button"
+                className="mt-2 text-xs text-muted-foreground underline hover:text-foreground"
+                onClick={() =>
+                  exportPdf(
+                    { programme, stage },
+                    `${plainName(programme) ?? ""} ${stage}`,
+                  ).catch(() => undefined)
+                }
+              >
+                {t("library.exportStage")}
+              </button>
             )}
           </div>
         );

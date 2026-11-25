@@ -9,6 +9,29 @@ function navLinks() {
   return within(nav).getAllByRole("link").map((l) => l.textContent);
 }
 
+describe("notification bell", () => {
+  it("counts unread, hides titles it wasn't given, and opens the review", async () => {
+    session.signIn("t");
+    let read = "";
+    const { router } = (mockFetch({
+      "GET /api/v1/me": () => json(makeMe()),
+      "GET /api/v1/notifications": () =>
+        json([
+          { id: "a", kind: "review_requested", document_id: "n1", title: "Discovery Workshop", ref_id: "r1", created_at: "2026-11-24T09:00:00Z", read: false },
+          { id: "b", kind: "sop_approved", document_id: null, title: null, ref_id: null, created_at: "2026-11-23T09:00:00Z", read: true },
+        ]),
+      "POST /api/v1/notifications/a/read": (req) => ((read = new URL(req.url).pathname), new Response(null, { status: 204 })),
+    }), renderApp("/"));
+    const bell = await screen.findByRole("button", { name: "Notifications (1 unread)" });
+    await userEvent.click(bell);
+    expect(screen.getByText("Approved: a document you can no longer open")).toBeInTheDocument();
+    await userEvent.click(screen.getByText("Review requested: Discovery Workshop"));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/review"));
+    expect(router.state.location.search).toBe("?tab=changes&id=r1");
+    await waitFor(() => expect(read).toBe("/api/v1/notifications/a/read"));
+  });
+});
+
 describe("app shell", () => {
   it("shows an employee only Ask and Library", async () => {
     session.signIn("t");

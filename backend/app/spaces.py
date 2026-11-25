@@ -22,6 +22,7 @@ class SpaceProfile:
     persona: str = ""
     rules: tuple[str, ...] = field(default_factory=tuple)
     local_only: bool = False
+    pdf_export: bool = True  # leads can turn PDF export off for the whole space
 
 
 def load_space_profiles(config_dir: Path | None = None) -> dict[str, SpaceProfile]:
@@ -38,6 +39,7 @@ def load_space_profiles(config_dir: Path | None = None) -> dict[str, SpaceProfil
             persona=" ".join(str(agent.get("persona") or "").split()),
             rules=tuple(str(r) for r in agent.get("rules") or ()),
             local_only=bool(raw.get("local_only", False)),
+            pdf_export=raw.get("pdf_export", True) is not False,
         )
     return out
 

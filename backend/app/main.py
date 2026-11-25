@@ -14,15 +14,19 @@ from app.api import (
     chat,
     classifications,
     documents,
+    exports,
     handovers,
     health,
     home,
     me,
     notes,
+    paths,
     projects,
+    reading,
     retention,
     reviews,
     search,
+    usage,
 )
 from app.api.access_log import AccessLogMiddleware
 from app.config import get_settings
@@ -54,16 +58,20 @@ def create_app() -> FastAPI:
         me,
         chat,
         documents,
+        exports,
         bookmarks,
         home,
         notes,
+        paths,
         reviews,
         handovers,
         projects,
+        reading,
         retention,
         search,
         classifications,
         admin,
+        usage,
     ):
         app.include_router(module.router, prefix="/api/v1")
     app.add_middleware(AccessLogMiddleware)

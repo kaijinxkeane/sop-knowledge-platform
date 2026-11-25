@@ -71,6 +71,7 @@ export function makeResolver(docs: Linkable[]) {
     add(basename(d.vault_path), d);
     add(stem(basename(d.vault_path)), d);
     add(stem(d.vault_path), d);
+    add(d.vault_path, d);
   }
   for (const d of docs) add(d.title, d);
   return (target: string): Linkable | null => {

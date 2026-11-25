@@ -46,6 +46,7 @@ from app.db.models import (
     DocumentAccess,
     DocumentVersion,
     Notification,
+    ReadingAssignment,
     ReviewRequest,
     Role,
     SopApproval,
@@ -80,6 +81,8 @@ class ReviewOut(BaseModel):
     requested_at: datetime
     self_review: bool  # the person asking to approve is also an author of the change
     stale: bool  # the note changed after it was submitted
+    git_commit: str | None  # the exact version submitted
+    base_commit: str | None  # the approved version it is compared against (None: first)
     summary: str | None
     summary_pending: bool
     comment: str
@@ -93,9 +96,15 @@ class DecisionIn(BaseModel):
     comment: str = Field(default="", max_length=4000)
 
 
+class ApproveIn(DecisionIn):
+    # People who must read this SOP read it again (frontend spec §9.2).
+    material_change: bool = False
+
+
 class DirectApproveIn(BaseModel):
     version: str = Field(min_length=64, max_length=64)  # governed hash shown in the diff
     comment: str = Field(default="", max_length=4000)
+    material_change: bool = False
 
 
 class DiffOut(BaseModel):
@@ -198,6 +207,8 @@ async def _review_out(
         requested_at=r.created_at,
         self_review=me.user.id in authors,
         stale=r.status == "open" and r.content_hash != doc.governed_hash,
+        git_commit=r.git_commit,
+        base_commit=r.base_commit,
         summary=r.summary,
         summary_pending=r.status == "open" and r.summary is None and r.summary_failed < 3,
         comment=r.comment,
@@ -216,8 +227,12 @@ async def _finish_approval(
     sessions: async_sessionmaker,
     git: GitVault,
     embed,
+    material_change: bool = False,
 ) -> str:
-    """Approve the document's current version if it is still `version`."""
+    """Approve the document's current version if it is still `version`.
+
+    With `material_change`, earlier read acknowledgements stop counting and the
+    people it's assigned to are asked to read it again."""
     config = vault_config()
     async with sessions() as s, s.begin():
         doc = await s.get(Document, doc_id, with_for_update=True)
@@ -238,9 +253,32 @@ async def _finish_approval(
         if request is not None:
             authors.add(request.requested_by)
         method = "self" if me.user.id in authors else "review"
+        doc_had_approval = doc.approved_hash is not None
         approval = await approve_version(
             s, doc, approver_id=me.user.id, method=method, config=config, request_id=request_id
         )
+        # A first approval has nothing to re-read.
+        approval.material_change = material_change and doc_had_approval
+        if approval.material_change:
+            from app.governance.reading import assignees
+
+            assigned = (
+                (
+                    await s.execute(
+                        select(ReadingAssignment).where(ReadingAssignment.document_id == doc.id)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            if assigned:
+                await notify(
+                    s,
+                    [u.id for u in await assignees(s, list(assigned))],
+                    "reading_reread",
+                    document_id=doc.id,
+                    skip=me.user.id,
+                )
         if request is not None:
             request.status, request.decided_by = "approved", me.user.id
             request.decided_at = datetime.now(UTC)
@@ -276,6 +314,7 @@ async def _finish_approval(
                 "commit": doc.approved_commit,
                 "method": method,
                 "review": str(request_id) if request_id else None,
+                "material_change": approval.material_change,
             },
         )
         rel, due, title_status = doc.vault_path, doc.review_due, doc.status
@@ -429,6 +468,7 @@ async def approve_direct(
         sessions=sessions,
         git=git,
         embed=embed,
+        material_change=body.material_change,
     )
     return {"approval": method}
 
@@ -526,7 +566,7 @@ async def get_review(
 @router.post("/reviews/{review_id}/approve")
 async def approve_request(
     review_id: uuid.UUID,
-    body: DecisionIn,
+    body: ApproveIn,
     me: CurrentUser = Depends(current_user),
     session: AsyncSession = Depends(get_db),
     sessions: async_sessionmaker = Depends(get_session_factory),
@@ -549,6 +589,7 @@ async def approve_request(
         sessions=sessions,
         git=git,
         embed=embed,
+        material_change=body.material_change,
     )
     return {"approval": method}
 

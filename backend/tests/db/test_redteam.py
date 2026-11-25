@@ -69,6 +69,10 @@ async def test_hidden_document_is_404_on_every_endpoint(
         ("POST", f"/notes/{rate}/retire", None),
         ("PUT", f"/notes/{rate}", {"base_version": "0" * 64, "content": "x"}),
         ("POST", f"/documents/{rate}/names", {"names": []}),
+        ("GET", f"/documents/{rate}/reading", None),
+        ("POST", f"/documents/{rate}/acknowledge", None),
+        ("POST", "/exports", {"document_id": rate}),
+        ("POST", "/reading-assignments", {"document_id": rate, "roles": ["core-staff"]}),
     ]
     odd = {}
     for method, path, body in calls:
@@ -571,3 +575,54 @@ async def test_a_project_share_cannot_reach_another_departments_sops(
     assert (await client.get(f"{API}/documents/{rate}/file", headers=staff_only)).status_code == 404
     r = await client.get(f"{API}/search", params={"q": "floor price"}, headers=hm)
     assert not leaks(r) and "Rate Card" not in r.text
+
+
+async def test_required_reading_never_shows_titles_people_cannot_read(
+    indexed, sessions, client, make_user, sign_in
+):
+    """A lead may assign a restricted SOP to someone the labels don't cover:
+    the assignee sees no title and can't acknowledge it; staff can't read
+    the leads' status report or the cost report."""
+    lead, staff = await make_user(roles=LEAD), await make_user(roles=STAFF)
+    hl, hs = await sign_in(lead), await sign_in(staff)
+    rate = await doc_id(sessions, RATE)
+    r = await client.post(
+        f"{API}/reading-assignments",
+        headers=hl,
+        json={"document_id": rate, "user_ids": [str(staff.user.id)]},
+    )
+    assert r.status_code == 201, r.text
+    for path in ("/me/required-reading", "/notifications"):
+        r = await client.get(API + path, headers=hs)
+        assert r.status_code == 200 and "Rate Card" not in r.text and not leaks(r)
+    for path in ("/reports/read-status", "/reports/usage"):
+        assert (await client.get(API + path, headers=hs)).status_code == 403
+
+
+async def test_onboarding_paths_never_leak_titles(indexed, sessions, client, make_user, sign_in):
+    """A lead can't put another department's restricted SOP on a path, and a
+    learner never sees the title of an item they can't read."""
+    lead, staff = await make_user(roles=LEAD), await make_user(roles=STAFF)
+    hl, hs = await sign_in(lead), await sign_in(staff)
+    hr_doc, rate = await doc_id(sessions, DISCIPLINARY), await doc_id(sessions, RATE)
+    steps = [{"title": "Week 1", "items": [{"document_id": hr_doc}]}]
+    r = await client.post(
+        f"{API}/paths", headers=hl, json={"space": "core", "title": "x", "steps": steps}
+    )
+    assert r.status_code == 422 and not leaks(r)
+    r = await client.post(
+        f"{API}/paths", headers=hl, json={"space": "hr", "title": "x", "steps": []}
+    )
+    assert r.status_code == 403
+    steps = [{"title": "Week 1", "items": [{"document_id": rate}]}]
+    p = (
+        await client.post(
+            f"{API}/paths", headers=hl, json={"space": "core", "title": "Pricing", "steps": steps}
+        )
+    ).json()
+    await client.post(
+        f"{API}/paths/{p['id']}/assign", headers=hl, json={"user_ids": [str(staff.user.id)]}
+    )
+    r = await client.get(f"{API}/me/paths", headers=hs)
+    assert r.status_code == 200 and "Rate Card" not in r.text and not leaks(r)
+    assert (await client.get(f"{API}/paths", headers=hs)).status_code == 403

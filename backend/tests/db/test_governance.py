@@ -143,6 +143,16 @@ async def test_edit_is_cited_only_after_approval(
     d = (await client.get(f"{API}/notes/{note}/diff", headers=hl)).json()
     assert "+" + NEW_STEP in d["diff"] and d["added"] >= 1
     assert (await client.get(f"{API}/notes/{note}/diff", headers=hr)).status_code == 404
+    # The Review screen shows exactly the submitted version against its base.
+    sub, base = queue[0]["git_commit"], queue[0]["base_commit"]
+    assert sub and base and sub != base
+    v = await client.get(f"{API}/documents/{note}/versions/{sub}", headers=hl)
+    assert v.status_code == 200 and NEW_STEP in v.json()["content"]
+    v = await client.get(f"{API}/documents/{note}/versions/{base}", headers=hl)
+    assert v.status_code == 200 and NEW_STEP not in v.json()["content"]
+    assert (
+        await client.get(f"{API}/documents/{note}/versions/{sub}", headers=hr)
+    ).status_code == 404
     assert (
         await client.post(f"{API}/reviews/{review}/approve", headers=hs, json={})
     ).status_code == 403

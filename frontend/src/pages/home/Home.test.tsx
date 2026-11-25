@@ -61,7 +61,7 @@ describe("Home cards", () => {
     await userEvent.click(within(gaps).getByRole("button", { name: "Request an SOP" }));
     await waitFor(() => expect(requested).toBe(true));
     const waiting = screen.getByRole("region", { name: "Waiting for you" });
-    expect(within(waiting).getByRole("link", { name: "2 to review" })).toHaveAttribute("href", "/review");
+    expect(within(waiting).getByRole("link", { name: "2 to review" })).toHaveAttribute("href", "/review?tab=changes");
     expect(within(waiting).getByRole("link", { name: "1 unsubmitted drafts" })).toBeInTheDocument();
     expect(within(waiting).queryByText(/AI label/)).toBeNull();
     const recent = screen.getByRole("region", { name: "Recently approved" });

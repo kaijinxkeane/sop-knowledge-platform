@@ -150,3 +150,20 @@ async def test_audit_rows_cannot_be_changed_or_deleted(client, admin, sessions):
         async with sessions() as s:
             with pytest.raises(DBAPIError, match="append-only"):
                 await s.execute(text(stmt))
+
+
+async def test_people_picker_gives_names_only(client, admin, make_user, sign_in):
+    _, h = admin
+    staff = await make_user(email="robin.picker@example.com")
+    gone = await make_user(email="robin.gone@example.com")
+    await client.patch(f"{API}/users/{gone.user.id}", headers=h, json={"is_active": False})
+    me = await make_user()
+    mh = await sign_in(me)
+    r = await client.get("/api/v1/people", params={"q": "robin"}, headers=mh)
+    assert r.status_code == 200
+    assert r.json() == [{"id": str(staff.user.id), "name": "robin.picker"}]  # no emails
+    everyone = (await client.get("/api/v1/people", headers=mh)).json()
+    assert str(me.user.id) not in {p["id"] for p in everyone}
+    # Wildcards in the query are ignored, never used as patterns.
+    assert (await client.get("/api/v1/people", params={"q": "%"}, headers=mh)).status_code == 200
+    assert (await client.get("/api/v1/people")).status_code == 401
