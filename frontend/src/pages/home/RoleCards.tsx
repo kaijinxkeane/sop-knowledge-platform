@@ -8,6 +8,7 @@ import { useMyPaths } from "@/pages/paths/api";
 import { shortDate, useMyReading } from "@/pages/reading/api";
 import { leadSpaces, useCoverage, useHrGaps, useStaleAll } from "@/pages/retain/api";
 import { countQueue, useQueue } from "@/pages/review/api";
+import { TIME_ZONE } from "@/lib/dates";
 
 export function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -138,7 +139,7 @@ export function RoleCards() {
               <li key={d.document_id} className="flex items-baseline justify-between gap-2">
                 <Link className="truncate hover:underline" to={`/library/${d.document_id}`}>{d.title}</Link>
                 <span className="shrink-0 text-xs text-muted-foreground">
-                  {new Date(d.review_due).toLocaleDateString([], { day: "numeric", month: "short" })}
+                  {new Date(d.review_due).toLocaleDateString([], { timeZone: TIME_ZONE, day: "numeric", month: "short" })}
                 </span>
               </li>
             ))}

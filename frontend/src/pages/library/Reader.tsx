@@ -36,6 +36,7 @@ function backLabel(back: Place): string {
 }
 import { StatusDot } from "./StatusDot";
 import { spaceLabel } from "@/lib/spaceLabel";
+import { TIME_ZONE } from "@/lib/dates";
 
 const ext = (doc: Doc) => doc.vault_path.split(".").pop()?.toLowerCase() ?? "";
 
@@ -161,7 +162,7 @@ function Sidebar({ doc, viewing }: { doc: Doc; viewing: string | null }) {
                 {v.latest && !v.approved && <Badge variant="warning">{t("version.unapproved")}</Badge>}
               </div>
               <div className="text-xs text-muted-foreground">
-                {new Date(v.committed_at).toLocaleString()}
+                {new Date(v.committed_at).toLocaleString([], { timeZone: TIME_ZONE })}
                 {v.author_source === "git" && ` · ${t("doc.viaObsidian")}`}
               </div>
               {v.author_source === "unattributed" && (
@@ -201,7 +202,7 @@ function OldVersion({ doc, commit }: { doc: Doc; commit: string }) {
       <div role="note" className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm">
         <span>
           {t("version.banner", {
-            when: new Date(v.data.committed_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }),
+            when: new Date(v.data.committed_at).toLocaleString([], { timeZone: TIME_ZONE, dateStyle: "medium", timeStyle: "short" }),
             who: v.data.author_name,
           })}
           {!v.data.approved && ` ${t("version.bannerUnapproved")}`}

@@ -11,6 +11,7 @@ import { BookmarkList } from "@/pages/library/Bookmarks";
 import { requestSop } from "@/pages/ask/api";
 import { useMyGaps, useRecent, useWaiting } from "./api";
 import { Card, HandoverCard, PathCard, ReadingCard, RoleCards } from "./RoleCards";
+import { TIME_ZONE } from "@/lib/dates";
 
 type Gap = NonNullable<ReturnType<typeof useMyGaps>["data"]>[number];
 
@@ -117,7 +118,7 @@ export function HomeCards() {
                   {d.title}
                 </Link>
                 <span className="shrink-0 text-xs text-muted-foreground">
-                  {[plainName(d.programme), new Date(d.approved_at).toLocaleDateString([], { day: "numeric", month: "short" })]
+                  {[plainName(d.programme), new Date(d.approved_at).toLocaleDateString([], { timeZone: TIME_ZONE, day: "numeric", month: "short" })]
                     .filter(Boolean)
                     .join(" · ")}
                 </span>

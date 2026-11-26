@@ -14,9 +14,10 @@ import { NotFound } from "@/pages/NotFound";
 import { placeFor } from "@/lib/places";
 import { useComments, useHandover, useHandoverActions, useHandovers, type Handover, type Issue } from "./api";
 import { spaceLabel } from "@/lib/spaceLabel";
+import { TIME_ZONE } from "@/lib/dates";
 
 const day = (iso: string | null | undefined) =>
-  iso ? new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "";
+  iso ? new Date(iso).toLocaleString([], { timeZone: TIME_ZONE, dateStyle: "medium", timeStyle: "short" }) : "";
 
 const statusLabel = (s: string) =>
   ["draft", "sent", "acknowledged"].includes(s) ? t(`handover.status.${s}` as MessageKey) : s;

@@ -326,7 +326,7 @@ Example grants, with `core` as the strictest space:
 | employee | core, it, hr | public | ask |
 | core-staff | core | internal | ask, contribute |
 | core-lead (the CEO) | core | restricted | ask, contribute, review, approve |
-| ceo | it, hr (and every department created in the app) | internal | ask, contribute |
+| ceo | core, it, hr (and every department created in the app) | internal | ask, contribute |
 | it-staff | it | internal | ask, contribute |
 | hr-staff | hr | internal | ask, contribute, review |
 | hr-staff | *(all spaces)* | — | `view_gap_reports` (anonymised, aggregated only, §7) |
@@ -1858,8 +1858,12 @@ Code review (2026-11-26), each confirmed by a test that failed before the fix:
   take the places they held (`test_arranging_keeps_the_place_of_documents_you_cannot_see`).
 - **Local date vs UTC date.** Some screens used the server's local date, others the
   UTC date, so on a machine not set to UTC a review due today showed as overdue (and
-  tests failed in the early morning). Fix: one `app/clock.today()` (UTC) everywhere
-  (`test_overdue_uses_the_same_day_as_the_reminders`).
+  tests failed in the early morning). Fix: one `app/clock.today()` everywhere, on the
+  company's calendar: **Singapore time** (`SOP_TIMEZONE`, default `Asia/Singapore`,
+  owner's decision 2026-11-26). Timestamps stay stored in UTC; dates shown from them,
+  the nightly job schedule (arq `timezone`) and every date in the web app
+  (`frontend/src/lib/dates.ts`) use Singapore time, wherever the viewer is
+  (`test_overdue_uses_the_company_date_whatever_the_server_time_zone`).
 - **An empty folder with `_` in its name couldn't be removed.** The "is it empty"
   check used LIKE without escaping, so `_` matched any character and the documents of a
   similarly named folder counted. Fix: escaped prefix

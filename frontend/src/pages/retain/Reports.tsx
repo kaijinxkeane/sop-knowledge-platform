@@ -26,9 +26,10 @@ import {
   type Topic,
 } from "./api";
 import { spaceLabel } from "@/lib/spaceLabel";
+import { TIME_ZONE } from "@/lib/dates";
 
 const day = (iso: string | null | undefined) =>
-  iso ? new Date(iso).toLocaleDateString([], { dateStyle: "medium" }) : "";
+  iso ? new Date(iso).toLocaleDateString([], { timeZone: TIME_ZONE, dateStyle: "medium" }) : "";
 
 const known = (key: string): key is MessageKey => key in en;
 

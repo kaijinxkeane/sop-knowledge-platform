@@ -13,6 +13,7 @@ import { Select } from "@/components/ui/select";
 import { t } from "@/i18n";
 import { useUsers } from "./api";
 import { actionText, detailRows, targetText } from "./auditText";
+import { TIME_ZONE, startOfDay, todayIso } from "@/lib/dates";
 
 type Event = Schemas["AuditOut"];
 type Filter = { action: string; since: string; until: string; target: string; limit: number };
@@ -45,7 +46,7 @@ const ACTIONS = [
   "totp_enrolled", "totp_reset", "unattributed_changes", "user_created", "user_unlocked", "user_updated",
 ];
 
-const iso = (d: string) => (d ? new Date(`${d}T00:00:00`).toISOString() : undefined);
+const iso = (d: string) => (d ? startOfDay(d) : undefined);
 
 function useAudit(f: Filter) {
   return useQuery({
@@ -83,7 +84,7 @@ export function toCsv(
     if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
     return `"${s.replace(/"/g, '""')}"`;
   };
-  const when = (ts: string) => new Date(ts).toLocaleString([], { dateStyle: "medium", timeStyle: "medium" });
+  const when = (ts: string) => new Date(ts).toLocaleString([], { timeZone: TIME_ZONE, dateStyle: "medium", timeStyle: "medium" });
   const readable = (e: Event) =>
     detailRows(e.details, nameOf)
       .map((r) => `${r.label}: ${r.value}`)
@@ -185,7 +186,7 @@ export default function Audit() {
           variant="outline"
           size="sm"
           disabled={!events.data?.length}
-          onClick={() => download(toCsv(events.data ?? [], name, nameOf), `audit-${new Date().toISOString().slice(0, 10)}.csv`)}
+          onClick={() => download(toCsv(events.data ?? [], name, nameOf), `audit-${todayIso()}.csv`)}
         >
           {t("audit.export")}
         </Button>
@@ -231,7 +232,7 @@ export default function Audit() {
               {events.data.map((e) => (
                 <tr key={e.id} className="border-t align-top">
                   <td className="px-3 py-1.5 text-xs text-muted-foreground">{e.id}</td>
-                  <td className="whitespace-nowrap px-3 py-1.5">{new Date(e.ts).toLocaleString([], { dateStyle: "medium", timeStyle: "medium" })}</td>
+                  <td className="whitespace-nowrap px-3 py-1.5">{new Date(e.ts).toLocaleString([], { timeZone: TIME_ZONE, dateStyle: "medium", timeStyle: "medium" })}</td>
                   <td className="px-3 py-1.5">{name(e.actor_id)}</td>
                   <td className="px-3 py-1.5">
                     <span className="font-medium" title={e.action}>{actionText(e.action)}</span>

@@ -3,6 +3,7 @@ import { Loading } from "@/app/routes";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { t, type MessageKey } from "@/i18n";
 import { useGovernance, type Governance as Report, type GovernanceItem } from "./api";
+import { TIME_ZONE } from "@/lib/dates";
 
 const LISTS = [
   "changes_awaiting_review",
@@ -15,7 +16,7 @@ const LISTS = [
 ] as const satisfies readonly (keyof Report)[];
 
 const day = (iso: unknown) =>
-  typeof iso === "string" ? new Date(iso).toLocaleDateString([], { dateStyle: "medium" }) : "";
+  typeof iso === "string" ? new Date(iso).toLocaleDateString([], { timeZone: TIME_ZONE, dateStyle: "medium" }) : "";
 
 function detail(kind: (typeof LISTS)[number], d: Record<string, unknown>): string {
   if (kind === "changes_awaiting_review") return d.submitted ? t("gov.submitted") : "";

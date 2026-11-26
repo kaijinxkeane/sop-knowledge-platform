@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { t } from "@/i18n";
 import { shortDate, useReadStatus, useReadingActions, type DocStatus } from "./api";
+import { todayIso } from "@/lib/dates";
 
 /** One CSV for the yearly audit: SOP, version, person, status, dates. */
 function toCsv(rows: DocStatus[]): string {
@@ -30,7 +31,7 @@ function download(rows: DocStatus[]) {
   const url = URL.createObjectURL(new Blob([toCsv(rows)], { type: "text/csv" }));
   const a = document.createElement("a");
   a.href = url;
-  a.download = `read-status-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `read-status-${todayIso()}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }

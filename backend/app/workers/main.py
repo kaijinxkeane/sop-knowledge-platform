@@ -27,7 +27,7 @@ import logging
 from arq import cron
 from arq.connections import RedisSettings
 
-from app import audit
+from app import audit, clock
 from app.config import get_settings
 from app.db.session import get_sessionmaker
 from app.logging import configure_logging
@@ -219,4 +219,6 @@ class WorkerSettings:
         cron(render_slides, minute=set(range(5, 60, 10)), unique=True, timeout=1800),
     ]
     on_startup = startup
+    # Nightly jobs run at night in the company's time zone (app/clock.py).
+    timezone = clock.zone()
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)

@@ -603,7 +603,7 @@ async def stale(
                 title=d.title,
                 review_due=d.review_due,
                 overdue=d.review_due < today,
-                approved_on=last.date() if last else None,
+                approved_on=clock.local_date(last) if last else None,
             )
         )
     return out

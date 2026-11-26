@@ -605,22 +605,24 @@ async def test_checked_pairs_never_crowd_out_new_ones(indexed, sessions):
     assert gw.calls == 3 and len(seen) == 3
 
 
-async def test_overdue_uses_the_same_day_as_the_reminders(
+async def test_overdue_uses_the_company_date_whatever_the_server_time_zone(
     indexed, sessions, client, make_user, sign_in, monkeypatch
 ):
-    """Every date in the app is the UTC date, whatever the server's time zone
-    (the reminder job and approvals already use it)."""
+    """Every date in the app is the company's date (SOP_TIMEZONE, Singapore by
+    default), whatever time zone the server itself is set to."""
     import time
-    from datetime import UTC, datetime
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
 
-    utc_today = datetime.now(UTC).date()
-    # A time zone where today's local date isn't the UTC date.
-    ahead = datetime.now(UTC).hour >= 12
-    monkeypatch.setenv("TZ", "Etc/GMT-14" if ahead else "Etc/GMT+12")
+    assert clock.zone() == ZoneInfo("Asia/Singapore")
+    company_today = clock.today()
+    # A server time zone where today's local date isn't Singapore's date.
+    evening = datetime.now(clock.zone()).hour >= 18
+    monkeypatch.setenv("TZ", "Etc/GMT-14" if evening else "Etc/GMT+12")
     time.tzset()
     try:
-        assert date.today() != utc_today
-        due = utc_today if ahead else utc_today - timedelta(days=1)
+        assert date.today() != company_today
+        due = company_today  # due today: not overdue yet
         async with sessions() as s:
             doc = (
                 (await s.execute(select(Document).where(Document.vault_path.like("Programmes/%"))))
@@ -632,7 +634,7 @@ async def test_overdue_uses_the_same_day_as_the_reminders(
         lead = await make_user(roles=LEAD)
         rows = (await client.get(f"{API}/spaces/core/stale", headers=await sign_in(lead))).json()
         row = next(r for r in rows if r["document_id"] == str(doc.id))
-        assert row["overdue"] is (due < utc_today)
+        assert row["overdue"] is False
     finally:
         monkeypatch.delenv("TZ")
         time.tzset()

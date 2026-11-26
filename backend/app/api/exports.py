@@ -132,7 +132,7 @@ async def export_pdf(
                 owner=owner,
                 author=author.display_name if author else None,
                 approver=approver.display_name if approver else None,
-                approved_on=live.approved_at.date() if live else None,
+                approved_on=clock.local_date(live.approved_at) if live else None,
             )
         )
     restricted = any(p[-1] for p in picked)

@@ -19,6 +19,7 @@ import { LinkDialog } from "./LinkDialog";
 import { MergeDialog } from "./MergeDialog";
 import { MetaForm } from "./MetaForm";
 import { UploadDialog } from "./UploadDialog";
+import { TIME_ZONE } from "@/lib/dates";
 
 const MilkdownEditor = lazy(() => import("@/editor/MilkdownEditor"));
 
@@ -36,7 +37,7 @@ const STATUS = {
 const statusLabel = (s: string | undefined) => t(STATUS[(s || "draft") as keyof typeof STATUS] ?? "doc.unreviewed");
 
 function time(d: Date) {
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString([], { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit" });
 }
 
 function Editor({ id, opened }: { id: string; opened: Saved }) {

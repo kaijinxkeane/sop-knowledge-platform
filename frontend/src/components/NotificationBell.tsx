@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { en } from "@/i18n/en";
 import { t, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/utils";
+import { TIME_ZONE } from "@/lib/dates";
 
 type Note = Schemas["NotificationOut"];
 
@@ -110,7 +111,7 @@ export function NotificationBell() {
                   >
                     <span>{notificationText(n)}</span>
                     <span className="text-xs font-normal text-muted-foreground">
-                      {new Date(n.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
+                      {new Date(n.created_at).toLocaleString([], { timeZone: TIME_ZONE, dateStyle: "medium", timeStyle: "short" })}
                     </span>
                   </button>
                 </li>

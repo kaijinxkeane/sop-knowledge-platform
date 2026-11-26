@@ -7,9 +7,10 @@ import { Select } from "@/components/ui/select";
 import { t } from "@/i18n";
 import { NotFound } from "@/pages/NotFound";
 import { useDocument, useVersion, useVersions, type Version } from "./api";
+import { TIME_ZONE } from "@/lib/dates";
 
 export function versionLabel(v: Version): string {
-  const when = new Date(v.committed_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+  const when = new Date(v.committed_at).toLocaleString([], { timeZone: TIME_ZONE, dateStyle: "medium", timeStyle: "short" });
   const tags = [v.live && t("version.live"), v.latest && !v.approved && t("version.unapproved")].filter(Boolean);
   return `${when} · ${v.author_name}${tags.length ? ` (${tags.join(", ")})` : ""}`;
 }

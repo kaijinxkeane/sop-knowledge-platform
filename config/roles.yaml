@@ -33,6 +33,7 @@ roles:
       The CEO: writes and edits notes in every department, up to internal. Approving
       them stays with each department's lead; restricted material stays with them.
     grants:
+      - {space: core, max_sensitivity: internal, actions: [ask, contribute]}
       - {space: it, max_sensitivity: internal, actions: [ask, contribute]}
       - {space: hr, max_sensitivity: internal, actions: [ask, contribute]}
     new_departments: {max_sensitivity: internal, actions: [ask, contribute]}

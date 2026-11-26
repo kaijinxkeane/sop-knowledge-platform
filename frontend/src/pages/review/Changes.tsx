@@ -13,8 +13,9 @@ import { t } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { useVersion } from "@/pages/library/api";
 import { useReviewActions, useReviews, type ReviewItem } from "./api";
+import { TIME_ZONE } from "@/lib/dates";
 
-const when = (iso: string) => new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+const when = (iso: string) => new Date(iso).toLocaleString([], { timeZone: TIME_ZONE, dateStyle: "medium", timeStyle: "short" });
 
 /** The submitted version against the last approved one, side by side. */
 function ReviewDiff({ r }: { r: ReviewItem }) {

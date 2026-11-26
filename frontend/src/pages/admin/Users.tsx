@@ -30,6 +30,7 @@ import {
   type User,
   type UserUpdate,
 } from "./api";
+import { TIME_ZONE } from "@/lib/dates";
 
 function StatusBadges({ user }: { user: User }) {
   const badges: [string, "default" | "warning" | "danger" | "outline"][] = [];
@@ -51,7 +52,7 @@ function StatusBadges({ user }: { user: User }) {
 }
 
 function formatDate(iso: string | null | undefined): string {
-  return iso ? new Date(iso).toLocaleDateString() : t("users.never");
+  return iso ? new Date(iso).toLocaleDateString([], { timeZone: TIME_ZONE }) : t("users.never");
 }
 
 /** Shows a sign-in link once. Closing the dialog is the only way out: it isn't stored anywhere. */

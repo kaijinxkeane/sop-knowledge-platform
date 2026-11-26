@@ -22,9 +22,10 @@ import { useSpaces } from "@/pages/review/api";
 import { placeFor } from "@/lib/places";
 import { useProject, useProjectActions, useProjects, useShareRequests, type Project, type ShareRequest } from "./api";
 import { spaceLabel } from "@/lib/spaceLabel";
+import { TIME_ZONE, todayIso } from "@/lib/dates";
 
-const day = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString([], { dateStyle: "medium" }) : "");
-const tomorrow = () => new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+const day = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString([], { timeZone: TIME_ZONE, dateStyle: "medium" }) : "");
+const tomorrow = () => todayIso(1);
 const label = (key: string, fallback: string) => (key in en ? t(key as MessageKey) : fallback);
 const level = (s: string) => label(`sensitivity.${s}`, s);
 

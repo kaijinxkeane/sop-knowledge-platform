@@ -43,6 +43,11 @@ class Settings(BaseSettings):
 
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
+    # The company's time zone: what "today" means for due dates, deadlines and
+    # reports, and when the nightly jobs run (app/clock.py). Timestamps are
+    # still stored in UTC.
+    time_zone: str = Field(default="Asia/Singapore", alias="SOP_TIMEZONE")
+
     # Development only: the seeded demo accounts (app/demo.py) sign in without a
     # two-factor code. Refused in any other environment; never affects real users.
     demo_skip_2fa: bool = Field(default=False, alias="SOP_DEMO_SKIP_2FA")

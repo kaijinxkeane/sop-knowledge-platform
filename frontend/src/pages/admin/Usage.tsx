@@ -4,9 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { t } from "@/i18n";
 import { usd, useUsage } from "./usageApi";
+import { TIME_ZONE, todayIso } from "@/lib/dates";
 
 const num = (n: number) => n.toLocaleString();
-const thisMonth = () => new Date().toISOString().slice(0, 7);
+const thisMonth = () => todayIso().slice(0, 7);
 
 /** Admin → Cost and usage: totals only (tiers, models, tokens), never questions or people. */
 export default function Usage() {
@@ -60,7 +61,7 @@ export default function Usage() {
                   {u.days.map((d) => (
                     <li key={d.day} className="grid grid-cols-[6rem_1fr_8rem] items-center gap-3 text-sm">
                       <span className="text-muted-foreground">
-                        {new Date(d.day).toLocaleDateString([], { day: "numeric", month: "short" })}
+                        {new Date(d.day).toLocaleDateString([], { timeZone: TIME_ZONE, day: "numeric", month: "short" })}
                       </span>
                       <span className="h-2 rounded bg-muted" aria-hidden>
                         <span className="block h-2 rounded bg-primary" style={{ width: `${(d.cost_usd / peak) * 100}%` }} />

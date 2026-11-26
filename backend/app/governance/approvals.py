@@ -209,6 +209,6 @@ async def provenance(s: AsyncSession, document_ids) -> dict[uuid.UUID, dict]:
             "written_by": author,
             "approved_by": approver,
             "approval": approval.method if approval is not None else None,
-            "approved_on": approval.approved_at.date().isoformat() if approval else None,
+            "approved_on": clock.local_date(approval.approved_at).isoformat() if approval else None,
         }
     return out

@@ -120,13 +120,13 @@ async def test_notes_in_the_folder_belong_to_the_department(
 async def test_the_ceo_writes_in_every_department_but_reads_no_restricted_material(
     indexed, client, make_user, sign_in
 ):
-    """`ceo` (config/roles.yaml): new notes and edits in IT and HR, up to internal;
-    approving stays with each department's lead."""
-    h = await sign_in(await make_user(roles=("employee", "core-lead", "ceo")))
+    """`ceo` (config/roles.yaml) on its own: new notes and edits in Core, IT and HR,
+    up to internal; approving stays with each department's lead."""
+    h = await sign_in(await make_user(roles=("employee", "ceo")))
     me = (await client.get("/api/v1/me", headers=h)).json()
     for space in ("core", "hr", "it"):
         assert "contribute" in me["space_actions"][space], space
-    assert "approve" not in me["space_actions"]["hr"]
+        assert "approve" not in me["space_actions"][space], space
     titles = {d["title"] for d in (await client.get("/api/v1/documents", headers=h)).json()}
     assert "Leave Policy" in titles  # HR internal: readable and editable
     assert "Disciplinary Process" not in titles  # HR restricted: still hidden

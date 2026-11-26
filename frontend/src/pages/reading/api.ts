@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Schemas } from "@/api/client";
 import { call } from "@/api/errors";
+import { TIME_ZONE } from "@/lib/dates";
 
 export type ReadingStatus = Schemas["StatusOut"];
 export type Required = Schemas["RequiredOut"];
@@ -49,4 +50,4 @@ export function useReadingActions() {
   };
 }
 
-export const shortDate = (d: string) => new Date(d).toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" });
+export const shortDate = (d: string) => new Date(d).toLocaleDateString([], { timeZone: TIME_ZONE, day: "numeric", month: "short", year: "numeric" });
