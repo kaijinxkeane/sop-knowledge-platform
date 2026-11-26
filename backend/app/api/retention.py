@@ -32,7 +32,7 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import audit
+from app import audit, clock
 from app.api.deps import (
     CurrentUser,
     current_user,
@@ -437,7 +437,7 @@ async def coverage(
     if not leads and not hr:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed")
     config = vault_config()
-    today = date.today()
+    today = clock.today()
     docs = (
         (
             await session.execute(
@@ -511,7 +511,7 @@ async def folder_coverage(
     if not _lead_of(me, space):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "only this space's leads")
     config = vault_config()
-    today = date.today()
+    today = clock.today()
     topics = (
         (await session.execute(select(GapTopic).where(GapTopic.space == space))).scalars().all()
     )
@@ -565,7 +565,7 @@ async def stale(
 ) -> list[StaleOut]:
     if not _lead_of(me, space):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "only this space's leads")
-    horizon = date.today() + timedelta(days=within_days)
+    horizon = clock.today() + timedelta(days=within_days)
     docs = (
         (
             await session.execute(
@@ -584,18 +584,26 @@ async def stale(
     docs = [d for d in docs if owner_space(d) == space and visible(me.principal, d)]
     from app.db.models import SopApproval
 
+    approved = dict(
+        (
+            await session.execute(
+                select(SopApproval.document_id, func.max(SopApproval.approved_at))
+                .where(SopApproval.document_id.in_([d.id for d in docs]))
+                .group_by(SopApproval.document_id)
+            )
+        ).all()
+    )
+    today = clock.today()
     out = []
     for d in docs:
-        approved = await session.scalar(
-            select(func.max(SopApproval.approved_at)).where(SopApproval.document_id == d.id)
-        )
+        last = approved.get(d.id)
         out.append(
             StaleOut(
                 document_id=str(d.id),
                 title=d.title,
                 review_due=d.review_due,
-                overdue=d.review_due < date.today(),
-                approved_on=approved.date() if approved else None,
+                overdue=d.review_due < today,
+                approved_on=last.date() if last else None,
             )
         )
     return out

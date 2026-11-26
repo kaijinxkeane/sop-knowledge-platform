@@ -19,14 +19,14 @@ current version is acknowledged (required reading), never by a click.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, date, datetime
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import audit
+from app import audit, clock
 from app.api.deps import CurrentUser, current_user, get_db
 from app.db.models import (
     Document,
@@ -526,7 +526,7 @@ async def completion(
         _hr(me.principal) or any("approve" in a for a in me.principal.space_actions().values())
     ):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "only leads and HR")
-    today = datetime.now(UTC).date()
+    today = clock.today()
     out = []
     for p in paths:
         assigned = list(

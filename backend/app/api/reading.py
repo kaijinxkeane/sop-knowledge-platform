@@ -14,14 +14,14 @@ append-only; audit details hold ids and counts only.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import audit
+from app import audit, clock
 from app.api.deps import CurrentUser, current_user, get_db
 from app.db.models import (
     Document,
@@ -131,7 +131,7 @@ async def _status(session: AsyncSession, me: CurrentUser, doc: Document) -> Stat
         .limit(1)
     )
     due = earliest_due(mine, me.user)
-    today = datetime.now(UTC).date()
+    today = clock.today()
     return StatusOut(
         document_id=str(doc.id),
         required=bool(mine),
@@ -369,7 +369,7 @@ async def read_status(
     by_doc: dict[uuid.UUID, list[ReadingAssignment]] = {}
     for a in rows:
         by_doc.setdefault(a.document_id, []).append(a)
-    today = datetime.now(UTC).date()
+    today = clock.today()
     out = []
     for doc_id, assigned in by_doc.items():
         doc = await session.get(Document, doc_id)

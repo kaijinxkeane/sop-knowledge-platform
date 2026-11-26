@@ -10,7 +10,7 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 from sqlalchemy import select, text
 
-from app import audit
+from app import audit, clock
 from app.agents.concierge import retrieve
 from app.classify.service import ClassifierService
 from app.db.models import (
@@ -302,7 +302,7 @@ async def test_stale_list(indexed, sessions, client, make_user, sign_in):
             .scalars()
             .first()
         )
-        doc.review_due = date.today() - timedelta(days=2)
+        doc.review_due = clock.today() - timedelta(days=2)
         await s.commit()
     lead = await make_user(roles=LEAD)
     rows = (await client.get(f"{API}/spaces/core/stale", headers=await sign_in(lead))).json()
@@ -603,3 +603,36 @@ async def test_checked_pairs_never_crowd_out_new_ones(indexed, sessions):
             rows = (await s.execute(select(Conflict.document_a, Conflict.document_b))).all()
         seen = {tuple(r) for r in rows}
     assert gw.calls == 3 and len(seen) == 3
+
+
+async def test_overdue_uses_the_same_day_as_the_reminders(
+    indexed, sessions, client, make_user, sign_in, monkeypatch
+):
+    """Every date in the app is the UTC date, whatever the server's time zone
+    (the reminder job and approvals already use it)."""
+    import time
+    from datetime import UTC, datetime
+
+    utc_today = datetime.now(UTC).date()
+    # A time zone where today's local date isn't the UTC date.
+    ahead = datetime.now(UTC).hour >= 12
+    monkeypatch.setenv("TZ", "Etc/GMT-14" if ahead else "Etc/GMT+12")
+    time.tzset()
+    try:
+        assert date.today() != utc_today
+        due = utc_today if ahead else utc_today - timedelta(days=1)
+        async with sessions() as s:
+            doc = (
+                (await s.execute(select(Document).where(Document.vault_path.like("Programmes/%"))))
+                .scalars()
+                .first()
+            )
+            doc.review_due = due
+            await s.commit()
+        lead = await make_user(roles=LEAD)
+        rows = (await client.get(f"{API}/spaces/core/stale", headers=await sign_in(lead))).json()
+        row = next(r for r in rows if r["document_id"] == str(doc.id))
+        assert row["overdue"] is (due < utc_today)
+    finally:
+        monkeypatch.delenv("TZ")
+        time.tzset()

@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime
 
 from sqlalchemy.dialects.postgresql import insert
 
+from app import clock
 from app.db.models import ModelUsage
 
 log = logging.getLogger("sop.usage")
@@ -42,7 +42,7 @@ def recorder(sessionmaker):
     async def record(e: UsageEvent) -> None:
         try:
             values = {
-                "day": datetime.now(UTC).date(),
+                "day": clock.today(),
                 "tier": e.tier,
                 "model": e.model,
                 "provider": e.provider,

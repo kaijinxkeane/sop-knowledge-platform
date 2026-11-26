@@ -157,3 +157,46 @@ async def test_arranging_a_programme_stage(indexed, sessions, client, make_user,
             await s.execute(select(AuditEvent).where(AuditEvent.action == "programme_arranged"))
         ).scalar()
         assert ev.details == {"documents": len(ids)}
+
+
+async def test_arranging_keeps_the_place_of_documents_you_cannot_see(
+    indexed, sessions, client, make_user, sign_in
+):
+    async with sessions() as s, s.begin():
+        stages: dict = {}
+        for d in (await s.execute(select(Document).order_by(Document.vault_path))).scalars():
+            owner = next((x.space for x in d.access if x.role == "owner"), None)
+            if d.kind == "note" and d.programme and owner == "core":
+                stages.setdefault((d.programme, d.stage), []).append(d)
+        notes = next(ds for ds in stages.values() if len(ds) >= 3)[:3]
+        hidden = notes[0]
+        for a in hidden.access:  # only the lead can read it now
+            a.sensitivity = "restricted"
+    a, b, c = (str(d.id) for d in notes)
+    programme, stage = notes[0].programme, notes[0].stage
+    url = f"{API}/order"
+    lead = await sign_in(await make_user(roles=("employee", "core-lead")))
+    staff = await sign_in(await make_user(roles=CORE_STAFF))
+
+    body = {"programme": programme, "stage": stage, "document_ids": [a, b, c]}
+    assert (await client.put(url, json=body, headers=lead)).status_code == 204
+    # Staff can't see the first one; they swap the other two.
+    body = {"programme": programme, "stage": stage, "document_ids": [c, b]}
+    assert (await client.put(url, json=body, headers=staff)).status_code == 204
+
+    got = {o["document_id"]: o["position"] for o in (await client.get(url, headers=lead)).json()}
+    assert len({got[a], got[b], got[c]}) == 3, got  # no two share a place
+    assert sorted([a, b, c], key=got.get) == [a, c, b]
+
+
+async def test_an_empty_folder_with_an_underscore_can_be_removed(
+    indexed, client, make_user, sign_in
+):
+    # "_" is a LIKE wildcard: "Signature_Personal…" must not count the documents
+    # in "Signature Personal…" as its own.
+    core = await sign_in(await make_user(roles=CORE_STAFF))
+    body = {"space": "core", "parent": "Programmes", "name": "Signature_Personal Brand Programme"}
+    r = await client.post(f"{API}/folders", json=body, headers=core)
+    assert r.status_code == 201, r.text
+    gone = await client.delete(f"{API}/folders/{r.json()['id']}", headers=core)
+    assert gone.status_code == 204, gone.text

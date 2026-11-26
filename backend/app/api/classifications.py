@@ -22,6 +22,7 @@ from pathlib import PurePosixPath
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import audit
@@ -174,6 +175,19 @@ async def _author(session: AsyncSession, doc: Document):
     )
 
 
+async def _first_authors(session: AsyncSession, doc_ids: list) -> dict:
+    """`_author` for many documents at once (those not created in the app)."""
+    if not doc_ids:
+        return {}
+    rows = await session.execute(
+        select(DocumentVersion.document_id, DocumentVersion.authored_by)
+        .where(DocumentVersion.document_id.in_(doc_ids))
+        .ext(distinct_on(DocumentVersion.document_id))
+        .order_by(DocumentVersion.document_id, DocumentVersion.committed_at)
+    )
+    return dict(rows.all())
+
+
 async def _load(session: AsyncSession, me: CurrentUser, proposal_id: uuid.UUID):
     p = await session.get(ClassificationProposal, proposal_id)
     doc = await session.get(Document, p.document_id) if p else None
@@ -206,9 +220,11 @@ async def queue(
     ).all()
     groups: dict[str, list[ProposalOut]] = defaultdict(list)
     config = vault_config()
+    authors = await _first_authors(session, [d.id for _, d in rows if d.author_id is None])
     for p, doc in rows:
-        access = await _access(session, doc)
-        if not _may_see(me.principal, p, doc, await _author(session, doc), access):
+        access = list(doc.access)  # loaded with the document
+        author = doc.author_id or authors.get(doc.id)
+        if not _may_see(me.principal, p, doc, author, access):
             continue
         proposed = _proposed(p)
         groups[p.group_key].append(

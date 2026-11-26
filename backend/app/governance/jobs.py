@@ -12,11 +12,12 @@ from __future__ import annotations
 
 import difflib
 import logging
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from app import clock
 from app.agents.untrusted import REMINDER, tag, with_rules
 from app.db.models import Document, DocumentVersion, ReviewRequest
 from app.governance import webhooks
@@ -99,7 +100,7 @@ async def summarise_reviews(
 async def review_reminders(
     sessions: async_sessionmaker, config: VaultConfig, *, today: date | None = None
 ) -> dict:
-    today = today or datetime.now(UTC).date()
+    today = today or clock.today()
     horizon = today + timedelta(days=config.reminder_days)
     sent = 0
     async with sessions() as s, s.begin():

@@ -75,24 +75,25 @@ def _clean(path: str) -> str:
     return "/".join(p.strip() for p in path.strip().strip("/").split("/") if p.strip())
 
 
-_department_of = department_of
-
-
 def _roots(space: str, config: VaultConfig) -> list[str]:
     return [
         r.path.strip("/")
         for r in config.folder_rules
-        if r.space == space and _department_of(r.path.strip("/"), config) == space
+        if r.space == space and department_of(r.path.strip("/"), config) == space
     ]
 
 
-async def _readable_paths(session: AsyncSession, me: CurrentUser) -> list[str]:
+async def _readable_docs(session: AsyncSession, me: CurrentUser) -> dict[uuid.UUID, Document]:
+    """Every document this person can read (RLS and the policy engine)."""
     await session.commit()
     await apply_reader_scope(session, me.principal)
-    docs = (await session.execute(select(Document))).scalars().all()
-    paths = [d.vault_path for d in docs if visible(me.principal, d)]
+    docs = {
+        d.id: d
+        for d in (await session.execute(select(Document))).scalars().all()
+        if visible(me.principal, d)
+    }
     await session.commit()
-    return paths
+    return docs
 
 
 @router.get("/folders", response_model=list[FolderOut])
@@ -102,7 +103,7 @@ async def list_folders(
     config = vault_config()
     spaces = list((await session.execute(select(Space.name))).scalars())
     editable = {s for s in spaces if me.principal.can("contribute", s)}
-    readable = await _readable_paths(session, me)
+    readable = [d.vault_path for d in (await _readable_docs(session, me)).values()]
     out: dict[str, FolderOut] = {}
     for space in sorted(editable):
         for root in _roots(space, config):
@@ -132,7 +133,7 @@ async def create_folder(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             "folder names can't contain slashes or start with a dot",
         )
-    if _department_of(parent, config) != body.space:
+    if department_of(parent, config) != body.space:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, "choose a folder of this department"
         )
@@ -173,13 +174,15 @@ async def delete_folder(
         raise NOT_FOUND
     has_docs = (
         await session.execute(
-            select(Document.id).where(Document.vault_path.startswith(folder.path + "/")).limit(1)
+            select(Document.id)
+            .where(Document.vault_path.startswith(folder.path + "/", autoescape=True))
+            .limit(1)
         )
     ).scalar()
     inside = (
         await session.execute(
             select(LibraryFolder.id)
-            .where(LibraryFolder.path.startswith(folder.path + "/"))
+            .where(LibraryFolder.path.startswith(folder.path + "/", autoescape=True))
             .limit(1)
         )
     ).scalar()
@@ -249,7 +252,7 @@ async def move_document(
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, "documents in this folder can't be moved"
         )
-    target = _department_of(folder, config)
+    target = department_of(folder, config)
     if target != in_force.space:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -317,18 +320,6 @@ class OrderIn(BaseModel):
     document_ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
 
 
-async def _readable_docs(session: AsyncSession, me: CurrentUser) -> dict[uuid.UUID, Document]:
-    await session.commit()
-    await apply_reader_scope(session, me.principal)
-    docs = {
-        d.id: d
-        for d in (await session.execute(select(Document))).scalars().all()
-        if visible(me.principal, d)
-    }
-    await session.commit()
-    return docs
-
-
 @router.get("/order", response_model=list[OrderOut])
 async def programme_order(
     me: CurrentUser = Depends(current_user), session: AsyncSession = Depends(get_db)
@@ -365,15 +356,50 @@ async def set_programme_order(
         owner = next((a.space for a in doc.access if a.role == "owner"), None)
         if owner is None or not me.principal.can("contribute", owner):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "you can't arrange this programme")
+    # The whole stage as everyone with full access sees it (outside the reader
+    # scope: positions only, nothing is returned). The listed documents take
+    # the places they held, in the new order; the others stay where they were,
+    # and the stage is renumbered so no two documents share a place.
+    same_stage = (
+        Document.stage == body.stage
+        if body.stage
+        else (Document.stage.is_(None) | (Document.stage == ""))
+    )
+    stage = [
+        (doc_id, title)
+        for doc_id, title in await session.execute(
+            select(Document.id, Document.title).where(
+                Document.programme == body.programme, same_stage
+            )
+        )
+    ]
     existing = {
         r.document_id: r
         for r in (
-            await session.execute(select(ProgrammeOrder).where(ProgrammeOrder.document_id.in_(ids)))
+            await session.execute(
+                select(ProgrammeOrder).where(ProgrammeOrder.document_id.in_([i for i, _ in stage]))
+            )
         ).scalars()
     }
-    for n, doc_id in enumerate(ids):
-        row = existing.get(doc_id) or ProgrammeOrder(document_id=doc_id)
-        row.position, row.updated_by = (n + 1) * 10, me.user.id
+    current = [
+        i
+        for i, _ in sorted(
+            stage,
+            key=lambda d: (
+                existing[d[0]].position if d[0] in existing else float("inf"),
+                d[1].lower(),
+            ),
+        )
+    ]
+    listed, new = set(ids), iter(ids)
+    sequence = [next(new) if doc_id in listed else doc_id for doc_id in current]
+    for n, doc_id in enumerate(sequence):
+        row = existing.get(doc_id)
+        if row is None:
+            row = ProgrammeOrder(document_id=doc_id, updated_by=me.user.id)
+        elif doc_id in listed:
+            row.updated_by = me.user.id
+        row.position = (n + 1) * 10
         session.add(row)
     await audit.record(
         session,

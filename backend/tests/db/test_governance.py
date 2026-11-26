@@ -8,12 +8,13 @@ cited until it is approved again.
 from __future__ import annotations
 
 import json
-from datetime import date, timedelta
+from datetime import timedelta
 
 import httpx
 import pytest
 from sqlalchemy import select, text
 
+from app import clock
 from app.agents.concierge import retrieve
 from app.classify.service import ClassifierService
 from app.db.models import (
@@ -289,7 +290,7 @@ async def test_review_reminders_are_sent_once(indexed, sessions, make_user, monk
     note = await doc_id(sessions)
     async with sessions() as s:
         doc = await s.get(Document, note)
-        doc.review_due = date.today() + timedelta(days=3)
+        doc.review_due = clock.today() + timedelta(days=3)
         await s.commit()
     subs = (webhooks.Subscriber("https://hooks.example.com/x", webhooks.EVENTS),)
     monkeypatch.setattr(webhooks, "subscribers", lambda: subs)

@@ -1,6 +1,7 @@
 # SOP & Knowledge Retention Platform — Architecture and Plan
 
-Status: proposal (architecture + plan only, no code yet) · updated 2026-11-20
+Status: built through Phase 5 plus project spaces (alpha) · plan written 2026-11-20 · updated 2026-11-26
+(what was built and measured since is in §12)
 
 > **Since 2026-11-25 the platform runs fully local.** The owner removed Claude:
 > every tier (answering included) runs on local Ollama models and the Anthropic
@@ -324,11 +325,17 @@ Example grants, with `core` as the strictest space:
 |---|---|---|---|
 | employee | core, it, hr | public | ask |
 | core-staff | core | internal | ask, contribute |
-| core-lead (the CEO) | core | restricted | ask, review, approve |
+| core-lead (the CEO) | core | restricted | ask, contribute, review, approve |
+| ceo | it, hr (and every department created in the app) | internal | ask, contribute |
 | it-staff | it | internal | ask, contribute |
 | hr-staff | hr | internal | ask, contribute, review |
 | hr-staff | *(all spaces)* | — | `view_gap_reports` (anonymised, aggregated only, §7) |
 | space-admin:core | core | restricted | all |
+
+The `ceo` role (2026-11-26) lets the CEO write and edit in every department
+without reading its restricted material or approving its SOPs; those stay with
+each department's lead. Its `new_departments` grant in `config/roles.yaml` is
+added to every department created later in Admin → Departments.
 
 So every employee can ask "how do I book a training room?" (a public `core`
 SOP). Only core staff can read the delivery playbooks, and only core leads can
@@ -1080,6 +1087,18 @@ service, so it is left for later and kept optional.
 - `handover_receivers(handover_id, user_id, acknowledged_at)`
 - `audit_events` (append-only, hash-chained)
 
+Added while building (each in its migration, `backend/app/db/migrations/versions/`):
+
+- `document_readers` (handover readers), `document_tags`, `known_names` (name detector), `vault_state`
+- `sop_approvals`, `review_requests`, `notifications`, `webhook_deliveries`, `handover_comments`
+- `search_events`, `bookmarks`, `conflicts`, `retractions`, `answer_reuse`, `message_feedback`, `model_usage` (daily totals only)
+- `projects`, `project_members`, `project_shares`
+- `reading_assignments`, `read_acknowledgements` (append-only), `reading_paths`, `path_items`, `path_assignments`, `path_progress`
+- `library_folders(space, path, created_by)` (0020): folders made in the Library
+- `sorter_models(documents, data, trained_at)` (0021): the trained sorter, average fingerprints only; `classification_proposals.sorter_vote`, `.suggested_folder`
+- `gap_topics.folder` (0022): the folder of the nearest live document, for coverage per folder
+- `programme_order(document_id, position, updated_by)` (0023): the hand-arranged order inside a programme stage
+
 **Retrieval** is hybrid: pgvector similarity plus Postgres full-text, with
 titles, tags and linked-note context as boosts. Scope filters are applied before ranking.
 pgvector keeps v1 at one database. A dedicated vector database is only needed
@@ -1092,10 +1111,13 @@ backend/                        # Python (FastAPI); everything server-side
   app/
     api/        routers, auth, policy engine, SSE
     agents/     concierge, department, classifier, librarian + prompt templates
-    models/     model gateway: anthropic + openai_compat adapters
+    models/     model gateway: openai_compat (Ollama) adapter; local only since 2026-11-25
     retrieval/  chunking, local embeddings, hybrid search
     vault/      parsers (MD/PPTX/PDF/DOCX + OCR), labels, git layer, indexer, renditions
     classify/, governance/, retention/, projects/, eval/   domain services
+                (classify/sorter.py + training.py: the trained sorter;
+                vault/folders.py: which department a folder belongs to)
+    departments.py  departments created in the app; clock.py  today's (UTC) date
     workers/    arq jobs: git change detection, nightly checks, retention and review-due
                 (slide rendering to images: planned)
     db/         SQLAlchemy models, Alembic migrations, RLS policies
@@ -1105,13 +1127,15 @@ backend/                        # Python (FastAPI); everything server-side
 frontend/                       # React + TypeScript (Vite); built to static files
   src/
     app/        routing, layout, theme (single place for future branding)
-    pages/      ask, home, library, write, admin (+ review, retain: to do)
+    pages/      ask, home, library, write, review, retain, handovers, projects,
+                reading, paths, admin
     editor/     Milkdown setup + Obsidian nodes (wikilinks, embeds, callouts, raw blocks)
     api/        generated typed client (from backend OpenAPI)
   (tests)       component tests next to their files (*.test.tsx), editor round-trip;
                 Playwright end-to-end: Phase 6
   package.json
-config/         vault.yaml, spaces/*.yaml, models.yaml, notice.md
+config/         vault.yaml, spaces/*.yaml, roles.yaml, models.yaml, notice.md,
+                help/*.md (built-in user guide), eval/
 demo-vault/     synthetic one-vault training company: Programmes/<Programme>/<Stage>/, Methodology/,
                 Shared Templates/, IT/, HR/, plus a deliberately unsorted Inbox/ (the only data in git)
 demo-vault-labels.yaml  correct labels for every demo note (Classifier tests)
@@ -1194,14 +1218,14 @@ repo on the company device, mounted at deploy time via `VAULT_PATH`.
 
 ## 12. Phased plan
 
-**Status at a glance (2026-11-25).** Details per phase follow below.
+**Status at a glance (2026-11-26).** Details per phase follow below.
 
 | Phase | Backend | Frontend |
 |---|---|---|
 | 0. Foundations | Done | Done |
 | 1. Identity and RBAC | Done | Done (sign-in, two-factor, notice, Admin users/roles/grants) |
-| 2. Indexing and retrieval | Done, incl. local OCR | Done: Library, editor, upload, merge, versions (notes, decks, PDFs), bookmarks, Ctrl+K, images in notes, slide pictures (headless LibreOffice, rendered once per deck version, cached; text fallback without it) |
-| 2b. AI Classifier | Done | Done: Review → AI label suggestions (grouped, bulk approve, edit, plain-words widening warning), unplaced notes |
+| 2. Indexing and retrieval | Done, incl. local OCR; Library folders, hand-arranged programme stages, search inside a folder | Done: Library, editor, upload, merge, versions (notes, decks, PDFs), bookmarks, Ctrl+K, images in notes, slide pictures (headless LibreOffice, rendered once per deck version, cached; text fallback without it) |
+| 2b. AI Classifier | Done; few-shot examples on, trained sorter as a tighten-only second vote | Done: Review → AI label suggestions (grouped, bulk approve, edit, plain-words widening warning), unplaced notes |
 | 3. Agents | Done | Done: Ask (streaming, citations panel, filters, follow-ups, no-answer actions, feedback, history) and Home |
 | 4. SOP governance | Done (approvals, reviews, notifications, governance report, webhooks, required reading and sign-off with append-only acknowledgements, material-change flag, PDF export with watermark and audit, per-space `pdf_export` switch) | Done: Review → SOP changes (side-by-side, material-change option), governance report, notifications bell, reader sign-off banner and "Assign reading", Export PDF (note or programme stage), print CSS |
 | 5. Retention | Done (handovers, gaps, coverage, stale, bus factor, conflicts, retract, retention job, onboarding paths, cost and usage: daily `model_usage` totals priced from `config/models.yaml`) | Done: Retain (gaps incl. HR view, coverage, review due, required-reading status with CSV export, bus factor, conflicts), handover notes, onboarding paths (learner, lead editor, HR completion), Admin → audit log and cost and usage, Home cards (CEO cost, leads, HR, required reading, onboarding) |
@@ -1399,10 +1423,11 @@ Phase 2b *backend* done (2026-11-21):
   0/30/60/120 labelled notes: 79.2 / 71.7 / 79.2 / 77.5% placed correctly,
   over-exposed 11.7 / 15.0 / 10.8 / 10.8%. None of the differences is
   significant (McNemar p ≥ 0.11), so `ClassifierService(use_examples=False)`
-  is the default. Caveat: the eval cases come in clusters, so neighbours
-  are unusually close; re-run `eval-classifier --example-pool N` on
-  real reviewer labels before switching it on. A LoRA fine-tune on those labels
-  (Phase 7) is the likelier path to a real gain.
+  was the default at first. Caveat: the eval cases come in clusters, so neighbours
+  are unusually close. **Switched on 2026-11-26** (`classifier.examples: true` in
+  `config/vault.yaml`) after the held-out comparison below; re-check it on real
+  reviewer labels. A LoRA fine-tune on those labels (Phase 7) is still the likelier
+  path to a bigger gain.
 - **Local models and thinking**: `qwen3:4b` on Ollama is now the 2507
   *Thinking* build, which can't switch thinking off. The `router` and
   `classifier` tiers therefore use `qwen3:4b-instruct`. Thinking is switched
@@ -1785,6 +1810,64 @@ injection and wildcards, frontmatter widening (sensitivity, `shared_with`,
 space, status), smuggled frontmatter, folder traversal, forged/`alg:none`/
 deactivated tokens, other people's conversations, reviews, notifications and
 handovers, staff opening lead/HR/admin reports.
+
+Usability and folders (2026-11-25/26):
+- **Built-in user guide** (`config/help/*.md`, `app/vault/help.py`): ten public guides
+  are added to every vault's `Help/` folder once, by the worker, as a platform commit,
+  approved as `baseline`. Guides people edited or deleted are never put back.
+- **"Where you were"** (`frontend/src/lib/places.ts`): tab, folder, search and selected
+  item are kept in memory only and cleared on sign-out; page state lives in the address.
+- **Departments created in the app** (`app/departments.py`, Admin → Departments,
+  `manage_spaces`, migration 0019): a YAML file in `SOP_SPACES_DIR`, a `spaces` row,
+  unassigned `-staff`/`-lead` roles, a public `ask` grant on `employee` and a folder
+  rule. A configured department is never overridden.
+- **Library folders** (`app/api/folders.py`, `app/vault/folders.py`, migration 0020):
+  each department makes its own folders. A document moves only between folders of its
+  own department and only where its access stays identical; it keeps its id, and
+  `GitVault.show` follows moves so past versions still read. Handover, project and Help
+  folders are closed; Inbox and Drafts can be left, never entered.
+- **Trained sorter** (`app/classify/sorter.py`, `training.py`, migration 0021): nightly
+  (02:20 and at worker start) it keeps one average fingerprint per department,
+  department + level and folder, from documents people filed. No text or titles.
+  Its vote only tightens (`combine`): disagreeing about the department holds the note
+  for review; agreeing can raise the level. `decide()` still applies the one-way rule.
+  Held-out classifier set (`config/eval/classifier-holdout.yaml`, 45 cases): AI alone
+  80% correct / 13% too loose; + sorter 84% / 2%; + examples 96% / 4%; both 91% / 4%.
+  Effective over-exposure 0 in every setup. Folder suggestions were right 3 times and
+  wrong 7 times in 28 on the demo vault, so filing stays an opt-in tick box in Review.
+- **Routing with the sorter** (`app/agents/router.py`): when search is unclear and the
+  sorter is confident (and agrees, or search found nothing strong), it picks the
+  department without a model call; when it disagrees with search's leader, both answer.
+  Held-out routing 40/42 → 42/42, dev 181/184 → 182/184, with fewer model calls.
+- **Folder uses:** search and Ask take a `folder` filter (LIKE wildcards escaped; it
+  only narrows what RLS allows). "Ask about this folder" in the Library.
+  `POST /notes/similar` warns a writer about notes they can already read with a close
+  title (distance ≤ 0.32, never stored). Onboarding paths can start from a folder.
+  `GET /spaces/{space}/folder-coverage` gives leads counts per folder (migration 0022).
+- **Arrange** (`GET`/`PUT /library/order`, migration 0023): people who can write in a
+  department put a programme stage in order by hand; everyone sees the same order.
+  Documents a person can't see keep their place.
+- **Labels and the CEO:** department names show as HR, IT, Core, Marketing
+  (`frontend/src/lib/spaceLabel.ts`, display only). The `ceo` role (§4) writes in every
+  department up to internal.
+
+Code review (2026-11-26), each confirmed by a test that failed before the fix:
+- **Arranging could put two documents in one place.** Someone who couldn't see one
+  document of a stage rearranged the others; the hidden one and a rearranged one both
+  got position 10. Fix: the server renumbers the whole stage and the listed documents
+  take the places they held (`test_arranging_keeps_the_place_of_documents_you_cannot_see`).
+- **Local date vs UTC date.** Some screens used the server's local date, others the
+  UTC date, so on a machine not set to UTC a review due today showed as overdue (and
+  tests failed in the early morning). Fix: one `app/clock.today()` (UTC) everywhere
+  (`test_overdue_uses_the_same_day_as_the_reminders`).
+- **An empty folder with `_` in its name couldn't be removed.** The "is it empty"
+  check used LIKE without escaping, so `_` matched any character and the documents of a
+  similarly named folder counted. Fix: escaped prefix
+  (`test_an_empty_folder_with_an_underscore_can_be_removed`).
+- **Faster:** search loads every candidate document in one query instead of one at a
+  time (5 queries per search instead of up to 32 on the demo vault; Ask runs several
+  searches per question). The review queue reuses access rows already loaded and finds
+  first authors in one query; the review-due list finds last approvals in one query.
 
 Phases 0–5 (backend and frontend) are developed and tested on a MacBook (Apple Silicon) using Docker
 Compose. Ollama runs natively on the Mac for the local embeddings, because

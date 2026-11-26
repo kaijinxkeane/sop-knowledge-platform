@@ -12,7 +12,6 @@ Every export is written to the audit log (ids and counts only).
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
@@ -20,7 +19,7 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import audit
+from app import audit, clock
 from app.api.deps import CurrentUser, current_user, get_db, get_git
 from app.api.notes import read_for
 from app.db.models import Document, User
@@ -137,7 +136,7 @@ async def export_pdf(
             )
         )
     restricted = any(p[-1] for p in picked)
-    today = datetime.now(UTC).date()
+    today = clock.today()
     pdf = render_pdf(
         ExportJob(
             docs=out,

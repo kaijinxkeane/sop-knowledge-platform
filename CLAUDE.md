@@ -95,6 +95,7 @@ backend/                 — FastAPI app (uv project, Python 3.12)
   app/policy/            — policy engine (scopes, actions, fail-closed sensitivity)
   app/security/          — passwords (Argon2), TOTP, tokens, key derivation
   app/identity.py, app/audit.py, app/cli.py — users/roles, hash-chained audit log, admin CLI
+  app/clock.py           — today's date (UTC) for every due date and deadline; never `date.today()`
   app/models/            — model gateway: tiers, data boundary, openai_compat (Ollama) adapter, usage
   app/db/                — SQLAlchemy models, Alembic migrations (incl. RLS), scoped reader
   app/vault/             — parsers (md/pptx/pdf/docx/images), local OCR, rule labels + safeguards, git layer, indexer, write rules

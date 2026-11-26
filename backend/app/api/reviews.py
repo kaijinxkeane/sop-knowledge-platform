@@ -24,14 +24,14 @@ from __future__ import annotations
 import difflib
 import re
 import uuid
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app import audit
+from app import audit, clock
 from app.api.deps import (
     CurrentUser,
     current_user,
@@ -324,7 +324,7 @@ async def _finish_approval(
             git,
             doc_view,
             reviewer=me.user.display_name,
-            approved_on=datetime.now(UTC).date(),
+            approved_on=clock.today(),
             review_due=due,
         ):
             await Indexer(git, sessions, embed).index_paths([rel])
@@ -689,7 +689,7 @@ async def governance_report(
     if not spaces:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed")
     since = datetime.now(UTC) - timedelta(days=REPORT_DAYS)
-    today = date.today()
+    today = clock.today()
     docs = (await session.execute(select(Document))).scalars().all()
     in_scope = {d.id: d for d in docs if owner_space(d) in spaces}
 

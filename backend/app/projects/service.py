@@ -33,6 +33,7 @@ from datetime import date
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import clock
 from app.db.models import Project, ProjectMember, ProjectShare, User
 from app.policy.engine import GrantRule, PartialShare, Principal, Sensitivity, resolve_sensitivity
 from app.spaces import SpaceProfile
@@ -67,7 +68,7 @@ def share_grants(share: ProjectShare) -> tuple[list[GrantRule], list[PartialShar
 async def project_access(
     s: AsyncSession, user: User, base: Principal, today: date | None = None
 ) -> tuple[list[GrantRule], list[PartialShare]]:
-    today = today or date.today()
+    today = today or clock.today()
     if user.leaving_on is not None and user.leaving_on < today:
         return [], []
     approves = [sp for sp, acts in base.space_actions().items() if "approve" in acts]
@@ -139,7 +140,7 @@ async def ending_reminders(s: AsyncSession, reminder_days: int, today: date | No
     sharing) ends."""
     from app.governance.notify import notify
 
-    today = today or date.today()
+    today = today or clock.today()
     n = 0
     for p in (await s.execute(select(Project).where(Project.closed_at.is_(None)))).scalars():
         left = (p.ends_on - today).days

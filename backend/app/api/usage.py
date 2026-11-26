@@ -8,13 +8,14 @@ tiers, models and token counts. No questions, no answers, no people.
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import clock
 from app.api.deps import CurrentUser, current_user, get_db, get_gateway
 from app.db.models import ModelUsage
 from app.models.usage import cost_usd
@@ -54,7 +55,7 @@ class UsageOut(BaseModel):
 
 
 def _month(value: str | None) -> tuple[date, date, str]:
-    today = datetime.now(UTC).date()
+    today = clock.today()
     if value is None:
         start = today.replace(day=1)
     else:

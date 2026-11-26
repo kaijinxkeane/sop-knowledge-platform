@@ -14,6 +14,7 @@ from datetime import UTC, date, datetime, timedelta
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import clock
 from app.db.models import Chunk, Document, DocumentLink, SopApproval, VaultState
 from app.governance.access import on_approval
 from app.governance.versions import with_frontmatter
@@ -51,7 +52,7 @@ async def approve(
     today: date | None = None,
 ) -> SopApproval:
     assert method in ("review", "self", "baseline")
-    today = today or datetime.now(UTC).date()
+    today = today or clock.today()
     approval = SopApproval(
         document_id=doc.id,
         git_commit=doc.current_commit,

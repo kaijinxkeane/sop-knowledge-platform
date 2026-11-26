@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import date, timedelta
+from datetime import timedelta
 
 from sqlalchemy import select, text
 
+from app import clock
 from app.agents.concierge import retrieve
 from app.db.models import Document, Notification, Project
 from app.db.scoped import apply_reader_scope, visible
@@ -50,7 +51,7 @@ async def setup(client, make_user, sign_in, shares=("hr",)):
         headers=h[lead],
         json={
             "name": "Leadership Offsite 2027",
-            "ends_on": (date.today() + timedelta(days=90)).isoformat(),
+            "ends_on": (clock.today() + timedelta(days=90)).isoformat(),
             "members": [str(member.user.id)],
             "shares": [{"space": s, "note": "onboarding steps for new trainers"} for s in shares],
         },
@@ -61,12 +62,12 @@ async def setup(client, make_user, sign_in, shares=("hr",)):
 
 async def test_only_space_leads_create_and_six_months_max(indexed, client, make_user, sign_in):
     staff, lead = await make_user(roles=STAFF), await make_user(roles=CORE_LEAD)
-    body = {"name": "Offsite", "ends_on": (date.today() + timedelta(days=30)).isoformat()}
+    body = {"name": "Offsite", "ends_on": (clock.today() + timedelta(days=30)).isoformat()}
     assert (
         await client.post(f"{API}/projects", headers=await sign_in(staff), json=body)
     ).status_code == 403
     hl = await sign_in(lead)
-    late = body | {"ends_on": (date.today() + timedelta(days=200)).isoformat()}
+    late = body | {"ends_on": (clock.today() + timedelta(days=200)).isoformat()}
     assert (await client.post(f"{API}/projects", headers=hl, json=late)).status_code == 422
     r = await client.post(
         f"{API}/projects", headers=hl, json=body | {"lead_id": str(staff.user.id)}
@@ -225,8 +226,8 @@ async def test_after_expiry_key_details_and_shares_close(
     async with sessions() as s:
         proj = await s.get(Project, uuid.UUID(p["id"]))
         proj.starts_on, proj.ends_on = (
-            date.today() - timedelta(days=100),
-            date.today() - timedelta(days=1),
+            clock.today() - timedelta(days=100),
+            clock.today() - timedelta(days=1),
         )
         for sh in proj.shares:  # approved until the project's (old) end
             sh.approved_until = proj.ends_on
@@ -247,7 +248,7 @@ async def test_after_expiry_key_details_and_shares_close(
     r = await client.post(
         f"{API}/projects/{p['id']}/renew",
         headers=h[lead],
-        json={"ends_on": (date.today() + timedelta(days=60)).isoformat()},
+        json={"ends_on": (clock.today() + timedelta(days=60)).isoformat()},
     )
     assert r.status_code == 200
     share = r.json()["shares"][0]
@@ -263,7 +264,7 @@ async def test_leaving_members_lose_project_access(indexed, sessions, client, ma
     p, lead, member, other, hr, h = await setup(client, make_user, sign_in)
     async with sessions() as s:
         u = await get_user(s, member.user.id)
-        u.leaving_on = date.today() - timedelta(days=1)
+        u.leaving_on = clock.today() - timedelta(days=1)
         await s.commit()
     assert (await principal(sessions, member)).can("ask", p["space"]) is False
 
@@ -274,7 +275,7 @@ async def test_ending_reminder_once_and_project_profiles_local(
     p, lead, *_ = await setup(client, make_user, sign_in)
     async with sessions() as s:
         proj = await s.get(Project, uuid.UUID(p["id"]))
-        proj.ends_on = date.today() + timedelta(days=10)
+        proj.ends_on = clock.today() + timedelta(days=10)
         await s.commit()
     for _ in range(2):
         async with sessions() as s, s.begin():
@@ -341,8 +342,8 @@ async def test_project_reviews_go_to_the_project_lead(
     # once the project has ended, nobody is asked
     async with sessions() as s:
         proj = await s.get(Project, uuid.UUID(p["id"]))
-        proj.ends_on = date.today() - timedelta(days=1)
-        proj.starts_on = date.today() - timedelta(days=30)
+        proj.ends_on = clock.today() - timedelta(days=1)
+        proj.starts_on = clock.today() - timedelta(days=30)
         await s.commit()
         from app.governance.notify import users_with
 

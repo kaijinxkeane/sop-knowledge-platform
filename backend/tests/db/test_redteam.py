@@ -13,6 +13,7 @@ import uuid
 import pytest
 from sqlalchemy import select
 
+from app import clock
 from app.agents.concierge import retrieve
 from app.classify.service import ClassifierService
 from app.db.models import ChatMessage, Conversation, Document
@@ -537,7 +538,7 @@ async def test_a_project_share_cannot_reach_another_departments_sops(
 ):
     """HR's lead approves HR's share with a *core* folder and a core SOP id: the
     project must still see nothing of core's restricted material."""
-    from datetime import date, timedelta
+    from datetime import timedelta
 
     lead, member = await make_user(roles=LEAD), await make_user(roles=STAFF)
     hr = await make_user(roles=("employee", "hr-staff", "hr-lead"))
@@ -548,7 +549,7 @@ async def test_a_project_share_cannot_reach_another_departments_sops(
             headers=hl,
             json={
                 "name": "Cross team",
-                "ends_on": (date.today() + timedelta(days=30)).isoformat(),
+                "ends_on": (clock.today() + timedelta(days=30)).isoformat(),
                 "members": [str(member.user.id)],
                 "shares": [{"space": "hr"}],
             },

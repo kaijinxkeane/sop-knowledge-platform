@@ -1,6 +1,6 @@
 # Frontend Specification (web app)
 
-Status: proposal · 2026-11-20 · Companion to `sop-platform-plan.md` (§8.1)
+Status: built (alpha) · written 2026-11-20 · updated 2026-11-26 · Companion to `sop-platform-plan.md` (§8.1)
 
 ## 1. Decisions
 
@@ -120,8 +120,10 @@ Status: proposal · 2026-11-20 · Companion to `sop-platform-plan.md` (§8.1)
 - **Several departments:** when more than one department answers, each answer
   appears in its own section headed by the department, with its own
   citations. Nothing is merged by a model.
-- **Follow-up chips:** 2–3 suggested next questions. The programme and stage
-  filters carry over to the next question.
+- **Follow-up chips:** 2–3 suggested next questions. The programme, stage and
+  folder filters carry over to the next question.
+- **Folder filter (2026-11-26):** Ask can be limited to one Library folder you can
+  read (filter bar, or "Ask about this folder" in the Library). It only narrows.
 - **No-answer state:** "*No SOP you can access covers this.*" This is never
   dressed up as an answer. Three actions follow:
   - **[Request an SOP]**
@@ -163,7 +165,16 @@ Status: proposal · 2026-11-20 · Companion to `sop-platform-plan.md` (§8.1)
 └───────────────────┴───────────────────────────────────────────────────┘
 ```
 
-- Switch between **programme**, **stage** and **department** views.
+- Switch between **programme**, **stage**, **department** and **folder** views.
+  Department names show as HR, IT, Core (abbreviations in capitals, display only).
+- **Folders (2026-11-25/26):** people who can write in a department make folders
+  in it and move its documents between them, only where access stays the same.
+  "Only search in this folder" narrows Library search; the built-in **Help**
+  guides sit in their own group.
+- **Arrange (2026-11-26):** in the programme view, each stage has an *Arrange*
+  link (shown to people who can write in every document's department): up and
+  down buttons, then *Save order*. Everyone sees the same order; documents you
+  can't see keep their place.
 - Status dots: approved, in review (visible to reviewers only), draft (own
   only).
 - Stage columns with **0 SOPs show ⚠**, linking to the coverage map.
@@ -203,6 +214,10 @@ Status: proposal · 2026-11-20 · Companion to `sop-platform-plan.md` (§8.1)
 ```
 
 - **Metadata is a form, not YAML.** Approval fields are read-only.
+- **Space picker:** every department you can write in (the CEO: all of them).
+- **Similar notes (2026-11-26):** while typing a new note's title, up to three
+  notes you can already read with a close title are shown, so you can edit
+  one instead. The title is never stored.
 - **Space and sensitivity:** the AI's suggestion is shown inline. Choosing
   something *looser* than the suggestion shows "needs lead approval" (the
   one-way rule).
@@ -231,6 +246,8 @@ Status: proposal · 2026-11-20 · Companion to `sop-platform-plan.md` (§8.1)
 - **AI label suggestions:** grouped cards ("40 workshop worksheets → Core ·
   internal") showing the AI's reasoning and evidence snippets, with Approve
   all · Edit · Reject. Anything that widens access says so in plain words.
+  When the trained sorter suggests a folder (only to people who can file
+  there), an unticked "File it in X when I approve" box moves the note on approval.
 - **Unplaced notes:** routed to the author, or to the lead as a fallback.
 - **Governance:** unattributed edits, notes left restricted by default
   (awaiting classification), and self-approved SOPs.
@@ -245,7 +262,8 @@ Status: proposal · 2026-11-20 · Companion to `sop-platform-plan.md` (§8.1)
     training planned → addressed) and a trend line showing whether
     questions drop after training.
 - **Coverage map:** a programme × stage grid. Click a cell for its SOPs, or
-  for "create one".
+  for "create one". Below it, leads see **coverage per folder** (documents,
+  approved, stale, open gaps; counts only).
 - **Handover notes:** a form following the handover template (client and
   programme, stage, done, open actions with dates, upcoming sessions, client
   preferences, files, contacts, risks). Pick the receivers, run the
@@ -324,6 +342,15 @@ Status: proposal · 2026-11-20 · Companion to `sop-platform-plan.md` (§8.1)
   for now), matching the multilingual search index.
 - **Theming:** colours, fonts, radius and logo live in `frontend/src/app/theme`
   for later branding.
+
+### 9.5 Help and admin additions (2026-11-25/26)
+
+- **Help:** ten user guides in `Help/`, opened from *Help* in the top bar.
+  They are ordinary public documents, so Ask can answer from them too.
+- **Admin → Departments:** create a department (name, description, contact,
+  folder); its roles start unassigned. Roles show as collapsible cards.
+- **Onboarding paths from a folder:** "Start from a folder" builds one step per
+  subfolder; "Add everything in a folder…" adds a folder's documents to a step.
 
 ## 11. Backend additions needed for the extras
 

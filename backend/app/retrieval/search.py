@@ -21,7 +21,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Document
@@ -174,17 +174,25 @@ async def search(
         ).all()
     }
 
-    docs: dict[uuid.UUID, Document] = {}
+    # One query for every candidate document (with its access rows), still
+    # under the caller's RLS scope.
+    docs: dict[uuid.UUID, Document] = {
+        d.id: d
+        for d in (
+            await session.execute(
+                select(Document).where(Document.id.in_({r.document_id for r in rows.values()}))
+            )
+        ).scalars()
+    }
     hits: list[Hit] = []
     per_doc: dict[uuid.UUID, int] = {}
     for score, cid, matched in scored:
         row = rows.get(cid)
         if row is None:
             continue
-        doc = docs.get(row.document_id) or await session.get(Document, row.document_id)
+        doc = docs.get(row.document_id)
         if doc is None:
             continue
-        docs[doc.id] = doc
         # Second, independent check (the policy engine), on top of RLS.
         if not visible(principal, doc):
             continue

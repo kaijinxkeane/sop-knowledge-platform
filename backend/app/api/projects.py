@@ -30,7 +30,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import audit
+from app import audit, clock
 from app.api.deps import CurrentUser, current_user, get_db
 from app.api.reviews import owner_space
 from app.db.models import Document, Project, ProjectMember, ProjectShare, Space, User
@@ -116,7 +116,7 @@ def _my_role(me: CurrentUser, p: Project) -> str | None:
 
 
 async def _out(s: AsyncSession, me: CurrentUser, p: Project) -> ProjectOut:
-    today = date.today()
+    today = clock.today()
     names = await _names(s, [p.lead_id, *(m.user_id for m in p.members)])
     return ProjectOut(
         id=str(p.id),
@@ -166,7 +166,7 @@ async def _lead_only(s: AsyncSession, me: CurrentUser, project_id: uuid.UUID) ->
 
 
 def _end_date(ends_on: date) -> date:
-    today = date.today()
+    today = clock.today()
     limit = today + timedelta(days=vault_config().project_max_days)
     if not today < ends_on <= limit:
         raise HTTPException(
@@ -250,7 +250,7 @@ async def create_project(
         folder=f"{vault_config().project_folder}/{slug}",
         lead_id=lead,
         created_by=me.user.id,
-        starts_on=date.today(),
+        starts_on=clock.today(),
         ends_on=ends_on,
         members=[],
         shares=[],
@@ -343,7 +343,7 @@ async def add_members(
     session: AsyncSession = Depends(get_db),
 ) -> ProjectOut:
     p = await _lead_only(session, me, project_id)
-    if not p.active(date.today()):
+    if not p.active(clock.today()):
         raise HTTPException(status.HTTP_409_CONFLICT, "the project has ended; renew it first")
     have = {m.user_id for m in p.members}
     new = [u for u in await _active_users(session, body.user_ids) if u not in have]
@@ -393,7 +393,7 @@ async def request_share(
     session: AsyncSession = Depends(get_db),
 ) -> ProjectOut:
     p = await _lead_only(session, me, project_id)
-    if not p.active(date.today()):
+    if not p.active(clock.today()):
         raise HTTPException(status.HTTP_409_CONFLICT, "the project has ended; renew it first")
     sh = await _request_share(session, me, p, body.space, body.note)
     await audit.record(
